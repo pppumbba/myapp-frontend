@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../../lib/metaApi';
 import { AppShell } from '../../components/AppShell';
-import { ArrowLeft, Edit01, Trash01 } from '@untitledui/icons';
+import { ArrowLeft, Edit01, PlayCircle, Trash01 } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { BadgeWithDot } from '@/components/base/badges/badges';
@@ -100,6 +100,11 @@ export default function MetaDetailPage() {
                   <Button color="secondary" iconLeading={Edit01} onPress={() => setEditing(true)}>
                     Edit
                   </Button>
+                  {meta.type?.code && (
+                    <Button iconLeading={PlayCircle} onPress={() => navigate(`/run/${meta.id}`)}>
+                      Open
+                    </Button>
+                  )}
                 </div>
               </div>
               {meta.description && <p className="max-w-prose text-md text-tertiary">{meta.description}</p>}

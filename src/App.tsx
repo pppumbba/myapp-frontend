@@ -3,6 +3,7 @@ import { GuestRoute, ProtectedRoute } from './auth/routes';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import RunPage from './pages/RunPage';
 import MetaDetailPage from './pages/metas/MetaDetailPage';
 import MetasPage from './pages/metas/MetasPage';
 
@@ -14,6 +15,7 @@ export default function App() {
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/metas" element={<ProtectedRoute><MetasPage /></ProtectedRoute>} />
       <Route path="/metas/:id" element={<ProtectedRoute><MetaDetailPage /></ProtectedRoute>} />
+      <Route path="/run/:id" element={<ProtectedRoute><RunPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

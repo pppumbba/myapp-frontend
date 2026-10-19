@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../lib/metaApi';
 import { AppShell } from '../components/AppShell';
-import { Plus } from '@untitledui/icons';
+import { ArrowRight, Plus } from '@untitledui/icons';
 import { Button } from '@/components/base/buttons/button';
 import { TypePreview, typeLook } from '../components/TypePreview';
 import { MetaCard } from './metas/MetaCard';
@@ -18,6 +18,7 @@ function greeting(): string {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [metas, setMetas] = useState<Meta[]>([]);
   const [types, setTypes] = useState<MetaType[]>([]);
   const [options, setOptions] = useState<MetaOption[]>([]);
@@ -63,6 +64,31 @@ export default function Dashboard() {
           </p>
         </div>
       </section>
+
+      {apps.length > 0 && (
+        <section className="mb-10" aria-labelledby="apps-heading">
+          <h2 id="apps-heading" className="text-lg font-semibold text-primary">
+            Your apps
+          </h2>
+          <p className="mt-1 mb-5 text-sm text-tertiary">Open an app to use it the way its users will.</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {apps.map((a) => (
+              <div key={a.id} className="flex items-center gap-4 rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary ring-inset">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-solid text-md font-semibold text-white" aria-hidden="true">
+                  {(a.label_name || a.name).charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-md font-semibold text-primary">{a.label_name || a.name}</p>
+                  {a.description && <p className="truncate text-sm text-tertiary">{a.description}</p>}
+                </div>
+                <Button color="secondary" size="sm" iconTrailing={ArrowRight} onPress={() => navigate(`/run/${a.id}`)}>
+                  Open
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-10" aria-labelledby="start-heading">
         <h2 id="start-heading" className="text-lg font-semibold text-primary">
