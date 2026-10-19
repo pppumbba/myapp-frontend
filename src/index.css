@@ -1,0 +1,25 @@
+@import "./styles/globals.css";
+
+/*
+ * Slate & Indigo light theme.
+ * Untitled UI builds every gray token (text-primary, border-secondary, bg-secondary...) from the
+ * neutral scale and every brand token from brand-*. Pointing neutral at slate makes the whole
+ * kit slate; brand is already indigo from `untitledui init --color indigo`.
+ */
+@theme {
+  --color-neutral-50: var(--color-slate-50);
+  --color-neutral-100: var(--color-slate-100);
+  --color-neutral-200: var(--color-slate-200);
+  --color-neutral-300: var(--color-slate-300);
+  --color-neutral-400: var(--color-slate-400);
+  --color-neutral-500: var(--color-slate-500);
+  --color-neutral-600: var(--color-slate-600);
+  --color-neutral-700: var(--color-slate-700);
+  --color-neutral-800: var(--color-slate-800);
+  --color-neutral-900: var(--color-slate-900);
+  --color-neutral-950: var(--color-slate-950);
+}
+
+body {
+  @apply bg-secondary text-primary;
+}

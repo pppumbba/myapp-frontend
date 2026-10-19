@@ -1,0 +1,124 @@
+/**
+ * Each meta type gets its own colour and a tiny drawing of what that screen looks like,
+ * so a datagrid card reads differently from a form card at a glance.
+ */
+export interface TypeLook {
+  ink: string;
+  tint: string;
+  /** What one row of a meta of this type is called. */
+  rowNoun: string;
+}
+
+const looks: Record<string, TypeLook> = {
+  app: { ink: '#4F46E5', tint: '#EEF2FF', rowNoun: 'menu item' },
+  datagrid: { ink: '#0D9488', tint: '#F0FDFA', rowNoun: 'column' },
+  form: { ink: '#7C3AED', tint: '#F5F3FF', rowNoun: 'field' },
+  calendar: { ink: '#D97706', tint: '#FFFBEB', rowNoun: 'event field' },
+  tabs: { ink: '#DB2777', tint: '#FDF2F8', rowNoun: 'tab' },
+};
+
+const fallback: TypeLook = { ink: '#64748B', tint: '#F1F5F9', rowNoun: 'row' };
+
+export function typeLook(code?: string | null): TypeLook {
+  return (code && looks[code]) || fallback;
+}
+
+export function TypePreview({ code, className = '' }: { code?: string | null; className?: string }) {
+  const { ink } = typeLook(code);
+  return (
+    <svg viewBox="0 0 120 72" className={className} aria-hidden="true" style={{ color: ink }}>
+      <Drawing code={code} />
+    </svg>
+  );
+}
+
+function Drawing({ code }: { code?: string | null }) {
+  const soft = { fill: 'currentColor', opacity: 0.18 };
+  const mid = { fill: 'currentColor', opacity: 0.4 };
+  const strong = { fill: 'currentColor', opacity: 0.85 };
+
+  switch (code) {
+    case 'app':
+      // Sidebar menu, header, content blocks.
+      return (
+        <>
+          <rect x="6" y="6" width="28" height="60" rx="5" {...soft} />
+          <rect x="11" y="13" width="18" height="4" rx="2" {...strong} />
+          <rect x="11" y="23" width="14" height="3" rx="1.5" {...mid} />
+          <rect x="11" y="31" width="16" height="3" rx="1.5" {...mid} />
+          <rect x="11" y="39" width="12" height="3" rx="1.5" {...mid} />
+          <rect x="40" y="6" width="74" height="10" rx="4" {...soft} />
+          <rect x="40" y="22" width="35" height="20" rx="4" {...mid} />
+          <rect x="79" y="22" width="35" height="20" rx="4" {...soft} />
+          <rect x="40" y="46" width="74" height="20" rx="4" {...soft} />
+        </>
+      );
+    case 'datagrid':
+      return (
+        <>
+          <rect x="6" y="8" width="108" height="10" rx="3" {...mid} />
+          {[24, 36, 48, 60].map((y) => (
+            <g key={y}>
+              <rect x="6" y={y} width="30" height="6" rx="2" {...soft} />
+              <rect x="42" y={y} width="40" height="6" rx="2" {...soft} />
+              <rect x="88" y={y} width="26" height="6" rx="2" {...(y === 36 ? strong : soft)} />
+            </g>
+          ))}
+        </>
+      );
+    case 'form':
+      return (
+        <>
+          {[8, 26].map((y) => (
+            <g key={y}>
+              <rect x="10" y={y} width="26" height="3" rx="1.5" {...mid} />
+              <rect x="10" y={y + 6} width="100" height="9" rx="3" {...soft} />
+            </g>
+          ))}
+          <rect x="10" y="44" width="40" height="3" rx="1.5" {...mid} />
+          <rect x="10" y="50" width="48" height="9" rx="3" {...soft} />
+          <rect x="80" y="52" width="30" height="12" rx="4" {...strong} />
+        </>
+      );
+    case 'calendar':
+      return (
+        <>
+          <rect x="8" y="6" width="104" height="9" rx="3" {...mid} />
+          {Array.from({ length: 28 }, (_, i) => {
+            const col = i % 7;
+            const row = Math.floor(i / 7);
+            return (
+              <rect
+                key={i}
+                x={8 + col * 15}
+                y={20 + row * 12.5}
+                width="13"
+                height="10"
+                rx="2"
+                {...(i === 10 ? strong : soft)}
+              />
+            );
+          })}
+        </>
+      );
+    case 'tabs':
+      return (
+        <>
+          <rect x="8" y="8" width="30" height="11" rx="4" {...strong} />
+          <rect x="42" y="8" width="30" height="11" rx="4" {...soft} />
+          <rect x="76" y="8" width="30" height="11" rx="4" {...soft} />
+          <rect x="8" y="23" width="104" height="43" rx="5" {...soft} />
+          <rect x="16" y="32" width="50" height="4" rx="2" {...mid} />
+          <rect x="16" y="41" width="70" height="4" rx="2" {...mid} />
+        </>
+      );
+    default:
+      return (
+        <>
+          <rect x="10" y="10" width="100" height="14" rx="4" {...mid} />
+          <rect x="10" y="30" width="48" height="32" rx="4" {...soft} />
+          <rect x="62" y="30" width="48" height="32" rx="4" {...soft} />
+        </>
+      );
+  }
+}
