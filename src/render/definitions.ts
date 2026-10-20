@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ApiError } from '../lib/api';
 import { dataApi, onDataWrite, type DataRow } from '../lib/dataApi';
-import { metaApi, type Meta, type MetaParam } from '../lib/metaApi';
+import { metaApi, type Meta, type MetaAction, type MetaParam } from '../lib/metaApi';
+import { workflowApi, type WorkflowDef } from '../lib/workflowApi';
 
 export interface MetaDef {
   meta: Meta;
@@ -16,10 +17,14 @@ export interface MetaDef {
  */
 const defs = new Map<number, Promise<MetaDef>>();
 const lookups = new Map<number, Promise<DataRow[]>>();
+const actionLists = new Map<number, Promise<MetaAction[]>>();
+const workflows = new Map<number, Promise<WorkflowDef>>();
 onDataWrite(() => lookups.clear());
 
 export function clearRenderCache() {
   defs.clear();
+  actionLists.clear();
+  workflows.clear();
   lookups.clear();
 }
 
@@ -57,6 +62,26 @@ export function useMetaDef(id: number | null | undefined) {
   return state;
 }
 
+/** Loads several metas at once, e.g. the line forms of a form's details. */
+export function useMetaDefs(ids: number[]) {
+  const key = ids.join(',');
+  const [state, setState] = useState<{ defs: MetaDef[] | null; error: string | null }>({ defs: null, error: null });
+
+  useEffect(() => {
+    let live = true;
+    setState({ defs: null, error: null });
+    Promise.all(key ? key.split(',').map((id) => loadDef(Number(id))) : []).then(
+      (defs) => live && setState({ defs, error: null }),
+      (err) => live && setState({ defs: null, error: errorText(err, 'Part of this screen could not be loaded.') }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [key]);
+
+  return state;
+}
+
 /** The text shown for a looked-up record: json_config.label_field, else its first text value. */
 export function rowLabel(row: DataRow, labelField?: unknown): string {
   if (typeof labelField === 'string' && row[labelField] != null) return String(row[labelField]);
@@ -67,6 +92,8 @@ export function rowLabel(row: DataRow, labelField?: unknown): string {
 export interface LookupOption {
   value: string;
   label: string;
+  /** The looked-up record, for copying its values (json_config.fill). */
+  row: DataRow;
 }
 
 /** Choices for a lookup param: up to 100 records from the meta it refers to. */
@@ -85,7 +112,7 @@ export function useLookup(param: MetaParam | undefined) {
       lookups.set(refId, p);
     }
     p.then(
-      (rows) => live && setOptions(rows.map((r) => ({ value: String(r.id), label: rowLabel(r, labelField) }))),
+      (rows) => live && setOptions(rows.map((r) => ({ value: String(r.id), label: rowLabel(r, labelField), row: r }))),
       () => live && setOptions([]),
     );
     return () => {
@@ -96,9 +123,27 @@ export function useLookup(param: MetaParam | undefined) {
   return options;
 }
 
-/** Params that render as fields or columns: visible, not the primary key, top level only. */
+/** A param's fixed list of values (json_config.options) as choices, or null when it has none. */
+export function optionsOf(param: MetaParam): { id: string; label: string }[] | null {
+  const options = param.json_config?.options;
+  if (!Array.isArray(options)) return null;
+  return options.map(String).map((o) => ({ id: o, label: o.charAt(0).toUpperCase() + o.slice(1) }));
+}
+
+/** The values json_config.fill copies from a picked lookup record ({ field: record's field }). */
+export function filledFrom(param: MetaParam, row: DataRow | undefined): Record<string, string> {
+  const fill = (param.json_config?.fill ?? {}) as Record<string, string>;
+  return Object.fromEntries(Object.entries(fill).flatMap(([to, from]) => (row?.[from] != null ? [[to, String(row[from])]] : [])));
+}
+
+/** Params that render as fields or columns: visible, not the primary key, not a detail or subgrid, top level only. */
 export function visibleParams(params: MetaParam[]): MetaParam[] {
-  return params.filter((p) => p.is_show && !p.is_primary);
+  return params.filter((p) => p.is_show && !p.is_primary && p.data_type !== 'detail' && p.data_type !== 'subgrid');
+}
+
+/** A form's detail params: line items edited under the form, each described by the form in ref_meta_id. */
+export function detailParams(params: MetaParam[]): (MetaParam & { ref_meta_id: number })[] {
+  return params.filter((p): p is MetaParam & { ref_meta_id: number } => p.is_show && p.data_type === 'detail' && !!p.ref_meta_id);
 }
 
 export function primaryKey(params: MetaParam[]): string {
@@ -107,4 +152,66 @@ export function primaryKey(params: MetaParam[]): string {
 
 export function title(meta: Meta): string {
   return meta.label_name || meta.name;
+}
+
+/** A grid's subgrids: grids shown under it for the picked row (json_config.params: their parameter <- this grid's field). */
+export function subgridParams(params: MetaParam[]): (MetaParam & { ref_meta_id: number })[] {
+  return params.filter((p): p is MetaParam & { ref_meta_id: number } => p.is_show && p.data_type === 'subgrid' && !!p.ref_meta_id);
+}
+
+/** A grid's toolbar buttons, in order (cached like definitions). */
+export function useActions(gridId: number) {
+  const [actions, setActions] = useState<MetaAction[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    let p = actionLists.get(gridId);
+    if (!p) {
+      p = metaApi.actions(gridId);
+      p.catch(() => actionLists.delete(gridId));
+      actionLists.set(gridId, p);
+    }
+    p.then(
+      (list) => live && setActions(list),
+      () => live && setActions([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [gridId]);
+
+  return actions;
+}
+
+/**
+ * The workflow running a grid's records: its ref_meta_id, when that meta is a workflow.
+ * null while loading or when there is none.
+ */
+export function useGridWorkflow(meta: Meta) {
+  const { def: ref } = useMetaDef(meta.ref_meta_id);
+  const workflowId = ref?.meta.type?.code === 'workflow' ? ref.meta.id : null;
+  const [workflow, setWorkflow] = useState<WorkflowDef | null>(null);
+
+  useEffect(() => {
+    if (!workflowId) {
+      setWorkflow(null);
+      return;
+    }
+    let live = true;
+    let p = workflows.get(workflowId);
+    if (!p) {
+      p = workflowApi.get(workflowId);
+      p.catch(() => workflows.delete(workflowId));
+      workflows.set(workflowId, p);
+    }
+    p.then(
+      (w) => live && setWorkflow(w),
+      () => live && setWorkflow(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [workflowId]);
+
+  return workflowId && workflow ? { id: workflowId, ...workflow } : null;
 }

@@ -10,7 +10,10 @@ import { BadgeWithDot } from '@/components/base/badges/badges';
 import { ConfirmDialog } from '../../components/Modal';
 import { TypePreview, typeLook } from '../../components/TypePreview';
 import { MetaFormModal } from './MetaFormModal';
+import { MetaActionsPanel } from './MetaActionsPanel';
 import { MetaParamsPanel } from './MetaParamsPanel';
+import { MetaPermissionsPanel, StatusPermissionsPanel } from './PermissionsPanel';
+import { WorkflowDesigner } from './WorkflowDesigner';
 
 export default function MetaDetailPage() {
   const { id } = useParams();
@@ -132,7 +135,19 @@ export default function MetaDetailPage() {
             </div>
           </header>
 
-          <MetaParamsPanel key={meta.id} meta={meta} options={options} />
+          {meta.type?.code === 'datagrid' && <MetaActionsPanel key={`actions-${meta.id}`} meta={meta} options={options} />}
+
+          {meta.type?.code === 'workflow' ? (
+            <>
+              <StatusPermissionsPanel key={`status-permissions-${meta.id}`} meta={meta} />
+              <WorkflowDesigner key={`workflow-${meta.id}`} meta={meta} options={options} />
+            </>
+          ) : (
+            <>
+              <MetaPermissionsPanel key={`permissions-${meta.id}`} meta={meta} />
+              <MetaParamsPanel key={meta.id} meta={meta} options={options} />
+            </>
+          )}
 
           {editing && (
             <MetaFormModal

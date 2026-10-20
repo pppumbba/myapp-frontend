@@ -87,4 +87,37 @@ export const metaApi = {
   updateParam: (paramId: number, input: MetaParamInput) =>
     api<MetaParam>(`/params/${paramId}`, { method: 'PUT', body: JSON.stringify(input) }),
   removeParam: (paramId: number) => api<null>(`/params/${paramId}`, { method: 'DELETE' }),
+
+  actions: (gridId: number) => api<MetaAction[]>(`/metas/${gridId}/actions`),
+  createAction: (gridId: number, input: MetaActionInput) =>
+    api<MetaAction>(`/metas/${gridId}/actions`, { method: 'POST', body: JSON.stringify(input) }),
+  updateAction: (actionId: number, input: MetaActionInput) =>
+    api<MetaAction>(`/actions/${actionId}`, { method: 'PUT', body: JSON.stringify(input) }),
+  removeAction: (actionId: number) => api<null>(`/actions/${actionId}`, { method: 'DELETE' }),
 };
+
+export type ActionKind = 'add' | 'edit' | 'delete' | 'custom';
+
+/**
+ * One toolbar button of a datagrid (backend: meta_actions). form_meta_id is the form it
+ * opens (for delete, the form whose table loses the row); get_meta_id decides the values
+ * that form opens with. json_config.params maps the get's named parameters to fields of
+ * the selected row.
+ */
+export interface MetaAction {
+  id: number;
+  grid_meta_id: number;
+  action: ActionKind;
+  label: string;
+  icon_cls: string | null;
+  form_meta_id: number | null;
+  get_meta_id: number | null;
+  needs_row: boolean;
+  show_in_row: boolean;
+  order_number: number;
+  json_config: { params?: Record<string, string> } | null;
+  form?: MetaRef | null;
+  get?: MetaRef | null;
+}
+
+export type MetaActionInput = Partial<Omit<MetaAction, 'id' | 'grid_meta_id' | 'form' | 'get'>>;

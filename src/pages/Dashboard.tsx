@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../lib/metaApi';
 import { AppShell } from '../components/AppShell';
-import { ArrowRight, Plus } from '@untitledui/icons';
+import { AppTile } from '../components/AppTile';
+import { Plus } from '@untitledui/icons';
 import { Button } from '@/components/base/buttons/button';
 import { TypePreview, typeLook } from '../components/TypePreview';
 import { MetaCard } from './metas/MetaCard';
@@ -17,8 +18,7 @@ function greeting(): string {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const [metas, setMetas] = useState<Meta[]>([]);
   const [types, setTypes] = useState<MetaType[]>([]);
   const [options, setOptions] = useState<MetaOption[]>([]);
@@ -49,15 +49,15 @@ export default function Dashboard() {
 
   return (
     <AppShell>
-      <section className="relative mb-10 overflow-hidden rounded-2xl bg-brand-section px-6 py-10 text-white sm:px-10 sm:py-12">
-        <div className="absolute -top-24 -right-16 size-72 rounded-full bg-brand-500/40 blur-2xl" aria-hidden="true" />
-        <div className="absolute -bottom-28 right-40 size-56 rounded-full bg-brand-400/25 blur-2xl" aria-hidden="true" />
+      <section className="relative mb-6 overflow-hidden rounded-xl bg-brand-section px-5 py-6 text-white sm:px-7 sm:py-7">
+        <div className="absolute -top-24 -right-16 size-64 rounded-full bg-brand-500/40 blur-2xl" aria-hidden="true" />
+        <div className="absolute -bottom-28 right-40 size-48 rounded-full bg-brand-400/25 blur-2xl" aria-hidden="true" />
         <div className="relative max-w-xl">
-          <h1 className="text-display-sm font-semibold sm:text-display-md">
+          <h1 className="text-display-xs font-semibold">
             {greeting()}
             {firstName ? `, ${firstName}` : ''}
           </h1>
-          <p className="mt-3 text-lg text-brand-200">
+          <p className="mt-1.5 text-md text-brand-200">
             {loaded && metas.length > 0
               ? `You have ${apps.length} app${apps.length === 1 ? '' : 's'} and ${metas.length} metas in total.`
               : 'Pick a building block below to start your first app.'}
@@ -66,36 +66,33 @@ export default function Dashboard() {
       </section>
 
       {apps.length > 0 && (
-        <section className="mb-10" aria-labelledby="apps-heading">
-          <h2 id="apps-heading" className="text-lg font-semibold text-primary">
-            Your apps
-          </h2>
-          <p className="mt-1 mb-5 text-sm text-tertiary">Open an app to use it the way its users will.</p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {apps.map((a) => (
-              <div key={a.id} className="flex items-center gap-4 rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary ring-inset">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-solid text-md font-semibold text-white" aria-hidden="true">
-                  {(a.label_name || a.name).charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-md font-semibold text-primary">{a.label_name || a.name}</p>
-                  {a.description && <p className="truncate text-sm text-tertiary">{a.description}</p>}
-                </div>
-                <Button color="secondary" size="sm" iconTrailing={ArrowRight} onPress={() => navigate(`/run/${a.id}`)}>
-                  Open
-                </Button>
-              </div>
+        <section className="mb-7" aria-labelledby="apps-heading">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 id="apps-heading" className="text-md font-semibold text-primary">
+                Your apps
+              </h2>
+              <p className="text-sm text-tertiary">Open an app to use it the way its users will.</p>
+            </div>
+            <Link to="/apps" className="shrink-0 text-sm font-semibold text-brand-secondary hover:text-brand-secondary_hover">
+              See all apps
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {apps.slice(0, 6).map((a, i) => (
+              <AppTile key={a.id} app={a} index={i} />
             ))}
           </div>
         </section>
       )}
 
-      <section className="mb-10" aria-labelledby="start-heading">
-        <h2 id="start-heading" className="text-lg font-semibold text-primary">
+      {isAdmin && (
+      <section className="mb-7" aria-labelledby="start-heading">
+        <h2 id="start-heading" className="text-md font-semibold text-primary">
           Create something new
         </h2>
-        <p className="mt-1 mb-5 text-sm text-tertiary">Each one becomes a screen you can link from an app’s menu.</p>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <p className="mb-3 text-sm text-tertiary">Each one becomes a screen you can link from an app’s menu.</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {(types.length ? types : []).map((t) => {
             const look = typeLook(t.code);
             return (
@@ -103,13 +100,13 @@ export default function Dashboard() {
                 key={t.id}
                 type="button"
                 onClick={() => setCreatingType(t.id)}
-                className="rounded-xl bg-primary p-3 text-left shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset outline-focus-ring hover:shadow-md hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="rounded-xl bg-primary p-2.5 text-left shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset outline-focus-ring hover:shadow-md hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2"
               >
-                <div className="rounded-lg p-2.5" style={{ background: look.tint }}>
-                  <TypePreview code={t.code} className="h-14 w-full" />
+                <div className="rounded-lg p-2" style={{ background: look.tint }}>
+                  <TypePreview code={t.code} className="h-11 w-full" />
                 </div>
-                <span className="mt-3 block px-1 text-sm font-semibold text-primary">{t.name}</span>
-                {t.description && <span className="mt-0.5 block px-1 text-xs text-tertiary line-clamp-2">{t.description}</span>}
+                <span className="mt-2 block px-0.5 text-sm font-semibold text-primary">{t.name}</span>
+                {t.description && <span className="mt-0.5 block px-0.5 text-xs text-tertiary line-clamp-2">{t.description}</span>}
               </button>
             );
           })}
@@ -121,17 +118,19 @@ export default function Dashboard() {
         )}
       </section>
 
-      {recent.length > 0 && (
+      )}
+
+      {isAdmin && recent.length > 0 && (
         <section aria-labelledby="recent-heading">
-          <div className="mb-5 flex items-end justify-between">
-            <h2 id="recent-heading" className="text-lg font-semibold text-primary">
+          <div className="mb-3 flex items-end justify-between">
+            <h2 id="recent-heading" className="text-md font-semibold text-primary">
               Recently added
             </h2>
             <Link to="/metas" className="text-sm font-semibold text-brand-secondary hover:text-brand-secondary_hover">
               See all metas
             </Link>
           </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
             {recent.map((m) => (
               <MetaCard key={m.id} meta={m} />
             ))}
@@ -139,7 +138,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {loaded && metas.length === 0 && types.length > 0 && (
+      {isAdmin && loaded && metas.length === 0 && types.length > 0 && (
         <div className="text-center">
           <Button size="lg" iconLeading={Plus} onPress={() => setCreatingType(types.find((t) => t.code === 'app')?.id ?? null)}>
             Create your first app

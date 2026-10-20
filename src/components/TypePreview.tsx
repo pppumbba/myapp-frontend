@@ -14,7 +14,10 @@ const looks: Record<string, TypeLook> = {
   datagrid: { ink: '#0D9488', tint: '#F0FDFA', rowNoun: 'column' },
   form: { ink: '#7C3AED', tint: '#F5F3FF', rowNoun: 'field' },
   calendar: { ink: '#D97706', tint: '#FFFBEB', rowNoun: 'event field' },
+  gantt: { ink: '#0284C7', tint: '#F0F9FF', rowNoun: 'task field' },
   tabs: { ink: '#DB2777', tint: '#FDF2F8', rowNoun: 'tab' },
+  get: { ink: '#059669', tint: '#ECFDF5', rowNoun: 'parameter' },
+  workflow: { ink: '#EA580C', tint: '#FFF7ED', rowNoun: 'status' },
 };
 
 const fallback: TypeLook = { ink: '#64748B', tint: '#F1F5F9', rowNoun: 'row' };
@@ -99,6 +102,50 @@ function Drawing({ code }: { code?: string | null }) {
               />
             );
           })}
+        </>
+      );
+    case 'gantt':
+      // Task labels on the left, staggered bars on a timeline.
+      return (
+        <>
+          {[
+            [10, 30, 34],
+            [24, 50, 40],
+            [38, 64, 30],
+            [52, 82, 30],
+          ].map(([y, x, w], i) => (
+            <g key={y}>
+              <rect x="6" y={y} width="20" height="6" rx="2" {...soft} />
+              <rect x={x} y={y - 1} width={w} height="8" rx="3" {...(i === 1 ? strong : mid)} />
+            </g>
+          ))}
+          <rect x="30" y="6" width="1" height="60" {...soft} />
+        </>
+      );
+    case 'workflow':
+      // Status boxes joined by arrows, one branching off.
+      return (
+        <>
+          <circle cx="12" cy="24" r="5" {...strong} />
+          <rect x="24" y="18" width="24" height="12" rx="3" {...mid} />
+          <rect x="60" y="18" width="24" height="12" rx="3" {...strong} />
+          <rect x="96" y="18" width="18" height="12" rx="3" {...mid} />
+          <rect x="60" y="46" width="24" height="12" rx="3" {...soft} />
+          <path d="M17 24h6M48 24h11M84 24h11M72 30v15" stroke="currentColor" strokeWidth="2" opacity="0.6" fill="none" />
+        </>
+      );
+    case 'get':
+      // A query on the left pouring values into form fields on the right.
+      return (
+        <>
+          <rect x="8" y="10" width="44" height="52" rx="5" {...soft} />
+          {[18, 28, 38, 48].map((y, i) => (
+            <rect key={y} x="14" y={y} width={[30, 22, 26, 18][i]} height="4" rx="2" {...mid} />
+          ))}
+          <path d="M58 36h12m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+          {[16, 32, 48].map((y) => (
+            <rect key={y} x="76" y={y} width="36" height="9" rx="3" {...(y === 32 ? strong : soft)} />
+          ))}
         </>
       );
     case 'tabs':

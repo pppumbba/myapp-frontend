@@ -51,8 +51,9 @@ export default function MetasPage() {
     setError(null);
     try {
       const [m, t, o] = await Promise.all([metaApi.list(), metaApi.types(), metaApi.options()]);
-      setMetas(m);
-      setTypes(t);
+      // Apps have their own page; this one is for the screens they link to.
+      setMetas(m.filter((x) => x.type?.code !== 'app'));
+      setTypes(t.filter((x) => x.code !== 'app'));
       setOptions(o);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Metas could not be loaded. Check that the API is running at the address in .env.');
@@ -104,9 +105,9 @@ export default function MetasPage() {
     <AppShell>
       <PageHeader
         title="Metas"
-        subtitle="Every app, grid, form, calendar and tab set you've built. Open one to edit its menus, columns or fields."
+        subtitle="The grids, forms, calendars, Gantt charts and tab sets your apps link to. Open one to edit its columns or fields."
         actions={
-          <Button size="md" iconLeading={Plus} onPress={() => setEditing(null)}>
+          <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
             New meta
           </Button>
         }
@@ -119,7 +120,7 @@ export default function MetasPage() {
       )}
 
       {/* Toolbar: search, type filters, view toggle */}
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by type">
           <FilterChip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')} count={metas.length}>
             All
@@ -182,7 +183,7 @@ export default function MetasPage() {
           </Button>
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-4">
           {visible.map((m) => (
             <MetaCard key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} />
           ))}
@@ -241,7 +242,7 @@ function FilterChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold shadow-xs ring-1 ring-inset transition duration-100 ease-linear ${
+      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold shadow-xs ring-1 ring-inset transition duration-100 ease-linear ${
         active ? 'bg-active text-secondary_hover ring-primary' : 'bg-primary text-secondary ring-primary hover:bg-primary_hover hover:text-secondary_hover'
       }`}
     >
@@ -255,7 +256,7 @@ function FilterChip({
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5" aria-label="Loading metas">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-4" aria-label="Loading metas">
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="h-60 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
       ))}

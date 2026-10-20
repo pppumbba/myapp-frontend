@@ -1,7 +1,9 @@
 import type { MetaParam } from '../lib/metaApi';
 import { Alert } from '../components/ui';
 import { Tab, TabList, TabPanel, Tabs } from '@/components/application/tabs/tabs';
+import { CalendarView } from './CalendarView';
 import { FormView } from './FormView';
+import { GanttView } from './GanttView';
 import { GridView } from './GridView';
 import { useMetaDef, type MetaDef } from './definitions';
 
@@ -21,6 +23,10 @@ export function MetaView({ metaId, depth = 0 }: { metaId: number; depth?: number
       return <GridView def={def} />;
     case 'form':
       return <FormView metaId={def.meta.id} />;
+    case 'calendar':
+      return <CalendarView def={def} />;
+    case 'gantt':
+      return <GanttView def={def} />;
     case 'tabs':
       return <TabsView def={def} depth={depth} />;
     case 'app':

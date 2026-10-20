@@ -20,9 +20,9 @@ export function Modal({
   description?: string;
   onClose: () => void;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }) {
-  const width = { sm: 'sm:max-w-100', md: 'sm:max-w-2xl', lg: 'sm:max-w-3xl' }[size];
+  const width = { sm: 'sm:max-w-100', md: 'sm:max-w-2xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' }[size];
 
   return (
     <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()}>

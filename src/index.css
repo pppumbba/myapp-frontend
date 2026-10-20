@@ -23,3 +23,11 @@
 body {
   @apply bg-secondary text-primary;
 }
+
+/*
+ * A slightly denser UI: Tailwind sizes, spacing and Untitled UI's type scale are all in rem,
+ * so a 15px root shrinks text, padding and controls together by about 6%.
+ */
+html {
+  font-size: 15px;
+}

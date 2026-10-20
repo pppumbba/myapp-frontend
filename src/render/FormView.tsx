@@ -5,23 +5,43 @@ import { dataApi, type DataRow } from '../lib/dataApi';
 import type { MetaParam } from '../lib/metaApi';
 import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
+import { ComboField } from '../components/ComboField';
+import { DatePicker } from '../components/DatePicker';
 import { Input } from '@/components/base/input/input';
-import { NativeSelect } from '@/components/base/select/select-native';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
-import { title, useLookup, useMetaDef, visibleParams } from './definitions';
+import { formatNumber } from './Cell';
+import { DetailLines, lineAmount, type Line } from './DetailLines';
+import { detailParams, filledFrom, optionsOf, primaryKey, title, useMetaDef, useMetaDefs, visibleParams, type MetaDef } from './definitions';
+import { LookupField } from './LookupField';
 
 type Values = Record<string, string | boolean>;
 
+let lineSeq = 0;
+const blankLine = (def: MetaDef): Line => ({ ...startValues(visibleParams(def.params), null), _key: `new-${++lineSeq}` });
+
+function startLines(def: MetaDef, rows: unknown): Line[] {
+  if (!Array.isArray(rows)) return [];
+  const key = primaryKey(def.params);
+  return (rows as DataRow[]).map((r) => ({ ...startValues(visibleParams(def.params), r), _key: String(r[key]), _id: String(r[key]) }));
+}
+
 const isTrue = (v: unknown) => v === true || v === 1 || v === '1' || v === 'true';
 
-function startValues(fields: MetaParam[], record: DataRow | null): Values {
+/** A database value as an input expects it: dates as "YYYY-MM-DD", datetimes as "YYYY-MM-DDTHH:mm". */
+function inputValue(f: MetaParam, raw: unknown): string {
+  if (f.data_type === 'date') return String(raw).slice(0, 10);
+  if (f.data_type === 'datetime') return String(raw).replace(' ', 'T').slice(0, 16);
+  return String(raw);
+}
+
+function startValues(fields: MetaParam[], record: DataRow | null, defaults?: DataRow): Values {
   const values: Values = {};
   for (const f of fields) {
-    const raw = record ? record[f.field_path] : f.default_value;
+    const raw = record ? record[f.field_path] : (defaults?.[f.field_path] ?? f.default_value);
     if (f.data_type === 'boolean') values[f.field_path] = isTrue(raw);
     else if (raw === null || raw === undefined) values[f.field_path] = '';
-    else values[f.field_path] = f.data_type === 'date' ? String(raw).slice(0, 10) : String(raw);
+    else values[f.field_path] = inputValue(f, raw);
   }
   return values;
 }
@@ -35,6 +55,7 @@ function toPayload(fields: MetaParam[], values: Values): DataRow {
     else if (v === '') out[f.field_path] = null;
     else if (f.data_type === 'integer') out[f.field_path] = parseInt(v, 10);
     else if (f.data_type === 'decimal') out[f.field_path] = Number(v);
+    else if (f.data_type === 'datetime') out[f.field_path] = `${v.replace('T', ' ')}:00`.slice(0, 19);
     else out[f.field_path] = v;
   }
   return out;
@@ -46,54 +67,100 @@ const wide = (f: MetaParam) => f.render_type === 'textarea' || f.data_type === '
  * A form meta as a working form. With recordId it edits that record, otherwise it adds one.
  * embedded: inside a modal opened from a grid. Otherwise it's a page of its own (e.g. a
  * "New request" menu item) and stays open for the next entry after saving.
+ * defaults: starting values for a new record, e.g. the day picked on a calendar.
+ * fill: a get meta and its named parameters; its first row decides the values the form
+ * opens with (over the record's own values when editing).
+ * Detail params (data_type "detail") add editable line items, saved with the record. A
+ * detail's json_config.amount and total_field make the header total follow the lines.
  */
 export function FormView({
   metaId,
   recordId,
+  defaults,
+  fill,
   embedded,
   onSaved,
   onCancel,
 }: {
   metaId: number;
   recordId?: string | null;
+  defaults?: DataRow;
+  fill?: { metaId: number; params: Record<string, string> };
   embedded?: boolean;
   onSaved?: (row: DataRow) => void;
   onCancel?: () => void;
 }) {
   const { def, error: defError } = useMetaDef(metaId);
   const fields = useMemo(() => (def ? visibleParams(def.params) : []), [def]);
+  const details = useMemo(() => (def ? detailParams(def.params) : []), [def]);
+  const { defs: lineDefs, error: lineDefError } = useMetaDefs(useMemo(() => details.map((d) => d.ref_meta_id), [details]));
 
   const [values, setValues] = useState<Values | null>(null);
+  const [lines, setLines] = useState<Record<string, Line[]>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // A new record starts with one empty line per detail.
+  const freshLines = () => Object.fromEntries(details.map((d, i) => [d.field_path, [blankLine(lineDefs![i])]]));
+
+  // The get meta's values win over the record's own and over defaults.
+  const fillKey = fill ? `${fill.metaId}:${JSON.stringify(fill.params)}` : '';
+
   useEffect(() => {
-    if (!def) return;
-    if (!recordId) {
-      setValues(startValues(fields, null));
-      return;
-    }
+    if (!def || !lineDefs) return;
     let live = true;
-    dataApi.get(def.meta.id, recordId).then(
-      (row) => live && setValues(startValues(fields, row)),
-      (err) => live && setLoadError(err instanceof ApiError ? err.message : 'This record could not be loaded.'),
-    );
+    const filled: Promise<DataRow> = fill ? dataApi.fill(fill.metaId, fill.params) : Promise.resolve({});
+    const fail = (err: unknown) => live && setLoadError(err instanceof ApiError ? err.message : 'This record could not be loaded.');
+
+    if (!recordId) {
+      filled.then((values) => {
+        if (!live) return;
+        setValues(startValues(fields, null, { ...defaults, ...values }));
+        setLines(freshLines());
+      }, fail);
+    } else {
+      Promise.all([dataApi.get(def.meta.id, recordId), filled]).then(([row, values]) => {
+        if (!live) return;
+        setValues(startValues(fields, { ...row, ...values }));
+        setLines(Object.fromEntries(details.map((d, i) => [d.field_path, startLines(lineDefs[i], row[d.field_path])])));
+      }, fail);
+    }
     return () => {
       live = false;
     };
-  }, [def, fields, recordId]);
+  }, [def, fields, details, lineDefs, recordId, fillKey]);
 
-  if (defError || loadError) return <Alert>{defError ?? loadError}</Alert>;
-  if (!def || !values) return <div className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (defError || lineDefError || loadError) return <Alert>{defError ?? lineDefError ?? loadError}</Alert>;
+  if (!def || !lineDefs || !values) return <div className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
 
-  const set = (field: string, value: string | boolean) => {
+  const set = (field: string, value: string | boolean, fill?: Record<string, string>) => {
     setSaved(false);
-    setValues((v) => ({ ...v!, [field]: value }));
+    setValues((v) => ({ ...v!, ...fill, [field]: value }));
   };
   const fe = (field: string) => fieldErrors[field]?.[0];
+
+  // Header fields a detail sums into: field_path -> the current total.
+  const totals = new Map(
+    details.flatMap((d) => {
+      const field = d.json_config?.total_field;
+      if (typeof field !== 'string') return [];
+      return [[field, (lines[d.field_path] ?? []).reduce((sum, l) => sum + (lineAmount(d, l) ?? 0), 0)] as const];
+    }),
+  );
+
+  function payload(): DataRow {
+    const out = toPayload(fields, values!);
+    totals.forEach((sum, field) => (out[field] = Math.round(sum * 100) / 100));
+    details.forEach((d, i) => {
+      const lineFields = visibleParams(lineDefs![i].params);
+      const key = primaryKey(lineDefs![i].params);
+      out[d.field_path] = (lines[d.field_path] ?? []).map((l) => ({ ...(l._id ? { [key]: Number(l._id) } : {}), ...toPayload(lineFields, l) }));
+    });
+    return out;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -102,10 +169,11 @@ export function FormView({
     setError(null);
     setFieldErrors({});
     try {
-      const payload = toPayload(fields, values);
-      const row = recordId ? await dataApi.update(def.meta.id, recordId, payload) : await dataApi.create(def.meta.id, payload);
+      const body = payload();
+      const row = recordId ? await dataApi.update(def.meta.id, recordId, body) : await dataApi.create(def.meta.id, body);
       if (!embedded && !recordId) {
         setValues(startValues(fields, null));
+        setLines(freshLines());
         setSaved(true);
       }
       onSaved?.(row);
@@ -122,7 +190,7 @@ export function FormView({
   }
 
   const form = (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-5">
       {error && <Alert>{error}</Alert>}
       {saved && (
         <div role="status" className="flex gap-3 rounded-xl bg-success-primary p-4 ring-1 ring-success-secondary ring-inset">
@@ -131,11 +199,36 @@ export function FormView({
         </div>
       )}
 
-      <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+      <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
         {fields.map((f) => (
           <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
-            <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={(v) => set(f.field_path, v)} />
+            {totals.has(f.field_path) ? (
+              <Input
+                label={f.label_name || f.param_name}
+                value={formatNumber(totals.get(f.field_path))}
+                isReadOnly
+                hint="Worked out from the lines below."
+                wrapperClassName="bg-secondary shadow-none"
+                inputClassName="font-semibold tabular-nums"
+              />
+            ) : (
+              <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={(v, fill) => set(f.field_path, v, fill)} />
+            )}
           </div>
+        ))}
+        {details.map((d, i) => (
+          <DetailLines
+            key={d.field_path}
+            detail={d}
+            def={lineDefs[i]}
+            lines={lines[d.field_path] ?? []}
+            errors={fieldErrors}
+            onChange={(next) => {
+              setSaved(false);
+              setLines((all) => ({ ...all, [d.field_path]: next }));
+            }}
+            onAdd={() => setLines((all) => ({ ...all, [d.field_path]: [...(all[d.field_path] ?? []), blankLine(lineDefs[i])] }))}
+          />
         ))}
       </div>
 
@@ -156,16 +249,16 @@ export function FormView({
 
   return (
     <div className="max-w-3xl rounded-xl bg-primary shadow-xs ring-1 ring-secondary">
-      <div className="border-b border-secondary px-4 py-5 sm:px-6">
+      <div className="border-b border-secondary px-4 py-4 sm:px-5">
         <h2 className="text-lg font-semibold text-primary">{title(def.meta)}</h2>
         {def.meta.description && <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>}
       </div>
-      <div className="px-4 py-6 sm:px-6">{form}</div>
+      <div className="px-4 py-5 sm:px-5">{form}</div>
     </div>
   );
 }
 
-/** Picks the Untitled UI control for one param. */
+/** Picks the Untitled UI control for one param. Picking a lookup record also returns the values json_config.fill copies from it. */
 function Field({
   param: f,
   value,
@@ -175,30 +268,26 @@ function Field({
   param: MetaParam;
   value: string | boolean;
   error?: string;
-  onChange: (value: string | boolean) => void;
+  onChange: (value: string | boolean, fill?: Record<string, string>) => void;
 }) {
-  const lookup = useLookup(f);
   const label = f.label_name || f.param_name;
-  const options = Array.isArray(f.json_config?.options) ? (f.json_config.options as unknown[]).map(String) : null;
+  const options = optionsOf(f);
   const common = { label, isRequired: f.is_required, isInvalid: !!error, hint: error };
 
   if (f.data_type === 'boolean') {
     return <Toggle label={label} hint={error} isSelected={value === true} onChange={onChange} />;
   }
 
-  if (lookup || options) {
-    const choices = lookup ?? options!.map((o) => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }));
-    return (
-      <NativeSelect
-        label={label}
-        required={f.is_required}
-        value={String(value)}
-        onChange={(e) => onChange(e.target.value)}
-        hint={error}
-        selectClassName={error ? 'ring-error' : undefined}
-        options={[{ label: lookup && !lookup.length ? 'Loading…' : 'Choose…', value: '' }, ...choices]}
-      />
-    );
+  if (f.is_select && f.ref_meta_id) {
+    return <LookupField {...common} param={f} value={String(value)} onChange={(v, row) => onChange(v, filledFrom(f, row))} />;
+  }
+
+  if (options) {
+    return <ComboField {...common} items={options} value={String(value)} onChange={onChange} />;
+  }
+
+  if (f.data_type === 'date' || f.data_type === 'datetime') {
+    return <DatePicker {...common} withTime={f.data_type === 'datetime'} value={String(value)} onChange={onChange} />;
   }
 
   if (f.render_type === 'textarea' || f.data_type === 'text') {
@@ -206,11 +295,7 @@ function Field({
   }
 
   const type =
-    f.data_type === 'date'
-      ? 'date'
-      : f.data_type === 'datetime'
-        ? 'datetime-local'
-        : f.data_type === 'integer' || f.data_type === 'decimal'
+    f.data_type === 'integer' || f.data_type === 'decimal'
           ? 'number'
           : f.render_type === 'email'
             ? 'email'

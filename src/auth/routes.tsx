@@ -10,6 +10,15 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Only admins: the builder and user management. Others go home. */
+export function AdminRoute({ children }: { children: ReactNode }) {
+  const { user, isAdmin, loading } = useAuth();
+  if (loading) return <FullPageSpinner />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 /** Signed-in users are sent away from login and register. */
 export function GuestRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();

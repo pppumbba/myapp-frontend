@@ -8,11 +8,12 @@ import { Badge, BadgeWithIcon } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
+import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 
-const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json'];
+const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid'];
 
 /** What "Refers to" means depends on the type of the meta that owns the row. */
 function refHint(ownerType?: string | null): string {
@@ -28,6 +29,13 @@ function refHint(ownerType?: string | null): string {
     default:
       return 'Another meta this row links to. Optional.';
   }
+}
+
+/** An example config for the data type, shown as the placeholder. */
+function configHint(dataType: string): string {
+  if (dataType === 'subgrid') return '{ "params": { "supplier_id": "id" } }   // subgrid parameter <- field of the picked row';
+  if (dataType === 'detail') return '{ "foreign_key": "order_id", "amount": ["quantity", "unit_price"], "total_field": "total" }';
+  return '{ "options": ["draft", "sent"] }   or   { "label_field": "name" }';
 }
 
 function rowLabel(p: MetaParam): string {
@@ -78,8 +86,11 @@ interface ParamForm {
   is_required: boolean;
   is_select: boolean;
   is_criteria: boolean;
+  is_mandatory_criteria: boolean;
   is_primary: boolean;
   default_value: string;
+  /** json_config as text; it must be valid JSON. */
+  json_config: string;
 }
 
 function emptyParam(order: number, parentId: number | null): ParamForm {
@@ -97,8 +108,10 @@ function emptyParam(order: number, parentId: number | null): ParamForm {
     is_required: false,
     is_select: false,
     is_criteria: false,
+    is_mandatory_criteria: false,
     is_primary: false,
     default_value: '',
+    json_config: '',
   };
 }
 
@@ -117,8 +130,10 @@ function toParamForm(p: MetaParam): ParamForm {
     is_required: p.is_required,
     is_select: p.is_select,
     is_criteria: p.is_criteria,
+    is_mandatory_criteria: p.is_mandatory_criteria,
     is_primary: p.is_primary,
     default_value: p.default_value ?? '',
+    json_config: p.json_config ? JSON.stringify(p.json_config, null, 2) : '',
   };
 }
 
@@ -137,8 +152,10 @@ function toParamInput(f: ParamForm): MetaParamInput {
     is_required: f.is_required,
     is_select: f.is_select,
     is_criteria: f.is_criteria,
+    is_mandatory_criteria: f.is_criteria && f.is_mandatory_criteria,
     is_primary: f.is_primary,
     default_value: f.default_value || null,
+    json_config: f.json_config.trim() ? (JSON.parse(f.json_config) as Record<string, unknown>) : null,
   };
 }
 
@@ -195,6 +212,13 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
     e.preventDefault();
     setSaving(true);
     setFieldErrors({});
+    try {
+      if (form.json_config.trim()) JSON.parse(form.json_config);
+    } catch {
+      setFieldErrors({ json_config: ['This is not valid JSON.'] });
+      setSaving(false);
+      return;
+    }
     try {
       const input = toParamInput(form);
       if (editing === 'new') await metaApi.createParam(meta.id, input);
@@ -398,7 +422,25 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                 <Toggle label="Lookup" hint="Picked from a list." isSelected={form.is_select} onChange={(v) => set('is_select', v)} />
                 <Toggle label="Use as filter" hint="Offered as a search filter." isSelected={form.is_criteria} onChange={(v) => set('is_criteria', v)} />
                 <Toggle label="Primary key" hint="Identifies each record." isSelected={form.is_primary} onChange={(v) => set('is_primary', v)} />
+                {form.is_criteria && (
+                  <Toggle
+                    label="Required filter"
+                    hint="No records show until it has a value."
+                    isSelected={form.is_mandatory_criteria}
+                    onChange={(v) => set('is_mandatory_criteria', v)}
+                  />
+                )}
               </div>
+              <TextArea
+                label="Config (JSON)"
+                rows={4}
+                value={form.json_config}
+                onChange={(v) => set('json_config', v)}
+                textAreaClassName="font-mono text-sm"
+                placeholder={configHint(form.data_type)}
+                isInvalid={!!fe('json_config')}
+                hint={fe('json_config') ?? "Optional settings, e.g. options for a list, a lookup's label_field, or a subgrid's params."}
+              />
             </Section>
 
             <div className="flex justify-end gap-3 border-t border-secondary pt-5">

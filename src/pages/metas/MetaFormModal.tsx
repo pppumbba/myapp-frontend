@@ -19,6 +19,7 @@ interface FormState {
   ref_meta_id: string;
   description: string;
   table_name: string;
+  query_string: string;
   is_active: boolean;
 }
 
@@ -31,6 +32,7 @@ function initialState(meta: Meta | null, presetTypeId?: number): FormState {
     ref_meta_id: meta?.ref_meta_id ? String(meta.ref_meta_id) : '',
     description: meta?.description ?? '',
     table_name: meta?.table_name ?? '',
+    query_string: meta?.query_string ?? '',
     is_active: meta?.is_active ?? true,
   };
 }
@@ -44,6 +46,7 @@ function toInput(f: FormState): MetaInput {
     ref_meta_id: f.ref_meta_id ? Number(f.ref_meta_id) : null,
     description: f.description || null,
     table_name: f.table_name || null,
+    query_string: f.query_string.trim() || null,
     is_active: f.is_active,
   };
 }
@@ -196,6 +199,24 @@ export function MetaFormModal({
             hint={fe('description')}
           />
         </Section>
+
+        {['datagrid', 'get', 'calendar', 'gantt'].includes(types.find((t) => String(t.id) === form.type_id)?.code ?? '') && (
+          <Section title="Query">
+            <TextArea
+              label="SQL query"
+              rows={6}
+              value={form.query_string}
+              onChange={(v) => set('query_string', v)}
+              placeholder={'SELECT o.id, o.po_number, s.name AS supplier_name\nFROM orders o JOIN suppliers s ON s.id = o.supplier_id\nWHERE (:status IS NULL OR o.status = :status)'}
+              textAreaClassName="font-mono text-sm"
+              isInvalid={!!fe('query_string')}
+              hint={
+                fe('query_string') ??
+                'Optional. Reads records from this query instead of the table. :name parameters are filled from filters with the same field path (and :user_id, :today); an empty filter is null. Saving still goes through a form with a table.'
+              }
+            />
+          </Section>
+        )}
 
         <Section title="Links">
           <NativeSelect

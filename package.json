@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
     "@react-stately/utils": "^3.12.1",
     "@tailwindcss/typography": "^0.5.20",
     "@untitledui/icons": "^0.0.23",
