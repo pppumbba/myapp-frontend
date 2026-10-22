@@ -17,8 +17,13 @@ const KINDS: { value: ActionKind; label: string; hint: string }[] = [
   { value: 'edit', label: 'Edit', hint: 'Opens the form with the picked row; saving updates it.' },
   { value: 'delete', label: 'Delete', hint: "Removes the picked row from the form's table, after a confirm." },
   { value: 'custom', label: 'Custom', hint: 'Opens the form to add a record, filled from the picked row by the get.' },
+  { value: 'import', label: 'Import', hint: 'Loads an Excel file into a table through an Excel import meta.' },
+  { value: 'stage_query', label: 'Stage query', hint: 'Runs a stage query; the get (or the picked row) fills its parameters first.' },
 ];
-const ICONS = ['', 'plus', 'edit', 'trash', 'copy', 'eye', 'check', 'file'];
+
+/** The kind of meta a button points at: a form, an Excel import or a stage query. */
+const targetOf = (kind: ActionKind) => (kind === 'import' || kind === 'stage_query' ? kind : 'form');
+const ICONS = ['', 'plus', 'edit', 'trash', 'copy', 'eye', 'check', 'file', 'upload'];
 
 interface ActionForm {
   action: ActionKind;
@@ -65,6 +70,8 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
 
   const forms = options.filter((o) => o.type === 'form');
   const gets = options.filter((o) => o.type === 'get');
+  const imports = options.filter((o) => o.type === 'excel_import');
+  const stageQueries = options.filter((o) => o.type === 'stage_query');
 
   async function load() {
     try {
@@ -95,14 +102,17 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
   function setKind(kind: ActionKind) {
     setForm((f) => {
       const usual = KINDS.find((k) => k.value === f.action)?.label;
-      const needsRow = kind !== 'add';
+      const needsRow = kind !== 'add' && kind !== 'import';
       return {
         ...f,
         action: kind,
         label: !f.label || f.label === usual ? KINDS.find((k) => k.value === kind)!.label : f.label,
         needs_row: needsRow,
         show_in_row: kind === 'edit' || kind === 'delete',
-        params: needsRow && !f.params ? '{\n  "id": "id"\n}' : f.params,
+        params: needsRow && !f.params ? '{\n  "id": "id"\n}' : kind === 'import' ? '' : f.params,
+        // A form, an import and a stage query are different kinds of meta.
+        form_meta_id: targetOf(kind) === targetOf(f.action) ? f.form_meta_id : '',
+        get_meta_id: kind === 'import' ? '' : f.get_meta_id,
       };
     });
   }
@@ -158,7 +168,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
   }
 
   return (
-    <section aria-labelledby="toolbar-heading" className="mb-8">
+    <section aria-labelledby="toolbar-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="toolbar-heading" className="text-lg font-semibold text-primary">
@@ -187,7 +197,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-primary">{a.label}</p>
                 <p className="truncate text-xs text-tertiary">
-                  {a.form ? `Form: ${a.form.name}` : 'No form'}
+                  {a.form ? `${a.action === 'import' ? 'Import' : a.action === 'stage_query' ? 'Stage query' : 'Form'}: ${a.form.name}` : 'No form'}
                   {a.get ? ` · Get: ${a.get.name}` : ''}
                 </p>
               </div>
@@ -243,24 +253,58 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
 
             <Section title="Connected to">
               <div className="grid gap-4 sm:grid-cols-2">
-                <NativeSelect
-                  label="Form"
-                  required
-                  value={form.form_meta_id}
-                  onChange={(e) => set('form_meta_id', e.target.value)}
-                  hint={fe('form_meta_id') ?? (form.action === 'delete' ? 'The row is removed from this form’s table.' : 'The form this button opens.')}
-                  options={[{ label: 'Choose a form…', value: '' }, ...forms.map((o) => ({ label: o.name, value: String(o.id) }))]}
-                />
-                {form.action !== 'delete' && (
+                {form.action === 'import' ? (
+                  <NativeSelect
+                    label="Excel import"
+                    required
+                    value={form.form_meta_id}
+                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    hint={fe('form_meta_id') ?? (imports.length ? 'Says which columns the file has and where they go.' : 'No Excel import metas yet. Create one on the Metas page.')}
+                    options={[{ label: 'Choose an import…', value: '' }, ...imports.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                  />
+                ) : form.action === 'stage_query' ? (
+                  <NativeSelect
+                    label="Stage query"
+                    required
+                    value={form.form_meta_id}
+                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    hint={fe('form_meta_id') ?? (stageQueries.length ? 'The query this button runs, after a dry-run check.' : 'No stage queries yet. Create one on the Metas page.')}
+                    options={[{ label: 'Choose a stage query…', value: '' }, ...stageQueries.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                  />
+                ) : (
+                  <NativeSelect
+                    label="Form"
+                    required
+                    value={form.form_meta_id}
+                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    hint={fe('form_meta_id') ?? (form.action === 'delete' ? 'The row is removed from this form’s table.' : 'The form this button opens.')}
+                    options={[{ label: 'Choose a form…', value: '' }, ...forms.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                  />
+                )}
+                {form.action !== 'delete' && form.action !== 'import' && (
                   <NativeSelect
                     label="Get (opens with)"
                     value={form.get_meta_id}
                     onChange={(e) => set('get_meta_id', e.target.value)}
-                    hint={fe('get_meta_id') ?? (gets.length ? 'Decides the values the form opens with.' : 'No get metas yet. Create one on the Metas page.')}
-                    options={[{ label: form.action === 'edit' ? 'The row from the form’s table' : 'Nothing (empty form)', value: '' }, ...gets.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    hint={
+                      fe('get_meta_id') ??
+                      (!gets.length
+                        ? 'No get metas yet. Create one on the Metas page.'
+                        : form.action === 'stage_query'
+                          ? 'Its first row fills the parameters with the same names.'
+                          : 'Decides the values the form opens with.')
+                    }
+                    options={[
+                      {
+                        label: form.action === 'edit' ? 'The row from the form’s table' : form.action === 'stage_query' ? 'The picked row (by Parameters)' : 'Nothing (empty form)',
+                        value: '',
+                      },
+                      ...gets.map((o) => ({ label: o.name, value: String(o.id) })),
+                    ]}
                   />
                 )}
               </div>
+              {form.action !== 'import' && (
               <TextArea
                 label="Parameters"
                 rows={3}
@@ -272,9 +316,12 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
                 hint={
                   fe('params') ??
                   fe('json_config.params') ??
-                  'Which field of the picked row fills each :parameter of the get. For edit and delete, "id" is the record opened or removed.'
+                  (form.action === 'stage_query' && !form.get_meta_id
+                    ? 'Which field of the picked row fills each :parameter of the stage query.'
+                    : 'Which field of the picked row fills each :parameter of the get. For edit and delete, "id" is the record opened or removed.')
                 }
               />
+              )}
             </Section>
 
             <Section title="Placement">
@@ -284,7 +331,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
               </div>
             </Section>
 
-            <div className="flex justify-end gap-3 border-t border-secondary pt-5">
+            <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
               <Button size="md" color="secondary" onPress={() => setEditing(undefined)}>
                 Cancel
               </Button>

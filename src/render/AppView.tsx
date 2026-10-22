@@ -19,12 +19,15 @@ import {
   ShoppingCart01,
   Truck01,
   Users01,
+  Zap,
 } from '@untitledui/icons';
 import type { MetaParam } from '../lib/metaApi';
 import { AppSidebar } from '../components/AppSidebar';
 import type { NavItemType } from '@/components/application/app-navigation/config';
+import { DrilldownHost } from './DrilldownHost';
 import { MetaView } from './MetaView';
-import { title, useMetaDef, type MetaDef } from './definitions';
+import { presetOf, title, useMetaDef, type MetaDef } from './definitions';
+import { useAuth } from '../auth/AuthContext';
 
 // icon_cls on a menu item picks one of these.
 const icons: Record<string, FC<{ className?: string }>> = {
@@ -43,6 +46,7 @@ const icons: Record<string, FC<{ className?: string }>> = {
   truck: Truck01,
   search: SearchLg,
   settings: Settings01,
+  zap: Zap,
 };
 
 const menuLabel = (p: MetaParam) => p.label_name || p.param_name;
@@ -67,6 +71,7 @@ function trail(items: MetaParam[], id: number): MetaParam[] | null {
  * without one but with children are collapsible groups. The open screen is kept in ?screen=.
  */
 export function AppView({ def }: { def: MetaDef }) {
+  const { user } = useAuth();
   const [search] = useSearchParams();
   const all = screens(def.params);
   const current = all.find((p) => String(p.id) === search.get('screen')) ?? all[0];
@@ -116,7 +121,9 @@ export function AppView({ def }: { def: MetaDef }) {
               ))}
             </ol>
           </nav>
-          <MetaView key={current.id} metaId={current.ref_meta_id} />
+          <DrilldownHost>
+            <MetaView key={current.id} metaId={current.ref_meta_id} preset={presetOf(current, user)} />
+          </DrilldownHost>
         </>
       ) : (
         <div className="rounded-xl bg-primary px-6 py-14 text-center shadow-xs ring-1 ring-secondary">
@@ -167,7 +174,9 @@ export function RunMeta({ metaId }: { metaId: number }) {
       </header>
       <main className="px-4 py-8 sm:px-8 lg:py-10">
         <div className="mx-auto max-w-6xl">
-          <MetaView metaId={metaId} />
+          <DrilldownHost>
+            <MetaView metaId={metaId} />
+          </DrilldownHost>
         </div>
       </main>
     </div>

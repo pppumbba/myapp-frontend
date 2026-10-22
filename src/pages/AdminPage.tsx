@@ -182,7 +182,7 @@ function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () 
           hint={fe('code') ?? 'Lowercase letters, numbers, - and _.'}
         />
         <TextArea label="Description" value={description} onChange={setDescription} rows={3} />
-        <div className="flex justify-end gap-3 border-t border-secondary pt-4">
+        <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>
             Cancel
           </Button>
@@ -307,7 +307,7 @@ function UserRolesModal({
             <Checkbox key={r.id} label={r.name} hint={r.description || undefined} isSelected={picked.has(r.id)} onChange={(on) => toggle(r.id, on)} />
           ))}
         </div>
-        <div className="flex justify-end gap-3 border-t border-secondary pt-4">
+        <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>
             Cancel
           </Button>

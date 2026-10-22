@@ -12,8 +12,9 @@ import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
+import { AutonumberEditor } from './AutonumberEditor';
 
-const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid'];
+const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid', 'signature'];
 
 /** What "Refers to" means depends on the type of the meta that owns the row. */
 function refHint(ownerType?: string | null): string {
@@ -26,16 +27,26 @@ function refHint(ownerType?: string | null): string {
       return 'A lookup or related meta for this field. Optional.';
     case 'tabs':
       return 'The screen shown inside this tab.';
+    case 'dashboard':
+      return 'The chart placed here.';
+    case 'excel_import':
+      return 'For a lookup: the meta whose records the file names; the import saves their ids.';
+    case 'statement':
+    case 'report':
+      return 'A lookup meta that names this column’s values, or for a detail, the form describing one line.';
     default:
       return 'Another meta this row links to. Optional.';
   }
 }
 
 /** An example config for the data type, shown as the placeholder. */
-function configHint(dataType: string): string {
+function configHint(dataType: string, ownerType?: string | null): string {
+  if (ownerType === 'excel_import') return '{ "options": ["pcs", "box"] }  or { "column": "C" } to read a column by letter  or { "header": "Heading in the file" }  or, for dates, { "format": "d/m/Y" }';
+  if (ownerType === 'tabs' || ownerType === 'app') return '{ "filters": { "status": "draft" } } — filters start at it   { "fixed": { "requested_by": "{user_name}" } } — always, and new records get it   { "defaults": { "needed_by": "{today}" } } — a form starts with it.   Also {user_id}, {user_email}.';
   if (dataType === 'subgrid') return '{ "params": { "supplier_id": "id" } }   // subgrid parameter <- field of the picked row';
   if (dataType === 'detail') return '{ "foreign_key": "order_id", "amount": ["quantity", "unit_price"], "total_field": "total" }';
-  return '{ "options": ["draft", "sent"] }   or   { "label_field": "name" }';
+  if (dataType === 'signature') return 'Nothing needed: a report prints a line to sign, named by this row’s label.';
+  return '{ "options": ["draft", "sent"] }  or, in a statement, { "aggregate": "sum" }  or, to open another meta from this column, { "drilldown": { "meta_id": 12, "params": { "id": "id" } } }';
 }
 
 function rowLabel(p: MetaParam): string {
@@ -88,6 +99,9 @@ interface ParamForm {
   is_criteria: boolean;
   is_mandatory_criteria: boolean;
   is_primary: boolean;
+  is_label: boolean;
+  display_field: string;
+  value_field: string;
   default_value: string;
   /** json_config as text; it must be valid JSON. */
   json_config: string;
@@ -110,6 +124,9 @@ function emptyParam(order: number, parentId: number | null): ParamForm {
     is_criteria: false,
     is_mandatory_criteria: false,
     is_primary: false,
+    is_label: false,
+    display_field: '',
+    value_field: '',
     default_value: '',
     json_config: '',
   };
@@ -132,6 +149,9 @@ function toParamForm(p: MetaParam): ParamForm {
     is_criteria: p.is_criteria,
     is_mandatory_criteria: p.is_mandatory_criteria,
     is_primary: p.is_primary,
+    is_label: p.is_label,
+    display_field: p.display_field ?? '',
+    value_field: p.value_field ?? '',
     default_value: p.default_value ?? '',
     json_config: p.json_config ? JSON.stringify(p.json_config, null, 2) : '',
   };
@@ -154,6 +174,9 @@ function toParamInput(f: ParamForm): MetaParamInput {
     is_criteria: f.is_criteria,
     is_mandatory_criteria: f.is_criteria && f.is_mandatory_criteria,
     is_primary: f.is_primary,
+    is_label: f.is_label,
+    display_field: f.is_select ? f.display_field.trim() || null : null,
+    value_field: f.is_select ? f.value_field.trim() || null : null,
     default_value: f.default_value || null,
     json_config: f.json_config.trim() ? (JSON.parse(f.json_config) as Record<string, unknown>) : null,
   };
@@ -415,6 +438,16 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
               </div>
             </Section>
 
+            {['form', 'excel_import'].includes(meta.type?.code ?? '') && ['string', 'integer'].includes(form.data_type) && (
+              <Section title="Autonumber">
+                <AutonumberEditor
+                  json={form.json_config}
+                  fields={tree.map((p) => p.field_path).filter((f) => f !== form.field_path)}
+                  onChange={(v) => set('json_config', v)}
+                />
+              </Section>
+            )}
+
             <Section title="Behaviour">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Toggle label="Visible" hint="Shown on the screen." isSelected={form.is_show} onChange={(v) => set('is_show', v)} />
@@ -422,6 +455,13 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                 <Toggle label="Lookup" hint="Picked from a list." isSelected={form.is_select} onChange={(v) => set('is_select', v)} />
                 <Toggle label="Use as filter" hint="Offered as a search filter." isSelected={form.is_criteria} onChange={(v) => set('is_criteria', v)} />
                 <Toggle label="Primary key" hint="Identifies each record." isSelected={form.is_primary} onChange={(v) => set('is_primary', v)} />
+                <Toggle label="Names the record" hint="Shown for a record in lookups and pickers." isSelected={form.is_label} onChange={(v) => set('is_label', v)} />
+                {form.is_select && (
+                  <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+                    <Input label="Shows field" value={form.display_field} onChange={(v) => set('display_field', v)} isInvalid={!!fe('display_field')} hint={fe('display_field') ?? 'Of the looked-up record. Empty: the field that names it, else name.'} />
+                    <Input label="Stores field" value={form.value_field} onChange={(v) => set('value_field', v)} isInvalid={!!fe('value_field')} hint={fe('value_field') ?? 'Of the looked-up record. Empty: id.'} />
+                  </div>
+                )}
                 {form.is_criteria && (
                   <Toggle
                     label="Required filter"
@@ -437,13 +477,13 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                 value={form.json_config}
                 onChange={(v) => set('json_config', v)}
                 textAreaClassName="font-mono text-sm"
-                placeholder={configHint(form.data_type)}
+                placeholder={configHint(form.data_type, meta.type?.code)}
                 isInvalid={!!fe('json_config')}
-                hint={fe('json_config') ?? "Optional settings, e.g. options for a list, a lookup's label_field, or a subgrid's params."}
+                hint={fe('json_config') ?? "Optional settings, e.g. options for a list or a subgrid's params. Links to other metas are kept in meta_meta_map and shown here."}
               />
             </Section>
 
-            <div className="flex justify-end gap-3 border-t border-secondary pt-5">
+            <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
               <Button size="lg" color="secondary" onPress={() => setEditing(undefined)}>
                 Cancel
               </Button>

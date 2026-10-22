@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Grid01, HomeLine, LayersThree01, Users01 } from '@untitledui/icons';
+import { Clock, Grid01, HomeLine, LayersThree01, LayoutAlt01, UserSquare, Users01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { AppSidebar } from './AppSidebar';
 
@@ -11,6 +11,9 @@ const everyone = [
 // The builder and user management.
 const admins = [
   { href: '/metas', label: 'Metas', icon: LayersThree01 },
+  { href: '/widgets', label: 'Widget library', icon: LayoutAlt01 },
+  { href: '/schedules', label: 'Schedules', icon: Clock },
+  { href: '/session-values', label: 'Session values', icon: UserSquare },
   { href: '/admin', label: 'Users & roles', icon: Users01 },
 ];
 

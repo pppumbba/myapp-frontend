@@ -10,6 +10,50 @@ import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { Modal } from '../../components/Modal';
 import { TypePreview, typeLook } from '../../components/TypePreview';
+import { CodeEditor } from '../../components/CodeEditor';
+import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
+import { SCRIPT_COLUMNS } from '../../render/formScript';
+
+type ScriptColumn = (typeof SCRIPT_COLUMNS)[keyof typeof SCRIPT_COLUMNS];
+
+const NL = '\n';
+
+/** A form's scripts, in the order they are shown, with what each one is for. */
+const SCRIPTS: { column: ScriptColumn; label: string; hint: string; placeholder: string }[] = [
+  {
+    column: 'event_expression_string',
+    label: 'On change',
+    hint: 'Runs after any field changes. field is the field that changed (empty when a line was added or removed); detail and index say which line, for a field of a line.',
+    placeholder: ["if (detail === 'lines') {", "  set('total_amount', round(sum('lines', (l) => num(l.quantity) * num(l.unit_price)), 2));", '}'].join(NL),
+  },
+  {
+    column: 'load_expression_string',
+    label: 'On load',
+    hint: 'Runs once the form has its values, before they are shown. mode is "new" or "edit".',
+    placeholder: ["if (mode === 'new') set('order_date', today());", "readonly('total_amount');"].join(NL),
+  },
+  {
+    column: 'before_save_expression_string',
+    label: 'Before save',
+    hint: "Runs before saving and may change values. error('…') or return false stops the save.",
+    placeholder: "if (num(get('total_amount')) <= 0) error('Add at least one line.');",
+  },
+  {
+    column: 'after_save_expression_string',
+    label: 'After save',
+    hint: 'Runs after saving; row is the record as saved.',
+    placeholder: "message('Saved ' + row.po_number);",
+  },
+  {
+    column: 'var_fnc_expression_string',
+    label: 'Variables & functions',
+    hint: 'Shared: every script above can use what is declared here.',
+    placeholder: ['const VAT = 0.1;', '', 'function withVat(amount) {', '  return round(num(amount) * (1 + VAT), 2);', '}'].join(NL),
+  },
+];
+
+/** The names a script gets, coloured in the editor. */
+const SCRIPT_NAMES = ['values', 'get', 'set', 'lines', 'line', 'sum', 'setLine', 'header', 'num', 'round', 'today', 'hide', 'show', 'readonly', 'message', 'error', 'fill', 'session', 'field', 'value', 'detail', 'index', 'row', 'mode'];
 
 interface FormState {
   code: string;
@@ -21,6 +65,7 @@ interface FormState {
   table_name: string;
   query_string: string;
   is_active: boolean;
+  scripts: Record<ScriptColumn, string>;
 }
 
 function initialState(meta: Meta | null, presetTypeId?: number): FormState {
@@ -34,6 +79,7 @@ function initialState(meta: Meta | null, presetTypeId?: number): FormState {
     table_name: meta?.table_name ?? '',
     query_string: meta?.query_string ?? '',
     is_active: meta?.is_active ?? true,
+    scripts: Object.fromEntries(SCRIPTS.map((sc) => [sc.column, meta?.[sc.column] ?? ''])) as Record<ScriptColumn, string>,
   };
 }
 
@@ -48,6 +94,7 @@ function toInput(f: FormState): MetaInput {
     table_name: f.table_name || null,
     query_string: f.query_string.trim() || null,
     is_active: f.is_active,
+    ...Object.fromEntries(SCRIPTS.map((sc) => [sc.column, f.scripts[sc.column].trim() ? f.scripts[sc.column] : null])),
   };
 }
 
@@ -82,6 +129,8 @@ export function MetaFormModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
+  const [script, setScript] = useState<ScriptColumn>('event_expression_string');
+  const typeCode = types.find((t) => String(t.id) === form.type_id)?.code;
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const fe = (field: string) => fieldErrors[field]?.[0];
@@ -200,7 +249,23 @@ export function MetaFormModal({
           />
         </Section>
 
-        {['datagrid', 'get', 'calendar', 'gantt'].includes(types.find((t) => String(t.id) === form.type_id)?.code ?? '') && (
+        {types.find((t) => String(t.id) === form.type_id)?.code === 'stage_query' ? (
+          <Section title="Query">
+            <TextArea
+              label="SQL that changes data"
+              rows={8}
+              value={form.query_string}
+              onChange={(v) => set('query_string', v)}
+              placeholder={"UPDATE proc_purchase_requests\nSET status = 'rejected'\nWHERE status = 'draft' AND needed_by < :before;\n\nINSERT INTO audit_notes (note, created_by) VALUES ('Closed drafts', :user_id)"}
+              textAreaClassName="font-mono text-sm"
+              isInvalid={!!fe('query_string')}
+              hint={
+                fe('query_string') ??
+                'INSERT, UPDATE, DELETE or REPLACE; separate several with ;. They run together: if one fails, none is kept. :name parameters are its parameters (add one per name below the query), plus :user_id and :today.'
+              }
+            />
+          </Section>
+        ) : ['datagrid', 'get', 'calendar', 'gantt'].includes(types.find((t) => String(t.id) === form.type_id)?.code ?? '') && (
           <Section title="Query">
             <TextArea
               label="SQL query"
@@ -215,6 +280,46 @@ export function MetaFormModal({
                 'Optional. Reads records from this query instead of the table. :name parameters are filled from filters with the same field path (and :user_id, :today); an empty filter is null. Saving still goes through a form with a table.'
               }
             />
+          </Section>
+        )}
+
+        {typeCode === 'form' && (
+          <Section title="Scripts">
+            <ButtonGroup
+              size="sm"
+              selectedKeys={[script]}
+              onSelectionChange={(keys) => {
+                const [k] = [...keys];
+                if (k) setScript(k as ScriptColumn);
+              }}
+              disallowEmptySelection
+              className="w-auto flex-wrap"
+            >
+              {SCRIPTS.map((sc) => (
+                <ButtonGroupItem key={sc.column} id={sc.column}>
+                  {sc.label}
+                  {form.scripts[sc.column].trim() && <span className="ml-1 size-1.5 rounded-full bg-brand-solid" aria-label="(has a script)" />}
+                </ButtonGroupItem>
+              ))}
+            </ButtonGroup>
+            {SCRIPTS.filter((sc) => sc.column === script).map((sc) => (
+              <CodeEditor
+                key={sc.column}
+                label={`${sc.label} (JavaScript)`}
+                value={form.scripts[sc.column]}
+                onChange={(v) => setForm((f) => ({ ...f, scripts: { ...f.scripts, [sc.column]: v } }))}
+                names={SCRIPT_NAMES}
+                placeholder={sc.placeholder}
+                isInvalid={!!fe(sc.column)}
+                hint={
+                  fe(sc.column) ?? (
+                    <>
+                      {sc.hint} Helpers: <code className="text-xs">get(f) set(f, v) values sum(detail, fn|field) lines(detail) setLine(detail, i, f, v) header.get/set num(v) round(v, digits) today() hide(f) show(f) readonly(f) message(text) error(text) await fill(getId, params) session(path)</code>
+                    </>
+                  )
+                }
+              />
+            ))}
           </Section>
         )}
 
@@ -234,7 +339,7 @@ export function MetaFormModal({
           <Toggle label="Active" hint="Inactive metas stay saved but are hidden from apps." isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
         </Section>
 
-        <div className="flex justify-end gap-3 border-t border-secondary pt-5">
+        <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
           <Button size="lg" color="secondary" onPress={onClose}>
             Cancel
           </Button>

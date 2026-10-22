@@ -12,8 +12,10 @@ import { LookupField } from './LookupField';
 export type Filters = Record<string, string>;
 
 /**
- * The filter panel of a grid: one field per param marked is_criteria. Values apply when
- * the panel is submitted. Required filters (is_mandatory_criteria) are marked; a query
+ * The filter panel of a grid, statement, calendar or gantt: one field per param marked
+ * is_criteria, picking values the way a form does: a lookup, a list of options, a date. A
+ * filter that is neither a lookup nor a list itself picks with its form field's (filter_as).
+ * Values apply when the panel is submitted. Required filters (is_mandatory_criteria) are marked; a query
  * grid's :named parameters are filled from here too. In a grid run by a workflow, status_id
  * picks from its statuses.
  */
@@ -61,8 +63,16 @@ export function GridFilters({
   );
 }
 
+/** The param as it filters: with its form field's lookup or list when it borrows one. */
+export function asFilter(p: MetaParam): MetaParam {
+  const borrowed = p.filter_as;
+  if (!borrowed) return p;
+  const { options, ...lookup } = borrowed;
+  return { ...p, ...lookup, json_config: options ? { ...(p.json_config ?? {}), options } : p.json_config };
+}
+
 function FilterField({
-  param: p,
+  param,
   statuses,
   value,
   onChange,
@@ -72,6 +82,7 @@ function FilterField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const p = asFilter(param);
   const label = `${p.label_name || p.param_name}${p.is_mandatory_criteria ? ' *' : ''}`;
   const options = optionsOf(p);
   const common = { label, size: 'sm' as const, value, onChange };

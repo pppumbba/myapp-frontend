@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from '@untitledui/icons';
+import { ChevronLeft, ChevronRight, FilterLines, Plus } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
+import { GridFilters, type Filters } from './GridFilters';
 import { dataApi, type DataRow } from '../lib/dataApi';
 import { Alert } from '../components/ui';
 import { Modal } from '../components/Modal';
@@ -45,7 +46,8 @@ function place(from: Date, start: Date, end: Date) {
  * grouped by it, through its lookup if it has one), detail_field (shown under the title)
  * and color_field with colors. The meta's ref_meta is the form used to add and edit tasks.
  */
-export function GanttView({ def }: { def: MetaDef }) {
+/** scope: exact values every record has and new ones get; initialFilters: what the filters start at. */
+export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?: Filters; initialFilters?: Filters }) {
   const { meta, params } = def;
   const config = meta.json_config ?? {};
   const field = (name: string, fallback?: string) => (typeof config[name] === 'string' ? (config[name] as string) : fallback);
@@ -74,11 +76,16 @@ export function GanttView({ def }: { def: MetaDef }) {
   const [reload, setReload] = useState(0);
   // undefined: closed, null: adding, otherwise the id being edited.
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
+  // Filters: the params marked is_criteria, picked the way the form picks them.
+  const filterParams = useMemo(() => params.filter((p) => p.is_criteria && p.data_type !== 'detail' && p.data_type !== 'subgrid'), [params]);
+  const [filters, setFilters] = useState<Filters>(() => initialFilters ?? {});
+  const [showFilters, setShowFilters] = useState(() => !!initialFilters);
+  const filterKey = JSON.stringify([filters, scope]);
 
   useEffect(() => {
     if (!startField) return;
     let live = true;
-    dataApi.list(meta.id, { from: ymd(from), to: ymd(addDays(from, DAYS)), per_page: 100, sort: startField, dir: 'asc' }).then(
+    dataApi.list(meta.id, { from: ymd(from), to: ymd(addDays(from, DAYS)), per_page: 100, sort: startField, dir: 'asc', filter: filters, scope }).then(
       (r) => {
         if (!live) return;
         setRows(r.data);
@@ -89,7 +96,7 @@ export function GanttView({ def }: { def: MetaDef }) {
     return () => {
       live = false;
     };
-  }, [meta.id, startField, from, reload]);
+  }, [meta.id, startField, from, reload, filterKey]);
 
   const groups = useMemo(() => {
     const labels = new Map(groupOptions?.map((o) => [o.value, o.label]));
@@ -147,6 +154,11 @@ export function GanttView({ def }: { def: MetaDef }) {
               Today
             </Button>
             <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label="Later weeks" onPress={() => shift(4)} />
+            {filterParams.length > 0 && (
+              <Button size="sm" color={showFilters || Object.keys(filters).length ? 'primary' : 'secondary'} iconLeading={FilterLines} aria-expanded={showFilters} onPress={() => setShowFilters((s) => !s)}>
+                {Object.keys(filters).length ? `Filters (${Object.keys(filters).length})` : 'Filters'}
+              </Button>
+            )}
             {formId && (
               <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)} className="ml-auto sm:ml-2">
                 Add {item}
@@ -154,6 +166,8 @@ export function GanttView({ def }: { def: MetaDef }) {
             )}
           </div>
         </div>
+
+        {showFilters && <GridFilters params={filterParams} applied={filters} onApply={setFilters} />}
 
         {/* The timeline keeps a readable width and scrolls sideways on small screens. */}
         <div className="overflow-x-auto">
@@ -205,6 +219,7 @@ export function GanttView({ def }: { def: MetaDef }) {
           <FormView
             metaId={formId}
             recordId={editing}
+            fixed={scope}
             defaults={editing ? undefined : { [startField]: ymd(today), ...(endField && endField !== startField ? { [endField]: ymd(addDays(today, 4)) } : {}) }}
             embedded
             onCancel={() => setEditing(undefined)}

@@ -8,6 +8,9 @@ import NotificationsPage from './pages/NotificationsPage';
 import ProfilePage from './pages/ProfilePage';
 import Register from './pages/Register';
 import RunPage from './pages/RunPage';
+import SchedulesPage from './pages/SchedulesPage';
+import SessionValuesPage from './pages/SessionValuesPage';
+import WidgetsPage from './pages/WidgetsPage';
 import MetaDetailPage from './pages/metas/MetaDetailPage';
 import MetasPage from './pages/metas/MetasPage';
 
@@ -22,6 +25,9 @@ export default function App() {
       <Route path="/apps" element={<ProtectedRoute><AppsPage /></ProtectedRoute>} />
       <Route path="/metas" element={<AdminRoute><MetasPage /></AdminRoute>} />
       <Route path="/metas/:id" element={<AdminRoute><MetaDetailPage /></AdminRoute>} />
+      <Route path="/widgets" element={<AdminRoute><WidgetsPage /></AdminRoute>} />
+      <Route path="/schedules" element={<AdminRoute><SchedulesPage /></AdminRoute>} />
+      <Route path="/session-values" element={<AdminRoute><SessionValuesPage /></AdminRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       <Route path="/run/:id" element={<ProtectedRoute><RunPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

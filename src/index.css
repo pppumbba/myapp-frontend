@@ -31,3 +31,86 @@ body {
 html {
   font-size: 15px;
 }
+
+/*
+ * Chart series colours, in this fixed order (validated for colour-blind separation on the
+ * card surface in both modes). A series keeps its slot; there is never a 7th colour.
+ */
+:root {
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+}
+
+.dark-mode {
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+}
+
+/* Printing one element: see render/print.ts. */
+@media print {
+  body.printing > *:not(#print-root) {
+    display: none !important;
+  }
+  #print-root .no-print {
+    display: none !important;
+  }
+  #print-root > * {
+    box-shadow: none !important;
+    max-width: none !important;
+  }
+}
+
+@media screen {
+  #print-root {
+    display: none;
+  }
+}
+
+/*
+ * Thin scrollbars in the theme's own greys everywhere (light and dark follow the tokens).
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-primary) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg-quaternary);
+}
+
+/*
+ * A modal's footer (Save / Cancel row) sticks to the bottom of the scrolling body. The negative
+ * margin cancels the body's bottom padding so the footer's background reaches the modal's edge.
+ */
+.modal-body .modal-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--color-bg-primary);
+  padding-bottom: 1rem;
+  margin-bottom: -1rem;
+}
+@media (min-width: 40rem) {
+  .modal-body .modal-footer {
+    padding-bottom: 1.5rem;
+    margin-bottom: -1.5rem;
+  }
+}

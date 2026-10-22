@@ -11,9 +11,8 @@ import { Input } from '@/components/base/input/input';
 import { useDebounced } from '@/hooks/use-debounced';
 import { cx } from '@/utils/cx';
 import { ColumnValue } from './Cell';
-import { rowLabel, title, useLookup, useMetaDef, visibleParams, type LookupOption } from './definitions';
+import { lookupFields, lookupOption, rowLabel, title, useLookup, useMetaDef, visibleParams, type LookupOption } from './definitions';
 
-const option = (row: DataRow, labelField: unknown): LookupOption => ({ value: String(row.id), label: rowLabel(row, labelField), row });
 
 /**
  * A lookup param (is_select + ref_meta_id) as a searchable combo. Typing searches the
@@ -44,7 +43,8 @@ export function LookupField({
   hint?: string;
 }) {
   const refId = param.ref_meta_id!;
-  const labelField = param.json_config?.label_field;
+  const fields = lookupFields(param);
+  const option = (row: DataRow) => lookupOption(row, param);
   const first = useLookup(param);
   const [text, setText] = useState('');
   const search = useDebounced(text);
@@ -64,26 +64,27 @@ export function LookupField({
     }
     let live = true;
     dataApi.list(refId, { search, per_page: 50 }).then(
-      (page) => live && setFound(page.data.map((r) => option(r, labelField))),
+      (page) => live && setFound(page.data.map(option)),
       () => live && setFound([]),
     );
     return () => {
       live = false;
     };
-  }, [refId, search, searching, labelField]);
+  }, [refId, search, searching, fields.label, fields.value]);
 
   // A saved value beyond the first 100 records: fetch it once to show its name.
   useEffect(() => {
     if (!value || current || !first) return;
     let live = true;
-    dataApi.get(refId, value).then(
-      (row) => live && setKnown((k) => [...k, option(row, labelField)]),
+    // By the stored field, which need not be the id (e.g. a code).
+    dataApi.list(refId, { scope: { [fields.value]: value }, per_page: 1 }).then(
+      (page) => live && setKnown((k) => [...k, page.data[0] ? option(page.data[0]) : { value, label: `#${value}`, row: {} }]),
       () => live && setKnown((k) => [...k, { value, label: `#${value}`, row: {} }]),
     );
     return () => {
       live = false;
     };
-  }, [refId, value, current, first, labelField]);
+  }, [refId, value, current, first, fields.label, fields.value]);
 
   const items = useMemo(() => {
     const seen = new Set<string>();
@@ -91,7 +92,7 @@ export function LookupField({
   }, [listed]);
 
   const pick = (row: DataRow) => {
-    const o = option(row, labelField);
+    const o = option(row);
     setKnown((k) => [o, ...k.filter((x) => x.value !== o.value)]);
     onChange(o.value, row);
   };
@@ -126,6 +127,7 @@ export function LookupField({
         <LookupDialog
           refId={refId}
           value={value}
+          valueField={fields.value}
           onPick={(row) => {
             pick(row);
             setBrowsing(false);
@@ -140,7 +142,7 @@ export function LookupField({
 const PER_PAGE = 10;
 
 /** The lookup meta's records as a searchable, paged table; a row click picks it. */
-function LookupDialog({ refId, value, onPick, onClose }: { refId: number; value: string; onPick: (row: DataRow) => void; onClose: () => void }) {
+function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: number; value: string; valueField: string; onPick: (row: DataRow) => void; onClose: () => void }) {
   const { def, error: defError } = useMetaDef(refId);
   const columns = useMemo(() => (def ? visibleParams(def.params).slice(0, 6) : []), [def]);
   const [query, setQuery] = useState('');
@@ -188,7 +190,7 @@ function LookupDialog({ refId, value, onPick, onClose }: { refId: number; value:
               </thead>
               <tbody className="divide-y divide-secondary">
                 {result.data.map((row) => {
-                  const picked = String(row.id) === value;
+                  const picked = String(row[valueField]) === value;
                   return (
                     <tr
                       key={String(row.id)}

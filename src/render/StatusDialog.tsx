@@ -179,7 +179,7 @@ export function StatusDialog({
             )}
           </section>
 
-          <div className="flex justify-end border-t border-secondary pt-4">
+          <div className="modal-footer flex justify-end border-t border-secondary pt-4">
             <Button size="sm" color="secondary" onPress={onClose}>
               Close
             </Button>

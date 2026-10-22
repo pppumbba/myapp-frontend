@@ -164,8 +164,8 @@ const DropdownSeparator = (props: AriaSeparatorProps) => {
 const DropdownDotsButton = (props: AriaButtonProps & RefAttributes<HTMLButtonElement>) => {
     return (
         <AriaButton
-            {...props}
             aria-label="Open menu"
+            {...props}
             className={(state) =>
                 cx(
                     "cursor-pointer rounded-md text-fg-quaternary outline-focus-ring transition duration-100 ease-linear",

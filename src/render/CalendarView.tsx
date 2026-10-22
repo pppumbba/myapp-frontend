@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from '@untitledui/icons';
+import { ChevronLeft, ChevronRight, FilterLines, Plus } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
+import { GridFilters, type Filters } from './GridFilters';
 import { dataApi, type DataRow } from '../lib/dataApi';
 import { Alert } from '../components/ui';
 import { Modal } from '../components/Modal';
@@ -30,7 +31,8 @@ const label = (e: CalEvent, day: Date) =>
  * and color_field (with colors: value -> palette name). The meta's ref_meta is the form used
  * to add and edit events; without one the calendar is read-only.
  */
-export function CalendarView({ def }: { def: MetaDef }) {
+/** scope: exact values every record has and new ones get; initialFilters: what the filters start at. */
+export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; scope?: Filters; initialFilters?: Filters }) {
   const { meta, params } = def;
   const config = meta.json_config ?? {};
   const field = (name: string, fallback?: string) => (typeof config[name] === 'string' ? (config[name] as string) : fallback);
@@ -52,6 +54,11 @@ export function CalendarView({ def }: { def: MetaDef }) {
   const [reload, setReload] = useState(0);
   // undefined: closed, null: adding, otherwise the id being edited.
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
+  // Filters: the params marked is_criteria, picked the way the form picks them.
+  const filterParams = useMemo(() => params.filter((p) => p.is_criteria && p.data_type !== 'detail' && p.data_type !== 'subgrid'), [params]);
+  const [filters, setFilters] = useState<Filters>(() => initialFilters ?? {});
+  const [showFilters, setShowFilters] = useState(() => !!initialFilters);
+  const filterKey = JSON.stringify([filters, scope]);
 
   // Six Monday-first weeks covering the month.
   const days = useMemo(() => {
@@ -63,7 +70,7 @@ export function CalendarView({ def }: { def: MetaDef }) {
     if (!startField) return;
     let live = true;
     dataApi
-      .list(meta.id, { from: ymd(days[0]), to: ymd(addDays(days[41], 1)), per_page: 100, sort: startField, dir: 'asc' })
+      .list(meta.id, { from: ymd(days[0]), to: ymd(addDays(days[41], 1)), per_page: 100, sort: startField, dir: 'asc', filter: filters, scope })
       .then(
         (r) => {
           if (!live) return;
@@ -75,7 +82,7 @@ export function CalendarView({ def }: { def: MetaDef }) {
     return () => {
       live = false;
     };
-  }, [meta.id, startField, days, reload]);
+  }, [meta.id, startField, days, reload, filterKey]);
 
   // Each event is filed under every day it covers.
   const byDay = useMemo(() => {
@@ -134,6 +141,11 @@ export function CalendarView({ def }: { def: MetaDef }) {
               Today
             </Button>
             <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label="Next month" onPress={() => shift(1)} />
+            {filterParams.length > 0 && (
+              <Button size="sm" color={showFilters || Object.keys(filters).length ? 'primary' : 'secondary'} iconLeading={FilterLines} aria-expanded={showFilters} onPress={() => setShowFilters((s) => !s)}>
+                {Object.keys(filters).length ? `Filters (${Object.keys(filters).length})` : 'Filters'}
+              </Button>
+            )}
             {formId && (
               <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)} className="ml-auto sm:ml-2">
                 Add {item}
@@ -141,6 +153,8 @@ export function CalendarView({ def }: { def: MetaDef }) {
             )}
           </div>
         </div>
+
+        {showFilters && <GridFilters params={filterParams} applied={filters} onApply={setFilters} />}
 
         <div className="grid grid-cols-7 border-b border-secondary text-center text-xs font-medium text-tertiary">
           {weekdays.map((w) => (
@@ -247,6 +261,7 @@ export function CalendarView({ def }: { def: MetaDef }) {
           <FormView
             metaId={formId}
             recordId={editing}
+            fixed={scope}
             defaults={editing ? undefined : { [startField]: `${ymd(selected)}T09:00`, ...(endField ? { [endField]: `${ymd(selected)}T10:00` } : {}) }}
             embedded
             onCancel={() => setEditing(undefined)}

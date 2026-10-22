@@ -188,7 +188,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
   const statusName = (id: number | null) => (id ? (statuses.find((s) => s.id === id)?.name ?? `#${id}`) : 'Start');
 
   return (
-    <section aria-labelledby="workflow-heading" className="mb-8">
+    <section aria-labelledby="workflow-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="workflow-heading" className="text-lg font-semibold text-primary">

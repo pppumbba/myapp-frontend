@@ -19,7 +19,7 @@ const message = (err: unknown, fallback: string) => (err instanceof ApiError ? e
 
 function Panel({ title, description, footer, children }: { title: string; description: string; footer: ReactNode; children: ReactNode }) {
   return (
-    <section className="mb-10 rounded-xl bg-primary shadow-xs ring-1 ring-secondary" aria-label={title}>
+    <section className="rounded-xl bg-primary shadow-xs ring-1 ring-secondary" aria-label={title}>
       <div className="flex items-start gap-3 border-b border-secondary px-4 py-3.5 sm:px-5">
         <Lock01 className="mt-0.5 size-5 shrink-0 text-fg-quaternary" aria-hidden="true" />
         <div>

@@ -1,5 +1,6 @@
 import type { DialogProps as AriaDialogProps, ModalOverlayProps as AriaModalOverlayProps } from "react-aria-components";
 import { Dialog as AriaDialog, DialogTrigger as AriaDialogTrigger, Modal as AriaModal, ModalOverlay as AriaModalOverlay } from "react-aria-components";
+import type { Ref } from "react";
 import { cx } from "@/utils/cx";
 
 export const DialogTrigger = AriaDialogTrigger;
@@ -23,7 +24,7 @@ export const ModalOverlay = (props: AriaModalOverlayProps) => {
     );
 };
 
-export const Modal = (props: AriaModalOverlayProps) => (
+export const Modal = (props: AriaModalOverlayProps & { ref?: Ref<HTMLDivElement> }) => (
     <AriaModal
         {...props}
         className={(state) =>

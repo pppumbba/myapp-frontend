@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { Widget } from './pageApi';
 
 export interface MetaType {
   id: number;
@@ -25,7 +26,16 @@ export interface Meta {
   json_config: Record<string, unknown> | null;
   type_id: number | null;
   ref_meta_id: number | null;
+  /** A form's scripts (see render/formScript.ts): on load, on change, before and after save, shared code. */
+  load_expression_string?: string | null;
+  event_expression_string?: string | null;
+  before_save_expression_string?: string | null;
+  after_save_expression_string?: string | null;
+  var_fnc_expression_string?: string | null;
+  /** A widget meta's entry in the widget library. */
+  widget_id?: number | null;
   type?: MetaType | null;
+  widget?: Pick<Widget, 'id' | 'code' | 'name' | 'renderer' | 'icon'> & Partial<Widget>;
   ref_meta?: MetaRef | null;
   params_count?: number;
 }
@@ -59,6 +69,19 @@ export interface MetaParam {
   is_merge: boolean;
   is_select: boolean;
   is_mandatory_criteria: boolean;
+  /** Marks the field that names this meta's records (shown for them in lookups and pickers). */
+  is_label: boolean;
+  /** A lookup: the looked-up record's field it shows (empty: that meta's is_label field, else name). */
+  display_field: string | null;
+  /** A lookup: the looked-up record's field it stores (empty: id). */
+  value_field: string | null;
+  /** A lookup: the field it shows, worked out by the server. Read only. */
+  display_as?: string | null;
+  /**
+   * A filter that is neither a lookup nor a list itself: the lookup or list of the same field
+   * on the grid's form, which it picks with. Read only.
+   */
+  filter_as?: Partial<Pick<MetaParam, 'is_select' | 'ref_meta_id' | 'display_field' | 'display_as' | 'value_field'>> & { options?: string[] };
   default_value: string | null;
   min_value: string | null;
   max_value: string | null;
@@ -68,8 +91,8 @@ export interface MetaParam {
   children?: MetaParam[];
 }
 
-export type MetaInput = Partial<Omit<Meta, 'id' | 'type' | 'ref_meta' | 'params_count'>>;
-export type MetaParamInput = Partial<Omit<MetaParam, 'id' | 'children' | 'main_meta_id'>>;
+export type MetaInput = Partial<Omit<Meta, 'id' | 'type' | 'ref_meta' | 'params_count' | 'widget'>>;
+export type MetaParamInput = Partial<Omit<MetaParam, 'id' | 'children' | 'main_meta_id' | 'display_as' | 'filter_as'>>;
 
 export const metaApi = {
   types: () => api<MetaType[]>('/meta-types'),
@@ -96,11 +119,12 @@ export const metaApi = {
   removeAction: (actionId: number) => api<null>(`/actions/${actionId}`, { method: 'DELETE' }),
 };
 
-export type ActionKind = 'add' | 'edit' | 'delete' | 'custom';
+export type ActionKind = 'add' | 'edit' | 'delete' | 'custom' | 'import' | 'stage_query';
 
 /**
  * One toolbar button of a datagrid (backend: meta_actions). form_meta_id is the form it
- * opens (for delete, the form whose table loses the row); get_meta_id decides the values
+ * opens (for delete, the form whose table loses the row; for import, the excel_import meta
+ * that loads the file); get_meta_id decides the values
  * that form opens with. json_config.params maps the get's named parameters to fields of
  * the selected row.
  */

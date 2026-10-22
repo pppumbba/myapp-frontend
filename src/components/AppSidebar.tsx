@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronLeftDouble, ChevronRightDouble, Circle } from '@untitledui/icons';
-import { Link as AriaLink } from 'react-aria-components';
+import { Button as AriaButton, Link as AriaLink } from 'react-aria-components';
 import { MobileNavigationHeader } from '@/components/application/app-navigation/base-components/mobile-header';
 import { NavItemBase } from '@/components/application/app-navigation/base-components/nav-item';
 import { NavList } from '@/components/application/app-navigation/base-components/nav-list';
 import type { NavItemDividerType, NavItemType } from '@/components/application/app-navigation/config';
+import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
 import { cx } from '@/utils/cx';
 import { NotificationsMenu } from './NotificationsMenu';
@@ -101,7 +102,7 @@ export function AppSidebar({
     </aside>
   );
 
-  // Folded: one icon per top-level item. A group's icon unfolds the sidebar to show its screens.
+  // Folded: one icon per top-level item. A group's icon opens a dropdown of its screens.
   const rail = (
     <aside className="flex h-full w-(--rail) flex-col items-center overflow-y-auto border-r border-secondary bg-primary py-4">
       {logoMark}
@@ -168,6 +169,34 @@ function RailItem({ item, activeUrl, onExpand }: { item: NavItemType; activeUrl?
     'flex size-10 items-center justify-center rounded-md outline-focus-ring transition duration-100 ease-linear focus-visible:outline-2',
     current ? 'bg-secondary text-fg-quaternary_hover' : 'text-fg-quaternary hover:bg-primary_hover hover:text-fg-quaternary_hover',
   );
+
+  // A group opens a dropdown of its screens beside the rail, without unfolding the sidebar.
+  if (item.items?.length) {
+    return (
+      <Dropdown.Root>
+        <AriaButton aria-label={`${item.label} menu`} className={look}>
+          <Icon className="size-5" />
+        </AriaButton>
+        <Dropdown.Popover placement="right top" offset={8} className="w-56">
+          <Dropdown.Menu aria-label={item.label}>
+            <Dropdown.Section>
+              <Dropdown.SectionHeader className="px-4 pt-1.5 pb-1 text-xs font-semibold text-quaternary">{item.label}</Dropdown.SectionHeader>
+              {item.items.map((child) => (
+                <Dropdown.Item
+                  key={child.href}
+                  id={child.href}
+                  href={child.href}
+                  label={child.label}
+                  icon={child.icon}
+                  className={child.href === activeUrl ? '[&>div]:bg-secondary' : undefined}
+                />
+              ))}
+            </Dropdown.Section>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown.Root>
+    );
+  }
 
   return (
     <Tooltip title={item.label} placement="right">

@@ -10,9 +10,17 @@ import { BadgeWithDot } from '@/components/base/badges/badges';
 import { ConfirmDialog } from '../../components/Modal';
 import { TypePreview, typeLook } from '../../components/TypePreview';
 import { MetaFormModal } from './MetaFormModal';
+import { ChartDesigner } from './ChartDesigner';
+import { DashboardDesigner } from './DashboardDesigner';
 import { MetaActionsPanel } from './MetaActionsPanel';
+import { ExcelImportDesigner, FormSettingsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
 import { MetaParamsPanel } from './MetaParamsPanel';
+import { ProcessFlowPanel } from './ProcessFlowPanel';
+import { VersionsPanel } from './VersionsPanel';
+import { NotificationDesigner } from './NotificationDesigner';
+import { PageDesigner } from './PageDesigner';
 import { MetaPermissionsPanel, StatusPermissionsPanel } from './PermissionsPanel';
+import { WidgetDesigner } from './WidgetDesigner';
 import { WorkflowDesigner } from './WorkflowDesigner';
 
 export default function MetaDetailPage() {
@@ -27,6 +35,10 @@ export default function MetaDetailPage() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  // Bumped after a version is restored, so every panel below reloads what it shows.
+  const [revision, setRevision] = useState(0);
+  // Bumped when the stage query panel adds parameters, so the parameter list reloads.
+  const [paramsVersion, setParamsVersion] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
@@ -135,7 +147,32 @@ export default function MetaDetailPage() {
             </div>
           </header>
 
-          {meta.type?.code === 'datagrid' && <MetaActionsPanel key={`actions-${meta.id}`} meta={meta} options={options} />}
+          <VersionsPanel
+            meta={meta}
+            onRestored={async () => {
+              await load();
+              setRevision((r) => r + 1);
+            }}
+          />
+
+          {/* The page spaces its sections; they keep no outer margins of their own. */}
+          <div key={revision} className="space-y-8">
+
+          {meta.type?.code === 'datagrid' && (
+            <>
+              <MetaActionsPanel key={`actions-${meta.id}`} meta={meta} options={options} />
+              <GridDrilldownPanel key={`drilldown-${meta.id}`} meta={meta} options={options} />
+              <GridFilterLayoutPanel key={`filter-layout-${meta.id}`} meta={meta} />
+            </>
+          )}
+          {meta.type?.code === 'form' && <FormSettingsPanel key={`form-settings-${meta.id}`} meta={meta} options={options} />}
+          {meta.type?.code === 'statement' && <StatementDesigner key={`statement-${meta.id}`} meta={meta} options={options} />}
+          {meta.type?.code === 'report' && <ReportDesigner key={`report-${meta.id}`} meta={meta} />}
+          {meta.type?.code === 'excel_import' && <ExcelImportDesigner key={`import-${meta.id}`} meta={meta} />}
+          {meta.type?.code === 'stage_query' && (
+            <StageQueryPanel key={`stage-${meta.id}-${meta.query_string}`} meta={meta} onParamsChanged={() => setParamsVersion((v) => v + 1)} />
+          )}
+          {meta.type?.code === 'workspace' && <WorkspaceDesigner key={`workspace-${meta.id}-${meta.ref_meta_id}`} meta={meta} />}
 
           {meta.type?.code === 'workflow' ? (
             <>
@@ -145,9 +182,27 @@ export default function MetaDetailPage() {
           ) : (
             <>
               <MetaPermissionsPanel key={`permissions-${meta.id}`} meta={meta} />
-              <MetaParamsPanel key={meta.id} meta={meta} options={options} />
+              {meta.type?.code === 'chart' ? (
+                // Keyed on the source too, so editing the table or query reloads the columns.
+                <ChartDesigner key={`chart-${meta.id}-${meta.table_name}-${meta.query_string}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'dashboard' ? (
+                <DashboardDesigner key={`dashboard-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'notification' ? (
+                <NotificationDesigner key={`notification-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'page' || meta.type?.code === 'widget_template' ? (
+                <PageDesigner key={`page-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'matrix' ? (
+                <MatrixDesigner key={`matrix-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'widget' ? (
+                <WidgetDesigner key={`widget-${meta.id}-${meta.widget_id}`} meta={meta} options={options} onSaved={load} />
+              ) : (
+                <MetaParamsPanel key={`${meta.id}-${paramsVersion}`} meta={meta} options={options} />
+              )}
+              {meta.type?.code === 'form' && <ProcessFlowPanel key={`process-flow-${meta.id}`} meta={meta} options={options} />}
             </>
           )}
+
+          </div>
 
           {editing && (
             <MetaFormModal

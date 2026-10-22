@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../../lib/metaApi';
 import { AppShell, PageHeader } from '../../components/AppShell';
-import { Grid01, List, Plus, SearchLg } from '@untitledui/icons';
+import { ClockRewind, Grid01, List, Plus, SearchLg } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -10,6 +10,7 @@ import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/but
 import { ConfirmDialog } from '../../components/Modal';
 import { TypePreview, typeLook } from '../../components/TypePreview';
 import { MetaCard, MetaRow } from './MetaCard';
+import { DeletedMetasModal } from './DeletedMetasModal';
 import { MetaFormModal } from './MetaFormModal';
 
 type View = 'grid' | 'list';
@@ -32,6 +33,7 @@ function saveView(view: View) {
 }
 
 export default function MetasPage() {
+  const [showDeleted, setShowDeleted] = useState(false);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [types, setTypes] = useState<MetaType[]>([]);
   const [options, setOptions] = useState<MetaOption[]>([]);
@@ -107,11 +109,17 @@ export default function MetasPage() {
         title="Metas"
         subtitle="The grids, forms, calendars, Gantt charts and tab sets your apps link to. Open one to edit its columns or fields."
         actions={
-          <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
-            New meta
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" color="secondary" iconLeading={ClockRewind} onPress={() => setShowDeleted(true)}>
+              Deleted
+            </Button>
+            <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
+              New meta
+            </Button>
+          </div>
         }
       />
+      {showDeleted && <DeletedMetasModal onClose={() => setShowDeleted(false)} />}
 
       {error && (
         <div className="mb-6">

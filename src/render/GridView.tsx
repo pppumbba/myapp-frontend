@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
 import type { Selection, SortDescriptor } from 'react-aria-components';
-import { Check, Copy01, Edit01, Eye, File06, FilterLines, GitBranch01, Plus, SearchLg, Trash01 } from '@untitledui/icons';
+import { ArrowUpRight, Check, Copy01, Download01, Edit01, Eye, File06, FilterLines, GitBranch01, Plus, SearchLg, Trash01, Upload01, Zap } from '@untitledui/icons';
+import { Button as AriaButton } from 'react-aria-components';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { Ability } from '../lib/accessApi';
@@ -18,15 +19,26 @@ import { Input } from '@/components/base/input/input';
 import { ColumnValue } from './Cell';
 import { FormView } from './FormView';
 import { GridFilters, type Filters } from './GridFilters';
+import { GridSidebar } from './GridSidebar';
+import { ImportView } from './ImportView';
 import { detailParams, primaryKey, subgridParams, title, useActions, useGridWorkflow, useMetaDef, visibleParams, type MetaDef } from './definitions';
+import { drilldownOf, drillParams, useDrilldown } from './drilldown';
+import { StageQueryView } from './StageQueryView';
 import { StatusBadge, StatusDialog } from './StatusDialog';
 
 /** Quantities and amounts line up on the right; lookup ids don't count as numbers. */
 const isNumber = (p: MetaParam) => (p.data_type === 'integer' || p.data_type === 'decimal') && !p.is_select;
 
 // An action's icon_cls picks one of these; without one, its kind decides.
-const actionIcons: Record<string, FC<{ className?: string }>> = { plus: Plus, edit: Edit01, trash: Trash01, copy: Copy01, eye: Eye, check: Check, file: File06 };
-const kindIcons: Record<MetaAction['action'], FC<{ className?: string }>> = { add: Plus, edit: Edit01, delete: Trash01, custom: File06 };
+const actionIcons: Record<string, FC<{ className?: string }>> = { plus: Plus, edit: Edit01, trash: Trash01, copy: Copy01, eye: Eye, check: Check, file: File06, upload: Upload01 };
+const kindIcons: Record<MetaAction['action'], FC<{ className?: string }>> = {
+  add: Plus,
+  edit: Edit01,
+  delete: Trash01,
+  custom: File06,
+  import: Upload01,
+  stage_query: Zap,
+};
 const iconOf = (a: MetaAction) => (a.icon_cls && actionIcons[a.icon_cls]) || kindIcons[a.action];
 
 /** The column a workflow adds to its grid when the grid doesn't list status_id itself. */
@@ -56,27 +68,33 @@ function actionParams(action: MetaAction, row: DataRow | undefined, key: string)
 type Running = { action: MetaAction; row?: DataRow };
 
 /** What the user must be allowed to do with an action's form to see the button. */
-const abilityOf: Record<MetaAction['action'], Ability> = { add: 'create', custom: 'create', edit: 'edit', delete: 'delete' };
+// Running a stage query needs edit access to it, as the run endpoint does.
+const abilityOf: Record<MetaAction['action'], Ability> = { add: 'create', custom: 'create', edit: 'edit', delete: 'delete', import: 'create', stage_query: 'edit' };
 
 /**
  * A datagrid meta as a searchable, filterable, sortable, paged table. Its toolbar buttons
  * come from meta_actions (add, edit, delete, custom), each working through a form, and a
- * get meta decides what the form opens with. Click a row to pick it (buttons that need a
+ * get meta decides what the form opens with; an import button loads an Excel file through
+ * its excel_import meta. Export downloads what the grid shows, with its filters, as .xlsx. Click a row to pick it (buttons that need a
  * row act on it, and subgrids show its records); double-click runs its Edit button.
  *
  * fixed: filter values set from outside, e.g. a subgrid's parameters from the parent row.
+ * scope: exact values every row has and every new record gets, e.g. a workspace's tender_id;
+ * unlike fixed, they hold whether or not the field is a filter.
+ * initialFilters: what the filters start at, e.g. from a tab; people can change them.
  */
-export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters; label?: string }) {
+export function GridView({ def, fixed, scope, initialFilters, label }: { def: MetaDef; fixed?: Filters; scope?: Filters; initialFilters?: Filters; label?: string }) {
   const { meta, params } = def;
   const workflow = useGridWorkflow(meta);
   const columns = useMemo(() => {
-    const visible = visibleParams(params);
+    // A scoped column holds the same value on every row, so it isn't shown.
+    const visible = visibleParams(params).filter((p) => !(scope && p.field_path in scope));
     return workflow && !visible.some((p) => p.field_path === 'status_id') ? [...visible, statusColumn] : visible;
-  }, [params, workflow]);
+  }, [params, workflow, scope]);
   const statuses = useMemo(() => new Map((workflow?.statuses ?? []).map((s) => [s.id, s])), [workflow]);
   const filterParams = useMemo(
-    () => params.filter((p) => p.is_criteria && p.data_type !== 'detail' && p.data_type !== 'subgrid' && !(fixed && p.field_path in fixed)),
-    [params, fixed],
+    () => params.filter((p) => p.is_criteria && p.data_type !== 'detail' && p.data_type !== 'subgrid' && !(fixed && p.field_path in fixed) && !(scope && p.field_path in scope)),
+    [params, fixed, scope],
   );
   const subgrids = useMemo(() => subgridParams(params), [params]);
   const key = primaryKey(params);
@@ -85,14 +103,19 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
   const toolbar = useMemo(() => (actions ?? []).filter((a) => can(a.form_meta_id, abilityOf[a.action])), [actions, can]);
   const rowActions = toolbar.filter((a) => a.show_in_row);
   const editAction = toolbar.find((a) => a.action === 'edit');
+  // A drilldown on the grid opens from each row's button; one on a column, from its values.
+  const drill = useDrilldown();
+  const rowDrill = drill ? drilldownOf(meta.json_config) : null;
+  // json_config.filter_layout "sidebar": the filters sit beside the grid, always open.
+  const sidebar = meta.json_config?.filter_layout === 'sidebar' && filterParams.length > 0;
   const searchable = filterParams.some((p) => (p.data_type === 'string' || p.data_type === 'text') && !p.is_select && !Array.isArray(p.json_config?.options));
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [query, setQuery] = useState('');
   const search = useDebounced(query);
-  const [filters, setFilters] = useState<Filters>({});
-  const [showFilters, setShowFilters] = useState(() => filterParams.some((p) => p.is_mandatory_criteria));
+  const [filters, setFilters] = useState<Filters>(() => initialFilters ?? {});
+  const [showFilters, setShowFilters] = useState(() => filterParams.some((p) => p.is_mandatory_criteria) || !!initialFilters);
   const [sort, setSort] = useState<SortDescriptor | undefined>();
   const [result, setResult] = useState<Page<DataRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +126,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
   const [deleting, setDeleting] = useState<Running | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [changingStatus, setChangingStatus] = useState<DataRow | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // A notification links to /run/{grid}?record={id}: open that record's status straight away.
   const { pathname } = useLocation();
@@ -117,7 +141,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
       { replace: true },
     );
 
-  const fixedKey = JSON.stringify(fixed ?? {});
+  const fixedKey = JSON.stringify([fixed ?? {}, scope ?? {}]);
   const filterKey = JSON.stringify(filters);
   useEffect(() => setPage(1), [search, perPage, filterKey, fixedKey]);
 
@@ -129,6 +153,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
         per_page: perPage,
         search,
         filter: { ...filters, ...fixed },
+        scope,
         sort: sort?.column ? String(sort.column) : undefined,
         dir: sort?.direction === 'descending' ? 'desc' : 'asc',
       })
@@ -176,6 +201,23 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
     }
   }
 
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      await dataApi.exportExcel(meta.id, meta.code, {
+        search,
+        filter: { ...filters, ...fixed },
+        scope,
+        sort: sort?.column ? String(sort.column) : undefined,
+        dir: sort?.direction === 'descending' ? 'desc' : 'asc',
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'The records could not be exported.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const rowName = (row?: DataRow) => (row && columns[0] && !columns[0].is_select ? String(row[columns[0].field_path] ?? '') : '');
 
   return (
@@ -186,7 +228,13 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
         </div>
       )}
 
-      <TableCard.Root size="sm">
+      <div className={sidebar ? 'flex flex-col gap-4 lg:flex-row lg:items-start' : undefined}>
+      {sidebar && (
+        <div className="shrink-0 lg:w-64">
+          <GridSidebar metaId={meta.id} params={filterParams} filters={filters} onChange={setFilters} statuses={workflow?.statuses} search={search} scope={scope} fixed={fixed} />
+        </div>
+      )}
+      <TableCard.Root size="sm" className={sidebar ? 'min-w-0 flex-1' : undefined}>
         <TableCard.Header
           title={label ?? title(meta)}
           badge={
@@ -212,7 +260,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
                 />
               )}
               <div className="flex flex-wrap gap-2">
-                {filterParams.length > 0 && (
+                {filterParams.length > 0 && !sidebar && (
                   <Button size="sm" color="secondary" iconLeading={FilterLines} onPress={() => setShowFilters((s) => !s)} aria-expanded={showFilters}>
                     Filters{activeFilters ? ` (${activeFilters})` : ''}
                   </Button>
@@ -229,6 +277,9 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
                     {a.label}
                   </Button>
                 ))}
+                <Button size="sm" color="secondary" iconLeading={Download01} isDisabled={!result?.total} isLoading={exporting} onPress={exportExcel}>
+                  Export
+                </Button>
                 {workflow && (
                   <Button size="sm" color="secondary" iconLeading={GitBranch01} isDisabled={!selectedRow} onPress={() => selectedRow && setChangingStatus(selectedRow)}>
                     Change status
@@ -239,7 +290,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
           }
         />
 
-        {showFilters && filterParams.length > 0 && <GridFilters params={filterParams} applied={filters} onApply={setFilters} statuses={workflow?.statuses} />}
+        {showFilters && !sidebar && filterParams.length > 0 && <GridFilters params={filterParams} applied={filters} onApply={setFilters} statuses={workflow?.statuses} />}
 
         <Table
           aria-label={title(meta)}
@@ -263,12 +314,12 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
                   className={isNumber(c) && !(workflow && c.field_path === 'status_id') ? '[&>div]:justify-end' : undefined}
                 />
               )),
-              ...(rowActions.length ? [<Table.Head key="_actions" id="_actions" />] : []),
+              ...(rowActions.length || rowDrill ? [<Table.Head key="_actions" id="_actions" />] : []),
             ]}
           </Table.Header>
           <Table.Body
             items={rows.map((r): DataRow & { _key: string } => ({ ...r, _key: String(r[key]) }))}
-            dependencies={[columns, rowActions]}
+            dependencies={[columns, rowActions, rowDrill]}
             renderEmptyState={() => (
               <div className="px-6 py-10 text-center">
                 {missing.length ? (
@@ -296,15 +347,32 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
                     >
                       {workflow && c.field_path === 'status_id' ? (
                         <StatusBadge status={statuses.get(Number(row.status_id))} />
+                      ) : drill && drilldownOf(c.json_config) ? (
+                        <AriaButton
+                          onPress={() => {
+                            const d = drilldownOf(c.json_config)!;
+                            drill({ metaId: d.meta_id, params: drillParams(d, row), label: rowName(row) || title(meta) });
+                          }}
+                          className="rounded text-left font-medium text-brand-secondary underline-offset-2 outline-focus-ring hover:underline focus-visible:outline-2"
+                        >
+                          <ColumnValue param={c} value={row[c.field_path]} />
+                        </AriaButton>
                       ) : (
                         <ColumnValue param={c} value={row[c.field_path]} />
                       )}
                     </Table.Cell>
                   )),
-                  ...(rowActions.length
+                  ...(rowActions.length || rowDrill
                     ? [
                         <Table.Cell key="_actions" className="w-px">
                           <div className="flex justify-end gap-0.5">
+                            {rowDrill && (
+                              <IconAction
+                                icon={ArrowUpRight}
+                                label={rowDrill.label || 'Open'}
+                                onPress={() => drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), label: rowName(row) || title(meta) })}
+                              />
+                            )}
                             {rowActions.map((a) => (
                               <IconAction key={a.id} icon={iconOf(a)} danger={a.action === 'delete'} label={a.label} onPress={() => run(a, row)} />
                             ))}
@@ -328,6 +396,7 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
           />
         )}
       </TableCard.Root>
+      </div>
 
       {subgrids.map((s) => (
         <div key={s.id} className="mt-4">
@@ -335,16 +404,42 @@ export function GridView({ def, fixed, label }: { def: MetaDef; fixed?: Filters;
         </div>
       ))}
 
-      {running && running.action.form_meta_id && (
+      {running && running.action.action === 'import' && running.action.form_meta_id && (
+        <ImportDialog
+          label={running.action.label}
+          importId={running.action.form_meta_id}
+          onClose={() => setRunning(null)}
+          onDone={() => {
+            setRunning(null);
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
+
+      {running && running.action.action === 'stage_query' && running.action.form_meta_id && (
+        <StageQueryDialog
+          running={running}
+          queryId={running.action.form_meta_id}
+          params={actionParams(running.action, running.row, key)}
+          rowName={rowName(running.row)}
+          onClose={(ran) => {
+            setRunning(null);
+            if (ran) setReload((n) => n + 1);
+          }}
+        />
+      )}
+
+      {running && running.action.action !== 'import' && running.action.action !== 'stage_query' && running.action.form_meta_id && (
         <ActionDialog
           running={running}
           formId={running.action.form_meta_id}
           recordId={running.action.action === 'edit' && running.row ? actionParams(running.action, running.row, key).id || String(running.row[key]) : null}
           fillParams={actionParams(running.action, running.row, key)}
           rowName={rowName(running.row)}
+          scope={scope}
           onClose={() => setRunning(null)}
-          onSaved={() => {
-            setRunning(null);
+          onSaved={(next) => {
+            if (next !== 'new') setRunning(null);
             setReload((n) => n + 1);
           }}
         />
@@ -401,6 +496,7 @@ function ActionDialog({
   recordId,
   fillParams,
   rowName,
+  scope,
   onClose,
   onSaved,
 }: {
@@ -409,8 +505,10 @@ function ActionDialog({
   recordId: string | null;
   fillParams: Record<string, string>;
   rowName: string;
+  scope?: Filters;
   onClose: () => void;
-  onSaved: () => void;
+  /** next "new": the form stays open for another record. */
+  onSaved: (next?: 'new') => void;
 }) {
   const { def: formDef } = useMetaDef(formId);
   const wide = !!formDef && detailParams(formDef.params).length > 0;
@@ -422,10 +520,91 @@ function ActionDialog({
         metaId={formId}
         recordId={recordId}
         fill={action.get_meta_id ? { metaId: action.get_meta_id, params: fillParams } : undefined}
+        fixed={scope}
         embedded
         onCancel={onClose}
-        onSaved={onSaved}
+        onSaved={(_, next) => onSaved(next)}
       />
+    </Modal>
+  );
+}
+
+/**
+ * A stage query button, in a dialog. Its parameters start filled: by the get meta's first row
+ * (same-named columns) when the button has one, else straight from the row fields that
+ * json_config.params names. Closing after a run refreshes the grid.
+ */
+function StageQueryDialog({
+  running,
+  queryId,
+  params,
+  rowName,
+  onClose,
+}: {
+  running: Running;
+  queryId: number;
+  params: Record<string, string>;
+  rowName: string;
+  onClose: (ran: boolean) => void;
+}) {
+  const { action } = running;
+  const { def, error } = useMetaDef(queryId);
+  const [defaults, setDefaults] = useState<Record<string, string> | null>(action.get_meta_id ? null : params);
+  const [fillError, setFillError] = useState<string | null>(null);
+  const [ran, setRan] = useState(false);
+
+  useEffect(() => {
+    if (!action.get_meta_id) return;
+    let live = true;
+    dataApi
+      .fill(action.get_meta_id, params)
+      .then((row) => live && setDefaults(Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v == null ? '' : String(v)]))))
+      .catch((err) => {
+        if (!live) return;
+        setFillError(err instanceof ApiError ? err.message : 'The starting values could not be loaded.');
+        setDefaults({});
+      });
+    return () => {
+      live = false;
+    };
+    // Fills once per opening.
+  }, []);
+
+  return (
+    <Modal
+      title={rowName && action.needs_row ? `${action.label} · ${rowName}` : action.label}
+      description={def?.meta.description ?? undefined}
+      onClose={() => onClose(ran)}
+      size="lg"
+    >
+      {error ? (
+        <Alert>{error}</Alert>
+      ) : def && defaults ? (
+        <div className="space-y-4">
+          {fillError && <Alert>{fillError}</Alert>}
+          <StageQueryView def={def} defaults={defaults} embedded onRan={() => setRan(true)} />
+        </div>
+      ) : (
+        <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+      )}
+    </Modal>
+  );
+}
+
+/** An import button's excel_import meta, in a dialog. Closing after an import refreshes the grid. */
+function ImportDialog({ label, importId, onClose, onDone }: { label: string; importId: number; onClose: () => void; onDone: () => void }) {
+  const { def, error } = useMetaDef(importId);
+  const [imported, setImported] = useState(false);
+
+  return (
+    <Modal title={label} description={def?.meta.description ?? undefined} onClose={imported ? onDone : onClose} size="lg">
+      {error ? (
+        <Alert>{error}</Alert>
+      ) : def ? (
+        <ImportView def={def} embedded onDone={onDone} onImported={() => setImported(true)} />
+      ) : (
+        <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+      )}
     </Modal>
   );
 }

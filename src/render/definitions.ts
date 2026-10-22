@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fillTokens } from '../lib/sessionApi';
 import { ApiError } from '../lib/api';
 import { dataApi, onDataWrite, type DataRow } from '../lib/dataApi';
 import { metaApi, type Meta, type MetaAction, type MetaParam } from '../lib/metaApi';
@@ -82,7 +83,78 @@ export function useMetaDefs(ids: number[]) {
   return state;
 }
 
-/** The text shown for a looked-up record: json_config.label_field, else its first text value. */
+/**
+ * Values a tab or menu item hands the screen it shows (its param's json_config):
+ * filters, what a grid's filters start at (they can be changed); fixed, exact values that
+ * always hold and new records get (e.g. "My requests"); defaults, what a form starts with.
+ */
+export interface Preset {
+  filters?: Record<string, string>;
+  fixed?: Record<string, string>;
+  defaults?: Record<string, string>;
+}
+
+/** Fills {today}, {user_id}, {user_name}, {user_email} and session values (e.g. {sessionemployeeid}) in a preset value. */
+function presetValue(raw: unknown, user: { id: number; name: string; email: string } | null): string {
+  return fillTokens(raw, user);
+}
+
+/** A tab's or menu item's preset (json_config filters, fixed, defaults), its placeholders filled; undefined when it has none. */
+export function presetOf(param: MetaParam, user: { id: number; name: string; email: string } | null): Preset | undefined {
+  const config = param.json_config ?? {};
+  const part = (key: 'filters' | 'fixed' | 'defaults') => {
+    const values = config[key];
+    if (!values || typeof values !== 'object' || Array.isArray(values)) return undefined;
+    const entries = Object.entries(values as Record<string, unknown>).map(([k, v]) => [k, presetValue(v, user)] as const);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  };
+  const preset = { filters: part('filters'), fixed: part('fixed'), defaults: part('defaults') };
+  return preset.filters || preset.fixed || preset.defaults ? preset : undefined;
+}
+
+/** How many levels of lines a form may have (backend: MetaDataController::DETAIL_DEPTH). */
+const DETAIL_DEPTH = 3;
+
+/** A detail with its line form, and the details of that form's own lines. */
+export interface DetailNode {
+  detail: MetaParam & { ref_meta_id: number };
+  def: MetaDef;
+  children: DetailNode[];
+}
+
+/** A form's details, each with the details of its lines, down to DETAIL_DEPTH; a form above is never repeated. */
+async function loadDetailTree(def: MetaDef, parents: number[] = [def.meta.id]): Promise<DetailNode[]> {
+  if (parents.length > DETAIL_DEPTH) return [];
+  const details = detailParams(def.params).filter((d) => !parents.includes(d.ref_meta_id));
+  return Promise.all(
+    details.map(async (detail) => {
+      const child = await loadDef(detail.ref_meta_id);
+      return { detail, def: child, children: await loadDetailTree(child, [...parents, child.meta.id]) };
+    }),
+  );
+}
+
+/** Loads a form's details as a tree: their line forms, and their lines' details. */
+export function useDetailTree(def: MetaDef | null) {
+  const [state, setState] = useState<{ tree: DetailNode[] | null; error: string | null }>({ tree: null, error: null });
+
+  useEffect(() => {
+    if (!def) return;
+    let live = true;
+    setState({ tree: null, error: null });
+    loadDetailTree(def).then(
+      (tree) => live && setState({ tree, error: null }),
+      (err) => live && setState({ tree: null, error: errorText(err, 'Part of this screen could not be loaded.') }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [def]);
+
+  return state;
+}
+
+/** The text shown for a looked-up record: its labelField, else its first text value. */
 export function rowLabel(row: DataRow, labelField?: unknown): string {
   if (typeof labelField === 'string' && row[labelField] != null) return String(row[labelField]);
   const text = Object.entries(row).find(([k, v]) => k !== 'id' && typeof v === 'string');
@@ -96,29 +168,70 @@ export interface LookupOption {
   row: DataRow;
 }
 
+/** The looked-up record's fields a lookup shows and stores (display_field / value_field). */
+export function lookupFields(param: MetaParam): { label: string | undefined; value: string } {
+  return { label: param.display_as || param.display_field || undefined, value: param.value_field || 'id' };
+}
+
+/** A looked-up record as a choice: its stored value and the text shown for it. */
+export function lookupOption(row: DataRow, param: MetaParam): LookupOption {
+  const { label, value } = lookupFields(param);
+  return { value: String(row[value] ?? ''), label: rowLabel(row, label), row };
+}
+
+/** Up to 100 records of a lookup's meta, cached for the session. */
+function lookupRows(refId: number): Promise<DataRow[]> {
+  let p = lookups.get(refId);
+  if (!p) {
+    p = dataApi.list(refId, { per_page: 100 }).then((page) => page.data);
+    p.catch(() => lookups.delete(refId));
+    lookups.set(refId, p);
+  }
+  return p;
+}
+
+/** For each lookup among these params: field_path -> (stored value -> label). Plain params are left out. */
+export function useLookupLabels(params: MetaParam[]): Map<string, Map<string, string>> {
+  const lookupParams = params.filter((p) => p.is_select && p.ref_meta_id);
+  const key = lookupParams.map((p) => `${p.field_path}:${p.ref_meta_id}:${JSON.stringify(lookupFields(p))}`).join('|');
+  const [labels, setLabels] = useState<Map<string, Map<string, string>>>(new Map());
+
+  useEffect(() => {
+    let live = true;
+    Promise.all(
+      lookupParams.map((p) =>
+        lookupRows(p.ref_meta_id!).then(
+          (rows) => [p.field_path, new Map(rows.map((r) => { const o = lookupOption(r, p); return [o.value, o.label]; }))] as const,
+          () => [p.field_path, new Map<string, string>()] as const,
+        ),
+      ),
+    ).then((entries) => live && setLabels(new Map(entries)));
+    return () => {
+      live = false;
+    };
+    // The params are compared by what makes their labels.
+  }, [key]);
+
+  return labels;
+}
+
 /** Choices for a lookup param: up to 100 records from the meta it refers to. */
 export function useLookup(param: MetaParam | undefined) {
   const refId = param?.is_select ? param.ref_meta_id : null;
-  const labelField = param?.json_config?.label_field;
+  const fieldsKey = param ? JSON.stringify(lookupFields(param)) : '';
   const [options, setOptions] = useState<LookupOption[] | null>(null);
 
   useEffect(() => {
     if (!refId) return;
     let live = true;
-    let p = lookups.get(refId);
-    if (!p) {
-      p = dataApi.list(refId, { per_page: 100 }).then((page) => page.data);
-      p.catch(() => lookups.delete(refId));
-      lookups.set(refId, p);
-    }
-    p.then(
-      (rows) => live && setOptions(rows.map((r) => ({ value: String(r.id), label: rowLabel(r, labelField), row: r }))),
+    lookupRows(refId).then(
+      (rows) => live && setOptions(rows.map((r) => lookupOption(r, param!))),
       () => live && setOptions([]),
     );
     return () => {
       live = false;
     };
-  }, [refId, labelField]);
+  }, [refId, fieldsKey]);
 
   return options;
 }
@@ -128,6 +241,26 @@ export function optionsOf(param: MetaParam): { id: string; label: string }[] | n
   const options = param.json_config?.options;
   if (!Array.isArray(options)) return null;
   return options.map(String).map((o) => ({ id: o, label: o.charAt(0).toUpperCase() + o.slice(1) }));
+}
+
+/** How a field numbers itself (backend: App\Support\Autonumber). */
+export interface AutonumberConfig {
+  format: string;
+  rules?: { field: string; value: string | number | (string | number)[]; format: string }[];
+  editable?: boolean;
+}
+
+/** A param's json_config.autonumber, when it has one. */
+export function autonumberOf(param: MetaParam): AutonumberConfig | null {
+  const config = param.json_config?.autonumber as AutonumberConfig | undefined;
+  return config && typeof config.format === 'string' ? config : null;
+}
+
+/** The other fields an autonumber's number depends on: its rules' fields and {field} tokens. */
+export function autonumberFields(config: AutonumberConfig): string[] {
+  const formats = [config.format, ...(config.rules ?? []).map((r) => r.format)];
+  const tokens = formats.flatMap((f) => [...f.matchAll(/\{(\w+)(?::\d+)?\}/g)].map((m) => m[1])).filter((t) => !['seq', 'yyyy', 'yy', 'MM', 'dd'].includes(t));
+  return [...new Set([...(config.rules ?? []).map((r) => r.field), ...tokens])];
 }
 
 /** The values json_config.fill copies from a picked lookup record ({ field: record's field }). */
