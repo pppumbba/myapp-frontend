@@ -6,6 +6,7 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { Toggle } from '@/components/base/toggle/toggle';
+import { t, tLabels } from '@/i18n';
 
 const TYPES: { value: WidgetPropType; label: string }[] = [
   { value: 'text', label: 'Text (one line)' },
@@ -35,10 +36,10 @@ function CsvInput({ label, value, onChange, hint }: { label: string; value: stri
       label={label}
       size="sm"
       value={text}
-      onChange={(t) => {
-        setText(t);
+      onChange={(item) => {
+        setText(item);
         onChange(
-          t
+          item
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean),
@@ -93,16 +94,16 @@ export function PropsEditor({ value, onChange, nested = false }: { value: Widget
           <div className="flex items-center gap-2 px-2 py-1.5">
             <button type="button" onClick={() => toggle(i)} aria-expanded={open.has(i)} className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-0.5 text-left outline-focus-ring focus-visible:outline-2">
               {open.has(i) ? <ChevronDown className="size-4 shrink-0 text-fg-quaternary" /> : <ChevronRight className="size-4 shrink-0 text-fg-quaternary" />}
-              <span className="min-w-0 truncate text-sm font-medium text-primary">{p.label || 'New setting'}</span>
+              <span className="min-w-0 truncate text-sm font-medium text-primary">{p.label || t('New setting')}</span>
               <span className="shrink-0 font-mono text-xs text-quaternary">{p.key}</span>
-              <span className="ml-auto shrink-0 text-xs text-tertiary">{TYPES.find((t) => t.value === p.type)?.label ?? p.type}</span>
+              <span className="ml-auto shrink-0 text-xs text-tertiary">{t(TYPES.find((item) => item.value === p.type)?.label ?? p.type)}</span>
             </button>
-            <IconAction icon={ArrowUp} label={`Move ${p.label || 'setting'} up`} onPress={() => i > 0 && move(i, -1)} />
-            <IconAction icon={ArrowDown} label={`Move ${p.label || 'setting'} down`} onPress={() => i < value.length - 1 && move(i, 1)} />
+            <IconAction icon={ArrowUp} label={t('Move {name} up', { name: p.label || t('setting') })} onPress={() => i > 0 && move(i, -1)} />
+            <IconAction icon={ArrowDown} label={t('Move {name} down', { name: p.label || t('setting') })} onPress={() => i < value.length - 1 && move(i, 1)} />
             <IconAction
               icon={Trash01}
               danger
-              label={`Remove ${p.label || 'setting'}`}
+              label={t('Remove {name}', { name: p.label || t('setting') })}
               onPress={() => {
                 onChange(value.filter((_, j) => j !== i));
                 setOpen(new Set());
@@ -113,33 +114,33 @@ export function PropsEditor({ value, onChange, nested = false }: { value: Widget
           {open.has(i) && (
             <div className="space-y-3 border-t border-secondary p-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Input label="Label" size="sm" isRequired value={p.label} onChange={(v) => setLabel(i, v)} />
+                <Input label={t('Label')} size="sm" isRequired value={p.label} onChange={(v) => setLabel(i, v)} />
                 <Input
-                  label="Key"
+                  label={t('Key')}
                   size="sm"
                   isRequired
                   value={p.key}
                   onChange={(v) => set(i, { key: toKey(v) || v })}
                   isInvalid={duplicateKeys.has(p.key)}
-                  hint={duplicateKeys.has(p.key) ? 'Another setting has this key.' : 'What the renderer reads; {{key}} in a composite’s parts.'}
+                  hint={duplicateKeys.has(p.key) ? t('Another setting has this key.') : t('What the renderer reads; {{key}} in a composite’s parts.')}
                 />
-                <NativeSelect label="Type" value={p.type} onChange={(e) => setType(i, e.target.value as WidgetPropType)} options={TYPES} />
+                <NativeSelect label={t('Type')} value={p.type} onChange={(e) => setType(i, e.target.value as WidgetPropType)} options={tLabels(TYPES)} />
                 {p.type === 'boolean' ? (
                   <div className="self-end pb-1.5">
-                    <Toggle label="On by default" isSelected={p.default === true} onChange={(v) => set(i, { default: v })} />
+                    <Toggle label={t('On by default')} isSelected={p.default === true} onChange={(v) => set(i, { default: v })} />
                   </div>
                 ) : p.type === 'select' ? (
                   <NativeSelect
-                    label="Default"
+                    label={t('Default')}
                     value={p.default == null ? '' : String(p.default)}
                     onChange={(e) => set(i, { default: e.target.value || undefined })}
-                    options={[{ value: '', label: 'None' }, ...(p.options ?? []).map((o) => ({ value: o, label: o }))]}
+                    options={[{ value: '', label: t('None') }, ...(p.options ?? []).map((o) => ({ value: o, label: o }))]}
                   />
                 ) : p.type === 'list' || p.type === 'meta' ? (
                   <div />
                 ) : (
                   <Input
-                    label="Default"
+                    label={t('Default')}
                     size="sm"
                     type={p.type === 'number' ? 'number' : 'text'}
                     value={p.default == null ? '' : String(p.default)}
@@ -147,14 +148,14 @@ export function PropsEditor({ value, onChange, nested = false }: { value: Widget
                   />
                 )}
               </div>
-              <Input label="Hint" size="sm" value={p.hint ?? ''} onChange={(v) => set(i, { hint: v || undefined })} hint="A line under the field, to help whoever fills it in." />
-              {p.type === 'select' && <CsvInput label="Choices" value={p.options} onChange={(options) => set(i, { options })} hint="Comma separated, e.g. small, medium, large." />}
+              <Input label={t('Hint')} size="sm" value={p.hint ?? ''} onChange={(v) => set(i, { hint: v || undefined })} hint={t('A line under the field, to help whoever fills it in.')} />
+              {p.type === 'select' && <CsvInput label={t('Choices')} value={p.options} onChange={(options) => set(i, { options })} hint={t('Comma separated, e.g. small, medium, large.')} />}
               {p.type === 'meta' && (
-                <CsvInput label="Only these meta types" value={p.meta_types} onChange={(meta_types) => set(i, { meta_types: meta_types.length ? meta_types : undefined })} hint="Comma separated, e.g. chart, datagrid, form. Blank allows any." />
+                <CsvInput label={t('Only these meta types')} value={p.meta_types} onChange={(meta_types) => set(i, { meta_types: meta_types.length ? meta_types : undefined })} hint={t('Comma separated, e.g. chart, datagrid, form. Blank allows any.')} />
               )}
               {p.type === 'list' && !nested && (
                 <div>
-                  <p className="mb-1.5 text-sm font-medium text-secondary">Each row has</p>
+                  <p className="mb-1.5 text-sm font-medium text-secondary">{t('Each row has')}</p>
                   <PropsEditor nested value={p.fields ?? []} onChange={(fields) => set(i, { fields })} />
                 </div>
               )}
@@ -171,7 +172,7 @@ export function PropsEditor({ value, onChange, nested = false }: { value: Widget
           setOpen((s) => new Set(s).add(value.length));
         }}
       >
-        Add a setting
+        {t('Add a setting')}
       </Button>
     </div>
   );

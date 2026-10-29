@@ -10,6 +10,7 @@ import { Button } from '@/components/base/buttons/button';
 import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
 import { cx } from '@/utils/cx';
 import { IconAction } from './ui';
+import { t } from '@/i18n';
 
 export const notificationLooks: Record<string, { icon: typeof InfoCircle; color: string }> = {
   info: { icon: InfoCircle, color: 'text-fg-brand-primary' },
@@ -31,7 +32,7 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
   const unread = useUnreadCount();
   const [isOpen, setOpen] = useState(false);
   const count = unread > 99 ? '99+' : unread;
-  const name = unread ? `Notifications, ${unread} unread` : 'Notifications';
+  const name = unread ? t('Notifications, {count} unread', { count: unread }) : t('Notifications');
 
   const popover = (
     <Popover
@@ -45,7 +46,7 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
         )
       }
     >
-      <Dialog aria-label="Notifications" className="outline-hidden">
+      <Dialog aria-label={t("Notifications")} className="outline-hidden">
         <NotificationList onDone={() => setOpen(false)} />
       </Dialog>
     </Popover>
@@ -54,7 +55,7 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
   if (collapsed) {
     return (
       <DialogTrigger isOpen={isOpen} onOpenChange={setOpen}>
-        <Tooltip title="Notifications" placement="right">
+        <Tooltip title={t("Notifications")} placement="right">
           <TooltipTrigger
             aria-label={name}
             className={cx(
@@ -81,7 +82,7 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
         )}
       >
         <Bell01 aria-hidden="true" className="mr-2 size-5 shrink-0 text-fg-quaternary group-hover/item:text-fg-quaternary_hover" />
-        <span className="flex-1 truncate text-left text-sm font-semibold text-secondary group-hover/item:text-secondary_hover">Notifications</span>
+        <span className="flex-1 truncate text-left text-sm font-semibold text-secondary group-hover/item:text-secondary_hover">{t("Notifications")}</span>
         {unread > 0 && (
           <Badge className="ml-3" color="gray" type="pill-color" size="sm">
             {count}
@@ -114,7 +115,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
         setLast(r);
         setError(null);
       },
-      (err) => live && fail(err, 'Notifications could not be loaded.'),
+      (err) => live && fail(err, t("Notifications could not be loaded.")),
     );
     return () => {
       live = false;
@@ -129,7 +130,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
       setItems((all) => [...(all ?? []), ...r.data.filter((n) => !all?.some((a) => a.id === n.id))]);
       setLast(r);
     } catch (err) {
-      fail(err, 'Older notifications could not be loaded.');
+      fail(err, t("Older notifications could not be loaded."));
     } finally {
       setLoadingMore(false);
     }
@@ -142,7 +143,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
         setItems((all) => all?.map((a) => (a.id === n.id ? read : a)) ?? null);
         notificationsChanged();
       } catch (err) {
-        fail(err, 'That did not work. Try again.');
+        fail(err, t("That did not work. Try again."));
       }
     }
     if (n.link) {
@@ -157,7 +158,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
       setItems((all) => all?.filter((a) => a.id !== n.id) ?? null);
       notificationsChanged();
     } catch (err) {
-      fail(err, 'That did not work. Try again.');
+      fail(err, t("That did not work. Try again."));
     }
   }
 
@@ -168,7 +169,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
       setItems((all) => (onlyUnread ? [] : (all?.map((a) => ({ ...a, read_at: a.read_at ?? now })) ?? null)));
       notificationsChanged();
     } catch (err) {
-      fail(err, 'That did not work. Try again.');
+      fail(err, t("That did not work. Try again."));
     }
   }
 
@@ -177,14 +178,14 @@ function NotificationList({ onDone }: { onDone: () => void }) {
   return (
     <>
       <div className="flex items-center justify-between gap-3 border-b border-secondary px-4 py-3">
-        <h2 className="text-md font-semibold text-primary">Notifications</h2>
+        <h2 className="text-md font-semibold text-primary">{t("Notifications")}</h2>
         <div className="flex items-center gap-1">
           <Button size="sm" color="link-gray" onPress={() => setOnlyUnread((u) => !u)}>
-            {onlyUnread ? 'Show all' : 'Only unread'}
+            {onlyUnread ? t("Show all") : t("Only unread")}
           </Button>
           <span className="mx-1.5 h-4 w-px bg-border-secondary" aria-hidden="true" />
           <Button size="sm" color="link-color" iconLeading={CheckDone01} isDisabled={!hasUnread} onPress={readAll}>
-            Mark all read
+            {t("Mark all read")}
           </Button>
         </div>
       </div>
@@ -193,7 +194,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
 
       <div className="max-h-[min(28rem,60vh)] overflow-y-auto">
         {!items && !error && (
-          <div className="space-y-3 p-4" aria-label="Loading">
+          <div className="space-y-3 p-4" aria-label={t("Loading")}>
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-12 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
             ))}
@@ -203,8 +204,8 @@ function NotificationList({ onDone }: { onDone: () => void }) {
         {items && items.length === 0 && (
           <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
             <Bell01 className="size-6 text-fg-quaternary" aria-hidden="true" />
-            <p className="text-sm font-semibold text-primary">{onlyUnread ? 'Nothing unread' : 'No notifications yet'}</p>
-            <p className="text-sm text-tertiary">When a record is waiting for your next step, it shows up here.</p>
+            <p className="text-sm font-semibold text-primary">{onlyUnread ? t("Nothing unread") : t("No notifications yet")}</p>
+            <p className="text-sm text-tertiary">{t("When a record is waiting for your next step, it shows up here.")}</p>
           </div>
         )}
 
@@ -219,12 +220,12 @@ function NotificationList({ onDone }: { onDone: () => void }) {
                   <button type="button" onClick={() => open(n)} className="min-w-0 flex-1 rounded-md text-left outline-focus-ring focus-visible:outline-2">
                     <span className={cx('block text-sm text-primary', !n.read_at && 'font-semibold')}>
                       {n.title}
-                      {!n.read_at && <span className="sr-only"> (unread)</span>}
+                      {!n.read_at && <span className="sr-only"> {t("(unread)")}</span>}
                     </span>
                     {n.body && <span className="mt-0.5 block text-sm text-tertiary">{n.body}</span>}
                     <span className="mt-1 block text-xs text-quaternary">{notificationTime(n.created_at)}</span>
                   </button>
-                  <IconAction icon={Trash01} danger label="Remove notification" onPress={() => remove(n)} />
+                  <IconAction icon={Trash01} danger label={t("Remove notification")} onPress={() => remove(n)} />
                 </li>
               );
             })}
@@ -234,7 +235,7 @@ function NotificationList({ onDone }: { onDone: () => void }) {
         {last && last.current_page < last.last_page && (
           <div className="border-t border-secondary px-4 py-2.5 text-center">
             <Button size="sm" color="link-gray" isLoading={loadingMore} showTextWhileLoading onPress={more}>
-              Show older
+              {t("Show older")}
             </Button>
           </div>
         )}

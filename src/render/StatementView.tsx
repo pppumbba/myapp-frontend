@@ -11,6 +11,7 @@ import { title, useLookupLabels, visibleParams, type MetaDef } from './definitio
 import { drilldownOf, drillParams, useDrilldown } from './drilldown';
 import { GridFilters, type Filters } from './GridFilters';
 import { downloadCsv, printElement } from './print';
+import { t } from '@/i18n';
 
 type Aggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';
 const AGGREGATES = ['count', 'sum', 'avg', 'min', 'max'];
@@ -95,7 +96,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
     setError(null);
     dataApi.statement(meta.id, { filter: { ...filters, ...fixed }, scope }).then(
       (r) => live && setResult(r),
-      (err) => live && setError(err instanceof ApiError ? err.message : 'This statement could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t('This statement could not be loaded.')),
     );
     return () => {
       live = false;
@@ -133,7 +134,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
     try {
       await dataApi.exportExcel(meta.id, meta.code, { filter: { ...filters, ...fixed } });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The statement could not be exported.');
+      setError(err instanceof ApiError ? err.message : t('The statement could not be exported.'));
     } finally {
       setExporting(false);
     }
@@ -144,7 +145,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
     const head = [...levels, ...columns];
     const lines: (string | number | null)[][] = [head.map((p) => p.label_name || p.param_name)];
     for (const row of result.rows) lines.push(head.map((p) => (isNumeric(p) ? (row[p.field_path] as number | null) : text(p, row[p.field_path]))));
-    lines.push(head.map((p, i) => (i === 0 ? 'Grand total' : aggregateOf(p) ? (result.totals[p.field_path] as number | null) : '')));
+    lines.push(head.map((p, i) => (i === 0 ? t('Grand total') : aggregateOf(p) ? (result.totals[p.field_path] as number | null) : '')));
     downloadCsv(meta.code, lines);
   }
 
@@ -161,7 +162,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
     return (
       <button
         type="button"
-        onClick={() => drill({ metaId: target.meta_id, params: drillParams(target, row), label: text(p, row[p.field_path]) || title(meta) })}
+        onClick={() => drill({ metaId: target.meta_id, params: drillParams(target, row), drawer: target.open_in === 'drawer', label: text(p, row[p.field_path]) || title(meta) })}
         className="rounded text-left font-medium text-brand-secondary underline-offset-2 outline-focus-ring hover:underline focus-visible:outline-2"
       >
         {content}
@@ -211,7 +212,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
             <tr className="border-t border-secondary">
               {columns.map((p, i) => (
                 <td key={p.field_path} className={cx('py-2 pr-3 font-semibold text-primary', isNumeric(p) && 'text-right')} style={i === 0 ? indent(depth + 1) : undefined}>
-                  {i === 0 && <span className="mr-2 text-xs font-medium text-tertiary">Subtotal · {text(g.param, g.value) || '(empty)'}</span>}
+                  {i === 0 && <span className="mr-2 text-xs font-medium text-tertiary">{t('Subtotal · {value}', { value: text(g.param, g.value) || t('(empty)') })}</span>}
                   {aggregateOf(p) && totalCell(p, aggregate(g.rows, p.field_path, aggregateOf(p)!))}
                 </td>
               ))}
@@ -231,22 +232,22 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
           <h2 className="text-lg font-semibold text-primary">{title(meta)}</h2>
           {meta.description && <p className="mt-0.5 text-sm text-tertiary">{meta.description}</p>}
           {shownFilters.length > 0 && <p className="mt-1 text-sm text-tertiary">{shownFilters.join(' · ')}</p>}
-          <p className="mt-1 hidden text-xs text-quaternary print:block">Printed {new Date().toLocaleString()}</p>
+          <p className="mt-1 hidden text-xs text-quaternary print:block">{t('Printed {date}', { date: new Date().toLocaleString() })}</p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
           {filterParams.length > 0 && (
             <Button size="sm" color="secondary" iconLeading={FilterLines} onPress={() => setShowFilters((s) => !s)} aria-expanded={showFilters}>
-              Filters{Object.keys(filters).length ? ` (${Object.keys(filters).length})` : ''}
+              {Object.keys(filters).length ? t('Filters ({count})', { count: Object.keys(filters).length }) : t('Filters')}
             </Button>
           )}
           <Button size="sm" color="secondary" iconLeading={Download01} isDisabled={!result?.rows.length} isLoading={exporting} onPress={exportExcel}>
-            Excel
+            {t('Excel')}
           </Button>
           <Button size="sm" color="secondary" iconLeading={Download01} isDisabled={!result?.rows.length} onPress={exportCsv}>
-            CSV
+            {t('CSV')}
           </Button>
           <Button size="sm" color="secondary" iconLeading={Printer} isDisabled={!result?.rows.length} onPress={() => printElement(paper.current, title(meta))}>
-            Print
+            {t('Print')}
           </Button>
         </div>
       </div>
@@ -263,14 +264,14 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
         ) : !result ? (
           <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
         ) : missing.length ? (
-          <p className="py-10 text-center text-sm text-tertiary">{`Fill in ${missing.join(', ')} to see this statement.`}</p>
+          <p className="py-10 text-center text-sm text-tertiary">{t('Fill in {fields} to see this statement.', { fields: missing.join(', ') })}</p>
         ) : !result.rows.length ? (
-          <p className="py-10 text-center text-sm text-tertiary">Nothing matches these filters.</p>
+          <p className="py-10 text-center text-sm text-tertiary">{t('Nothing matches these filters.')}</p>
         ) : (
           <>
             {result.truncated && (
               <p role="status" className="mb-3 rounded-lg bg-warning-primary px-3 py-2 text-sm text-warning-primary">
-                Only the first {result.rows.length.toLocaleString()} records are listed, so group subtotals are incomplete. The grand total covers them all. Narrow the filters to see everything.
+                {t('Only the first {count} records are listed, so group subtotals are incomplete. The grand total covers them all. Narrow the filters to see everything.', { count: result.rows.length.toLocaleString() })}
               </p>
             )}
             <div className="overflow-x-auto">
@@ -302,7 +303,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
                     <tr className="border-t-2 border-primary">
                       {columns.map((p, i) => (
                         <td key={p.field_path} className={cx('pt-3 pr-3 font-semibold text-primary', isNumeric(p) && 'text-right')}>
-                          {i === 0 && <span className="mr-2">Grand total</span>}
+                          {i === 0 && <span className="mr-2">{t('Grand total')}</span>}
                           {aggregateOf(p) && totalCell(p, result.totals[p.field_path])}
                         </td>
                       ))}

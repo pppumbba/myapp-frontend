@@ -10,6 +10,7 @@ import { ChartTable, ChartView, rowName } from './charts/ChartView';
 import { title, useMetaDef, useMetaDefs, type MetaDef } from './definitions';
 import { drilldownOf, drillParams, periodRange, useDrilldown } from './drilldown';
 import { ymd } from './palette';
+import { t } from '@/i18n';
 
 /** Widths a chart can take on the dashboard's 12-column grid, and the rows it can span. */
 export const WIDTHS = [3, 4, 6, 8, 9, 12] as const;
@@ -88,8 +89,8 @@ export function DashboardView({ def }: { def: MetaDef }) {
         </DashboardGrid>
       ) : (
         <div className="rounded-xl bg-primary px-6 py-14 text-center shadow-xs ring-1 ring-secondary">
-          <p className="text-md font-semibold text-primary">This dashboard has no charts yet</p>
-          <p className="mt-1 text-sm text-tertiary">Place chart metas on it in the builder.</p>
+          <p className="text-md font-semibold text-primary">{t('This dashboard has no charts yet')}</p>
+          <p className="mt-1 text-sm text-tertiary">{t('Place chart metas on it in the builder.')}</p>
         </div>
       )}
     </div>
@@ -104,7 +105,7 @@ export function DateRangePresets({ value, onChange }: { value: Preset; onChange:
   return (
     <ButtonGroup
       size="sm"
-      aria-label="Date range"
+      aria-label={t('Date range')}
       selectedKeys={[value]}
       disallowEmptySelection
       onSelectionChange={(keys) => {
@@ -114,7 +115,7 @@ export function DateRangePresets({ value, onChange }: { value: Preset; onChange:
     >
       {presets.map((p) => (
         <ButtonGroupItem key={p.id} id={p.id}>
-          {p.label}
+          {t(p.label)}
         </ButtonGroupItem>
       ))}
     </ButtonGroup>
@@ -157,7 +158,7 @@ export function ChartCard({
         if (!live) return;
         setData(d);
       },
-      (err) => live && setError(err instanceof ApiError ? err.message : 'This chart could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t('This chart could not be loaded.')),
     );
     return () => {
       live = false;
@@ -174,7 +175,7 @@ export function ChartCard({
       ? (row: ChartRow | null) => {
           const period = periodRange(row?.x ?? null, data.bucket);
           const values = { x: row?.x, 'x.from': period.from, 'x.to': period.to, 'range.from': range.from, 'range.to': range.to };
-          drill({ metaId: target.meta_id, params: drillParams(target, values), label: row ? `${name} · ${rowName(row, data.bucket)}` : name });
+          drill({ metaId: target.meta_id, params: drillParams(target, values), drawer: target.open_in === 'drawer', label: row ? `${name} · ${rowName(row, data.bucket)}` : name });
         }
       : undefined;
   const kpi = data?.type === 'kpi';
@@ -182,7 +183,7 @@ export function ChartCard({
 
   return (
     <section
-      aria-label={name || 'Chart'}
+      aria-label={name || t('Chart')}
       className={cx('flex min-w-0 flex-col rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary', className)}
       style={{ height }}
     >
@@ -192,7 +193,7 @@ export function ChartCard({
           {!kpi && def?.meta.description && <p className="truncate text-xs text-tertiary">{def.meta.description}</p>}
         </div>
         {canTable && (
-          <IconAction icon={asTable ? BarChart01 : Table} label={asTable ? 'Show as chart' : 'Show as table'} onPress={() => setAsTable((t) => !t)} />
+          <IconAction icon={asTable ? BarChart01 : Table} label={asTable ? t('Show as chart') : t('Show as table')} onPress={() => setAsTable((item) => !item)} />
         )}
         {actions}
       </header>
@@ -207,7 +208,7 @@ export function ChartCard({
           <ChartView data={data} onSelect={onSelect} />
         )}
       </div>
-      {data?.truncated && !kpi && <p className="mt-1 text-xs text-quaternary">Some groups are left out; raise the limit to see more.</p>}
+      {data?.truncated && !kpi && <p className="mt-1 text-xs text-quaternary">{t('Some groups are left out; raise the limit to see more.')}</p>}
     </section>
   );
 }

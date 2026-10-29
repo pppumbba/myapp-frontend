@@ -11,6 +11,8 @@ export interface Page<T> {
   total: number;
   /** Labels of required filters (is_mandatory_criteria) still empty; no rows until they're filled. */
   missing_filters?: string[];
+  /** A grid's footer: each column's json_config.aggregate over every matching row, by field_path. */
+  footer?: Record<string, unknown>;
 }
 
 export interface ListQuery {
@@ -26,6 +28,8 @@ export interface ListQuery {
   filter?: Record<string, string>;
   /** Exact values that always hold, whether or not the field is a filter, e.g. a workspace's record (tender_id). */
   scope?: Record<string, string>;
+  /** A tree grid (a param with is_parent): the records under this one; empty for the top level. Rows then carry _children. */
+  parent?: string;
 }
 
 // Lookup lists are cached while an app runs; any write may change them, so writes clear the cache.
@@ -45,7 +49,8 @@ function queryString(q: Record<string, unknown>): string {
   for (const [k, v] of Object.entries(q)) {
     if (v && typeof v === 'object') {
       for (const [name, value] of Object.entries(v)) if (value !== undefined && value !== '') params.set(`${k}[${name}]`, String(value));
-    } else if (v !== undefined && v !== '') {
+    } else if (v !== undefined && (v !== '' || k === 'parent')) {
+      // An empty parent still says something: the top level of a tree.
       params.set(k, String(v));
     }
   }
@@ -103,6 +108,34 @@ export interface StageRun {
 }
 
 /** Records behind a datagrid, form or calendar meta (backend: MetaDataController). */
+/** Lines added, removed and changed in one detail (see RecordLog). */
+export interface LineChanges {
+  added?: DataRow[];
+  removed?: DataRow[];
+  changed?: ({ id: number | string } & RecordChanges)[];
+}
+
+/** What a save changed: fields as [old, new], and lines by detail field. */
+export interface RecordChanges {
+  fields?: Record<string, [unknown, unknown]>;
+  lines?: Record<string, LineChanges>;
+}
+
+/** One logged save of a record. */
+export interface RecordLogEntry {
+  id: number;
+  meta_id: number | null;
+  meta_name: string | null;
+  action: 'created' | 'updated' | 'deleted';
+  changes: RecordChanges | null;
+  snapshot: DataRow | null;
+  source: 'form' | 'process_flow' | 'schedule' | 'import' | 'matrix';
+  batch_id: string | null;
+  created_at: string;
+  user_id: number | null;
+  user_name: string | null;
+}
+
 export const dataApi = {
   list: (metaId: number, q: ListQuery = {}) => api<Page<DataRow>>(`/metas/${metaId}/data${queryString({ ...q })}`),
   /** For a grid's sidebar: how many records have each value of these filter fields, under the other filters. */
@@ -110,6 +143,8 @@ export const dataApi = {
     api<Record<string, Facet[]>>(`/metas/${metaId}/facets?${[queryString({ ...q }).slice(1), ...fields.map((f) => `fields[]=${encodeURIComponent(f)}`)].filter(Boolean).join('&')}`),
   statement: (metaId: number, q: Pick<ListQuery, 'search' | 'filter' | 'scope'> = {}) => api<StatementResult>(`/metas/${metaId}/statement${queryString({ ...q })}`),
   get: (metaId: number, id: number | string) => api<DataRow>(`/metas/${metaId}/data/${id}`),
+  /** A record's logged saves, newest first (metas with is_log). */
+  log: (metaId: number, id: number | string, page = 1) => api<Page<RecordLogEntry>>(`/metas/${metaId}/data/${id}/log?page=${page}`),
   /** A get meta's first row for these named parameters: the values a form opens with. */
   fill: (getMetaId: number, params: Record<string, string>) => api<DataRow>(`/metas/${getMetaId}/fill${queryString({ params })}`),
   /** The numbers a new record would get now, by field (json_config.autonumber), without taking them. */

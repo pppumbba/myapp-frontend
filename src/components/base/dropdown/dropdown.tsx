@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import { type FC, type RefAttributes, useCallback } from "react";
 import { Check, ChevronRight, DotsVertical } from "@untitledui/icons";
 import type {
@@ -164,7 +165,7 @@ const DropdownSeparator = (props: AriaSeparatorProps) => {
 const DropdownDotsButton = (props: AriaButtonProps & RefAttributes<HTMLButtonElement>) => {
     return (
         <AriaButton
-            aria-label="Open menu"
+            aria-label={t("Open menu")}
             {...props}
             className={(state) =>
                 cx(

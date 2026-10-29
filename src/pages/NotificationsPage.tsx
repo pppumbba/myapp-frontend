@@ -9,6 +9,7 @@ import { notificationLooks, notificationTime } from '../components/Notifications
 import { Alert, IconAction } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { cx } from '@/utils/cx';
+import { t } from '@/i18n';
 
 /** The signed-in user's notifications: newest first, opened to follow their link. */
 export default function NotificationsPage() {
@@ -27,7 +28,7 @@ export default function NotificationsPage() {
         setResult(r);
         setError(null);
       },
-      (err) => live && setError(err instanceof ApiError ? err.message : 'Notifications could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t("Notifications could not be loaded.")),
     );
     return () => {
       live = false;
@@ -44,7 +45,7 @@ export default function NotificationsPage() {
       await task();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'That did not work. Try again.');
+      setError(err instanceof ApiError ? err.message : t("That did not work. Try again."));
     }
   }
 
@@ -58,15 +59,15 @@ export default function NotificationsPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Notifications"
-        subtitle={result ? (result.unread ? `${result.unread} unread` : 'All caught up.') : undefined}
+        title={t("Notifications")}
+        subtitle={result ? (result.unread ? t('{count} unread', { count: result.unread }) : t("All caught up.")) : undefined}
         actions={
           <>
             <Button size="sm" color="secondary" onPress={() => { setPage(1); setOnlyUnread((u) => !u); }}>
-              {onlyUnread ? 'Show all' : 'Only unread'}
+              {onlyUnread ? t("Show all") : t("Only unread")}
             </Button>
             <Button size="sm" color="secondary" iconLeading={CheckDone01} isDisabled={!result?.unread} onPress={() => act(accessApi.readAll)}>
-              Mark all read
+              {t("Mark all read")}
             </Button>
           </>
         }
@@ -83,8 +84,8 @@ export default function NotificationsPage() {
       {result && items.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl bg-primary px-5 py-12 text-center ring-1 ring-secondary ring-inset">
           <Bell01 className="size-6 text-fg-quaternary" aria-hidden="true" />
-          <p className="text-sm font-semibold text-primary">{onlyUnread ? 'Nothing unread' : 'No notifications yet'}</p>
-          <p className="text-sm text-tertiary">When a record is waiting for your next step, it shows up here.</p>
+          <p className="text-sm font-semibold text-primary">{onlyUnread ? t("Nothing unread") : t("No notifications yet")}</p>
+          <p className="text-sm text-tertiary">{t("When a record is waiting for your next step, it shows up here.")}</p>
         </div>
       )}
 
@@ -99,12 +100,12 @@ export default function NotificationsPage() {
                 <button type="button" onClick={() => open(n)} className="min-w-0 flex-1 rounded-md text-left outline-focus-ring focus-visible:outline-2">
                   <span className={cx('block text-sm text-primary', !n.read_at && 'font-semibold')}>
                     {n.title}
-                    {!n.read_at && <span className="sr-only"> (unread)</span>}
+                    {!n.read_at && <span className="sr-only"> {t("(unread)")}</span>}
                   </span>
                   {n.body && <span className="mt-0.5 block text-sm text-tertiary">{n.body}</span>}
                   <span className="mt-1 block text-xs text-quaternary">{notificationTime(n.created_at)}</span>
                 </button>
-                <IconAction icon={Trash01} danger label="Remove notification" onPress={() => act(() => accessApi.removeNotification(n.id))} />
+                <IconAction icon={Trash01} danger label={t("Remove notification")} onPress={() => act(() => accessApi.removeNotification(n.id))} />
               </li>
             );
           })}
@@ -114,13 +115,13 @@ export default function NotificationsPage() {
       {result && result.last_page > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3 text-sm text-tertiary">
           <Button size="sm" color="secondary" isDisabled={page <= 1} onPress={() => setPage((p) => p - 1)}>
-            Newer
+            {t("Newer")}
           </Button>
           <span>
-            Page {result.current_page} of {result.last_page}
+            {t('Page {page} of {pages}', { page: result.current_page, pages: result.last_page })}
           </span>
           <Button size="sm" color="secondary" isDisabled={page >= result.last_page} onPress={() => setPage((p) => p + 1)}>
-            Older
+            {t("Older")}
           </Button>
         </div>
       )}

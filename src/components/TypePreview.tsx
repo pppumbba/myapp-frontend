@@ -30,6 +30,7 @@ const looks: Record<string, TypeLook> = {
   workspace: { ink: '#0E7490', tint: '#ECFEFF', rowNoun: 'section' },
   matrix: { ink: '#4D7C0F', tint: '#F7FEE7', rowNoun: 'row' },
   stage_query: { ink: '#B45309', tint: '#FFFBEB', rowNoun: 'parameter' },
+  theme: { ink: '#C026D3', tint: '#FDF4FF', rowNoun: 'setting' },
 };
 
 const fallback: TypeLook = { ink: '#64748B', tint: '#F1F5F9', rowNoun: 'row' };
@@ -256,6 +257,18 @@ function Drawing({ code }: { code?: string | null }) {
           <rect x="8" y="40" width="104" height="24" rx="4" {...soft} />
           <rect x="14" y="46" width="60" height="4" rx="2" {...mid} />
           <rect x="14" y="54" width="44" height="4" rx="2" {...mid} />
+        </>
+      );
+    case 'theme':
+      // A palette: colour chips in a row, one picked, over a page and a button.
+      return (
+        <>
+          {[10, 32, 54, 76, 98].map((x) => (
+            <circle key={x} cx={x + 6} cy="16" r="7" {...(x === 54 ? strong : soft)} />
+          ))}
+          <rect x="8" y="32" width="104" height="32" rx="4" {...soft} />
+          <rect x="16" y="40" width="52" height="6" rx="2" {...mid} />
+          <rect x="80" y="44" width="24" height="12" rx="3" {...strong} />
         </>
       );
     case 'matrix':

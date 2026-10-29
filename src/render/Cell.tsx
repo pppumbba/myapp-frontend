@@ -1,7 +1,9 @@
+import { FileNames } from './FileField';
 import { useMemo } from 'react';
 import type { MetaParam } from '../lib/metaApi';
 import { Badge, BadgeWithDot } from '@/components/base/badges/badges';
 import { useLookup } from './definitions';
+import { t } from '@/i18n';
 
 type StatusColor = 'gray' | 'brand' | 'success' | 'warning' | 'error';
 
@@ -36,8 +38,8 @@ export function formatDate(value: string): string {
 export function formatDateTime(value: string): string {
   const [h, min] = value.slice(11, 16).split(':').map(Number);
   if (!h && !min) return formatDate(value);
-  const t = new Date(2000, 0, 1, h, min).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${formatDate(value)}, ${t}`;
+  const item = new Date(2000, 0, 1, h, min).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${formatDate(value)}, ${item}`;
 }
 
 export function formatNumber(value: unknown, decimals = 2): string {
@@ -55,7 +57,7 @@ export function Cell({ param, value, lookup }: { param: MetaParam; value: unknow
     const on = value === true || value === 1 || value === '1';
     return (
       <BadgeWithDot type="pill-color" size="sm" color={on ? 'success' : 'gray'}>
-        {on ? 'Active' : 'Inactive'}
+        {on ? t('Active') : t('Inactive')}
       </BadgeWithDot>
     );
   }
@@ -70,8 +72,12 @@ export function Cell({ param, value, lookup }: { param: MetaParam; value: unknow
   }
 
   switch (param.data_type) {
+    case 'singlefile':
+    case 'multifile':
+    case 'document':
+      return <FileNames value={value} />;
     case 'boolean':
-      return <>{value === true || value === 1 || value === '1' ? 'Yes' : 'No'}</>;
+      return <>{value === true || value === 1 || value === '1' ? t('Yes') : t('No')}</>;
     case 'date':
       return <>{formatDate(String(value))}</>;
     case 'datetime':

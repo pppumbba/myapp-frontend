@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/base/buttons/button";
@@ -46,7 +47,7 @@ export const InputFile = ({
     size = "sm",
     label,
     hint,
-    placeholder = "Choose a file",
+    placeholder = t("Choose a file"),
     isDisabled,
     isInvalid,
     isRequired,
@@ -56,7 +57,7 @@ export const InputFile = ({
     allowsMultiple,
     onChange,
     className,
-    buttonText = "Upload",
+    buttonText = t("Upload"),
 }: InputFileProps) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [fileNames, setFileNames] = useState("");

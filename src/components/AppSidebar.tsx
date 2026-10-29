@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronLeftDouble, ChevronRightDouble, Circle } from '@untitledui/icons';
+import { ChevronLeftDouble, ChevronRightDouble, Circle, LogIn01 } from '@untitledui/icons';
 import { Button as AriaButton, Link as AriaLink } from 'react-aria-components';
 import { MobileNavigationHeader } from '@/components/application/app-navigation/base-components/mobile-header';
 import { NavItemBase } from '@/components/application/app-navigation/base-components/nav-item';
@@ -10,6 +10,8 @@ import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
 import { cx } from '@/utils/cx';
 import { NotificationsMenu } from './NotificationsMenu';
 import { UserMenu } from './UserMenu';
+import { useAuth } from '../auth/AuthContext';
+import { t } from '@/i18n';
 
 const WIDTH = 256;
 const RAIL_WIDTH = 64;
@@ -35,7 +37,7 @@ type Item = NavItemType | NavItemDividerType;
 
 /**
  * The Untitled UI sidebar used by the builder and by running apps, with the notifications
- * bell and the signed-in user at the foot. On large screens it's fixed on the left and can fold into an icon rail (the
+ * bell and the signed-in user at the foot (a guest, e.g. on a portal, gets Log in instead). On large screens it's fixed on the left and can fold into an icon rail (the
  * choice is remembered); below that it becomes a top bar whose menu button opens it as a
  * drawer.
  */
@@ -44,7 +46,7 @@ export function AppSidebar({
   logoMark,
   items,
   activeUrl,
-  footerItems = [],
+  footerItems: ownFooterItems = [],
   label,
   children,
 }: {
@@ -59,6 +61,8 @@ export function AppSidebar({
   label: string;
   children: ReactNode;
 }) {
+  const { user } = useAuth();
+  const footerItems: NavItemType[] = user ? ownFooterItems : [...ownFooterItems, { label: t('Log in'), icon: LogIn01, href: '/login' }];
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = (next: boolean) => {
     setCollapsed(next);
@@ -70,8 +74,8 @@ export function AppSidebar({
       <div className="flex items-center justify-between gap-2 px-3 lg:px-4">
         <div className="min-w-0 flex-1">{logo}</div>
         {withToggle && (
-          <Tooltip title="Collapse menu" placement="right">
-            <TooltipTrigger aria-label="Collapse menu" onPress={() => toggle(true)} className={railButton}>
+          <Tooltip title={t("Collapse menu")} placement="right">
+            <TooltipTrigger aria-label={t("Collapse menu")} onPress={() => toggle(true)} className={railButton}>
               <ChevronLeftDouble className="size-4" />
             </TooltipTrigger>
           </Tooltip>
@@ -94,10 +98,14 @@ export function AppSidebar({
             ))}
           </ul>
         )}
-        <NotificationsMenu />
-        <div className="border-t border-secondary pt-3">
-          <UserMenu />
-        </div>
+        {user && (
+          <>
+            <NotificationsMenu />
+            <div className="border-t border-secondary pt-3">
+              <UserMenu />
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );
@@ -106,8 +114,8 @@ export function AppSidebar({
   const rail = (
     <aside className="flex h-full w-(--rail) flex-col items-center overflow-y-auto border-r border-secondary bg-primary py-4">
       {logoMark}
-      <Tooltip title="Expand menu" placement="right">
-        <TooltipTrigger aria-label="Expand menu" onPress={() => toggle(false)} className={cx(railButton, 'mt-3')}>
+      <Tooltip title={t("Expand menu")} placement="right">
+        <TooltipTrigger aria-label={t("Expand menu")} onPress={() => toggle(false)} className={cx(railButton, 'mt-3')}>
           <ChevronRightDouble className="size-4" />
         </TooltipTrigger>
       </Tooltip>
@@ -132,10 +140,14 @@ export function AppSidebar({
         {footerItems.map((item) => (
           <RailItem key={item.label} item={item} activeUrl={activeUrl} onExpand={() => toggle(false)} />
         ))}
-        <NotificationsMenu collapsed />
-        <div className="border-t border-secondary pt-3">
-          <UserMenu collapsed />
-        </div>
+        {user && (
+          <>
+            <NotificationsMenu collapsed />
+            <div className="border-t border-secondary pt-3">
+              <UserMenu collapsed />
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );
@@ -174,7 +186,7 @@ function RailItem({ item, activeUrl, onExpand }: { item: NavItemType; activeUrl?
   if (item.items?.length) {
     return (
       <Dropdown.Root>
-        <AriaButton aria-label={`${item.label} menu`} className={look}>
+        <AriaButton aria-label={t('{name} menu', { name: item.label })} className={look}>
           <Icon className="size-5" />
         </AriaButton>
         <Dropdown.Popover placement="right top" offset={8} className="w-56">
@@ -205,7 +217,7 @@ function RailItem({ item, activeUrl, onExpand }: { item: NavItemType; activeUrl?
           <Icon className="size-5" />
         </AriaLink>
       ) : (
-        <TooltipTrigger aria-label={`${item.label} (opens the menu)`} onPress={onExpand} className={look}>
+        <TooltipTrigger aria-label={t('{name} (opens the menu)', { name: item.label })} onPress={onExpand} className={look}>
           <Icon className="size-5" />
         </TooltipTrigger>
       )}

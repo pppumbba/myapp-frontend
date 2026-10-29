@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CheckCircle, Plus, Printer } from '@untitledui/icons';
+import { CheckCircle, ClockRewind, Plus, Printer } from '@untitledui/icons';
 import { Modal } from '../components/Modal';
 import { ReportView } from './ReportView';
+import { RecordHistory } from './RecordHistory';
 import { ApiError } from '../lib/api';
 import { dataApi, type DataRow } from '../lib/dataApi';
 import type { ProcessRun } from '../lib/processFlowApi';
@@ -14,13 +15,24 @@ import { Input } from '@/components/base/input/input';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
-import { blankLine, DetailLines, lineAmount, linesPayload, startLines, type Line } from './DetailLines';
-import { autonumberFields, autonumberOf, filledFrom, optionsOf, primaryKey, title, useDetailTree, useMetaDef, visibleParams } from './definitions';
+import { blankLine, DetailSection, detailPayload, lineAmount, startLines, type Line } from './DetailLines';
+import { autonumberFields, autonumberOf, filledFrom, isOneToOne, optionsOf, primaryKey, title, useDetailTree, useMetaDef, visibleParams } from './definitions';
 import { startValues, toPayload, type Values } from './formValues';
 import { lineChanges, runScript, scriptsOf, type ScriptEvent, type ScriptKind, type ScriptState } from './formScript';
 import { LookupField } from './LookupField';
+import { FileField } from './FileField';
+import { DocumentCard, DocumentEditor } from './DocumentEditor';
+import type { MetaDef } from './definitions';
+import { isFileParam } from '../lib/contentApi';
+import { useAuth } from '../auth/AuthContext';
+import { useAppMetaId } from './appContext';
+import { criteriaPasses, type CriteriaVars } from './criteria';
+import type { DetailNode } from './definitions';
+import { t } from '@/i18n';
 
-const wide = (f: MetaParam) => f.render_type === 'textarea' || f.data_type === 'text' || f.data_type === 'boolean';
+const wide = (f: MetaParam) => f.render_type === 'textarea' || f.data_type === 'text' || f.data_type === 'boolean' || f.data_type === 'document' || isFileParam(f);
+/** Never changed on a document's page: what the server or the lines work out, and parts that are not values. */
+const NOT_ON_PAGE = ['document', 'detail', 'subgrid', 'signature'];
 /** A typed-in number, not a lookup's id or a choice from a list. */
 const isNumber = (f: MetaParam) => (f.data_type === 'integer' || f.data_type === 'decimal') && !f.is_select && !optionsOf(f);
 
@@ -36,6 +48,9 @@ const isNumber = (f: MetaParam) => (f.data_type === 'integer' || f.data_type ===
  * Besides Save: Save and add saves and starts a new record (json_config.save_and_add false
  * hides it); Save and print saves and prints the record with the report in
  * json_config.print_meta_id. onSaved's next is "new" when the form stays open for another.
+ * A document param (data_type "document", ref_meta_id a report) opens its report's page to
+ * fill in (DocumentEditor): only the fields this form lets you change can be changed there,
+ * and its Save and print prints that report.
  * Detail params (data_type "detail") add editable line items, saved with the record. A
  * detail's json_config.amount and total_field make the header total follow the lines,
  * unless the form has an event script, which then works out its fields itself (the server
@@ -73,11 +88,33 @@ export function FormView({
   // Bumped to start a fresh new record.
   const [fresh, setFresh] = useState(0);
   // A record just saved with Save and print, shown with its report; closing goes on.
-  const [printing, setPrinting] = useState<{ id: string; row: DataRow } | null>(null);
+  const [printing, setPrinting] = useState<{ id: string; row: DataRow; def: MetaDef } | null>(null);
+  // A document field open on its page, and its report (Save and print prints it).
+  const [editing, setEditing] = useState<MetaParam | null>(null);
+  const { def: editingDef } = useMetaDef(editing?.ref_meta_id ?? null);
+  const [showHistory, setShowHistory] = useState(false);
   const fields = useMemo(() => (def ? visibleParams(def.params).filter((p) => !(fixed && p.field_path in fixed)) : []), [def, fixed]);
   // The details, each with its line form and the details of its lines.
   const { tree, error: lineDefError } = useDetailTree(def);
   const details = useMemo(() => (tree ?? []).map((n) => n.detail), [tree]);
+  // What a detail's criteria can use besides the form's values, as the server gives it (Criteria::userVars).
+  const { user, access, session } = useAuth();
+  const appMetaId = useAppMetaId();
+  const userVars = useMemo((): CriteriaVars => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    return {
+      ...session,
+      sessionUserId: user?.id ?? null,
+      sessionUserName: user?.name ?? null,
+      sessionUserEmail: user?.email ?? null,
+      roleId: (access?.roles ?? []).map((r) => r.id),
+      today,
+      now: `${today} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+      appMetaId,
+    };
+  }, [session, user, access, appMetaId]);
 
   const [values, setValues] = useState<Values | null>(null);
   const [lines, setLines] = useState<Record<string, Line[]>>({});
@@ -157,7 +194,7 @@ export function FormView({
     if (!def || !tree) return;
     let live = true;
     const filled: Promise<DataRow> = fill ? dataApi.fill(fill.metaId, fill.params) : Promise.resolve({});
-    const fail = (err: unknown) => live && setLoadError(err instanceof ApiError ? err.message : 'This record could not be loaded.');
+    const fail = (err: unknown) => live && setLoadError(err instanceof ApiError ? err.message : t('This record could not be loaded.'));
 
     // The load script gets the starting values before they are shown.
     const start = async (values: Values, lines: Record<string, Line[]>) => {
@@ -217,6 +254,27 @@ export function FormView({
   };
   const fe = (field: string) => fieldErrors[field]?.[0];
 
+  /**
+   * The details a save takes with these values: those whose json_config.criteria holds, as the
+   * server decides (record values over userVars). One whose criteria can't be read is left
+   * out, with the reason.
+   */
+  function applicable(state: ScriptState): { nodes: DetailNode[]; problems: string[] } {
+    const vars: CriteriaVars = { ...userVars, ...fixed, ...state.values };
+    const problems: string[] = [];
+    const nodes = tree!.filter((n) => {
+      try {
+        const criteria = n.detail.json_config?.criteria;
+        return criteriaPasses(typeof criteria === 'string' ? criteria : null, vars);
+      } catch (err) {
+        problems.push(t('The criteria of "{name}": {error}', { name: n.detail.label_name || n.detail.field_path, error: err instanceof Error ? err.message : String(err) }));
+        return false;
+      }
+    });
+    return { nodes, problems };
+  }
+  const shown = applicable({ values, lines, hidden, readonly: locked });
+
   // Header fields a detail sums into: field_path -> the current total. A form with an event
   // script works out its own.
   const totals = new Map(
@@ -224,7 +282,7 @@ export function FormView({
       ? []
       : details.flatMap((d) => {
           const field = d.json_config?.total_field;
-          if (typeof field !== 'string') return [];
+          if (typeof field !== 'string' || isOneToOne(d)) return [];
           return [[field, (lines[d.field_path] ?? []).reduce((sum, l) => sum + (lineAmount(d, l) ?? 0), 0)] as const];
         }),
   );
@@ -232,7 +290,8 @@ export function FormView({
   function payload(state: ScriptState): DataRow {
     const out = { ...toPayload(fields, state.values), ...fixed };
     totals.forEach((sum, field) => (out[field] = Math.round(sum * 100) / 100));
-    tree!.forEach((n) => (out[n.detail.field_path] = linesPayload(n, state.lines[n.detail.field_path] ?? [])));
+    applicable(state).nodes.forEach((n) => (out[n.detail.field_path] = detailPayload(n, state.lines[n.detail.field_path] ?? [])));
+    if (appMetaId) out._context = { app_meta_id: appMetaId };
     return out;
   }
 
@@ -248,7 +307,7 @@ export function FormView({
     onSaved?.(row, next === 'add' ? 'new' : undefined);
   }
 
-  async function submit(next: 'save' | 'add' | 'print') {
+  async function submit(next: 'save' | 'add' | 'print', printWith: MetaDef | null = printDef) {
     if (!def || !values) return;
     setSaving(true);
     setError(null);
@@ -269,14 +328,15 @@ export function FormView({
         const after = await script('after_save', before.state, { row });
         if (after.stopped) setError(after.stopped);
       }
-      if (next === 'print' && printDef) setPrinting({ id: String(row[primaryKey(def.params)]), row });
+      setEditing(null);
+      if (next === 'print' && printWith) setPrinting({ id: String(row[primaryKey(def.params)]), row, def: printWith });
       else afterSave(row, next === 'print' ? 'save' : next);
     } catch (err) {
       if (err instanceof ApiError) {
         setFieldErrors(err.errors ?? {});
         if (!err.errors) setError(err.message);
       } else {
-        setError('This could not be saved. Check that the API is running.');
+        setError(t('This could not be saved. Check that the API is running.'));
       }
     } finally {
       setSaving(false);
@@ -303,8 +363,8 @@ export function FormView({
         <div role="status" className="flex gap-3 rounded-xl bg-success-primary p-4 ring-1 ring-success-secondary ring-inset">
           <CheckCircle className="size-5 shrink-0 text-fg-success-primary" aria-hidden="true" />
           <div className="text-sm text-success-primary">
-            <p className="font-medium">Saved. You can add another one.</p>
-            {alsoSaved.length > 0 && <p>Also saved: {alsoSaved.map((r) => (r.id ? `${r.process} #${r.id}` : r.process)).join(', ')}.</p>}
+            <p className="font-medium">{t('Saved. You can add another one.')}</p>
+            {alsoSaved.length > 0 && <p>{t('Also saved: {records}.', { records: alsoSaved.map((r) => (r.id ? `${r.process} #${r.id}` : r.process)).join(', ') })}</p>}
           </div>
         </div>
       )}
@@ -316,13 +376,15 @@ export function FormView({
           const readOnly = locked.has(f.field_path);
           return (
           <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
-            {auto && !auto.editable ? (
+            {f.data_type === 'document' ? (
+              <DocumentCard param={f} value={values[f.field_path]} onOpen={() => setEditing(f)} />
+            ) : auto && !auto.editable ? (
               <Input
                 label={f.label_name || f.param_name}
                 value={recordId ? String(values[f.field_path] ?? '') : (next ?? '…')}
                 isReadOnly
                 isInvalid={!!fe(f.field_path)}
-                hint={fe(f.field_path) ?? (currentId ? 'Numbered when it was added.' : 'Given when saved: this is the next number.')}
+                hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
                 wrapperClassName="bg-secondary shadow-none"
                 inputClassName="tabular-nums"
               />
@@ -331,7 +393,7 @@ export function FormView({
                 label={f.label_name || f.param_name}
                 value={formatNumber(totals.get(f.field_path))}
                 isReadOnly
-                hint="Worked out from the lines below."
+                hint={t('Worked out from the lines below.')}
                 wrapperClassName="bg-secondary shadow-none"
                 inputClassName="font-semibold tabular-nums"
               />
@@ -355,7 +417,7 @@ export function FormView({
                 param={f}
                 value={values[f.field_path]}
                 error={fe(f.field_path)}
-                hint={auto && next ? `Leave blank for ${next}.` : undefined}
+                hint={auto && next ? t('Leave blank for {next}.', { next }) : undefined}
                 optional={!!auto && !recordId}
                 onChange={(v, fill) => set(f.field_path, v, fill)}
               />
@@ -363,8 +425,13 @@ export function FormView({
           </div>
           );
         })}
-        {tree.map((n) => (
-          <DetailLines
+        {shown.problems.map((p) => (
+          <div key={p} className="sm:col-span-2">
+            <Alert>{p}</Alert>
+          </div>
+        ))}
+        {shown.nodes.map((n) => (
+          <DetailSection
             key={n.detail.field_path}
             node={n}
             lines={lines[n.detail.field_path] ?? []}
@@ -375,28 +442,63 @@ export function FormView({
       </div>
 
       <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
+        {currentId && def?.meta.is_log && (
+          <Button size="lg" color="tertiary" iconLeading={ClockRewind} className="mr-auto" onPress={() => setShowHistory(true)}>
+            {t('History')}
+          </Button>
+        )}
         {onCancel && (
           <Button size="lg" color="secondary" onPress={onCancel}>
-            Cancel
+            {t('Cancel')}
           </Button>
         )}
         {canAdd && (
           <Button size="lg" color="secondary" iconLeading={Plus} isDisabled={saving} onPress={() => submit('add')}>
-            Save and add
+            {t('Save and add')}
           </Button>
         )}
         {printDef && (
           <Button size="lg" color="secondary" iconLeading={Printer} isDisabled={saving} onPress={() => submit('print')}>
-            Save and print
+            {t('Save and print')}
           </Button>
         )}
         <Button size="lg" type="submit" isLoading={saving} showTextWhileLoading>
-          {saving ? 'Saving…' : currentId ? 'Save changes' : 'Save'}
+          {saving ? t('Saving…') : currentId ? t('Save changes') : t('Save')}
         </Button>
       </div>
-      {printing && printDef && (
+      {showHistory && currentId && def && (
+        <RecordHistory metaId={def.meta.id} recordId={currentId} params={def.params} tree={tree ?? []} onClose={() => setShowHistory(false)} />
+      )}
+      {editing && (
+        <DocumentEditor
+          formMetaId={def.meta.id}
+          param={editing}
+          recordId={currentId}
+          payload={payload({ values, lines, hidden, readonly: locked })}
+          fields={fields}
+          values={values}
+          errors={fieldErrors}
+          error={error}
+          editable={(f) => {
+            const auto = autonumberOf(f);
+            return !NOT_ON_PAGE.includes(f.data_type) && !hidden.has(f.field_path) && !locked.has(f.field_path) && !totals.has(f.field_path) && !(auto && !auto.editable);
+          }}
+          onValue={(field, v) => set(field, v)}
+          renderField={(f) => (
+            <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={(v, fill) => set(f.field_path, v, fill)} />
+          )}
+          renderLines={(detail) => {
+            const n = shown.nodes.find((x) => x.detail.field_path === detail);
+            return n ? <DetailSection node={n} lines={lines[detail] ?? []} errors={fieldErrors} onChange={(next) => setDetail(detail, next)} /> : null;
+          }}
+          saving={saving}
+          onSaveAndPrint={() => submit('print', editingDef)}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {printing && (
         <Modal
-          title={`Saved. Printing ${title(printDef.meta).toLowerCase()}`}
+          title={t('Saved. Printing {name}', { name: title(printing.def.meta).toLowerCase() })}
           onClose={() => {
             const { row } = printing;
             setPrinting(null);
@@ -404,7 +506,7 @@ export function FormView({
           }}
           size="xl"
         >
-          <ReportView def={printDef} recordId={printing.id} autoPrint />
+          <ReportView def={printing.def} recordId={printing.id} autoPrint />
         </Modal>
       )}
     </form>
@@ -413,7 +515,7 @@ export function FormView({
   if (embedded) return form;
 
   return (
-    <div className={`${details.length ? 'max-w-6xl' : 'max-w-3xl'} rounded-xl bg-primary shadow-xs ring-1 ring-secondary`}>
+    <div className={`${details.some((d) => !isOneToOne(d)) ? 'max-w-6xl' : 'max-w-3xl'} rounded-xl bg-primary shadow-xs ring-1 ring-secondary`}>
       <div className="border-b border-secondary px-4 py-4 sm:px-5">
         <h2 className="text-lg font-semibold text-primary">{title(def.meta)}</h2>
         {def.meta.description && <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>}
@@ -447,6 +549,10 @@ function Field({
 
   if (f.data_type === 'boolean') {
     return <Toggle label={label} hint={error} isSelected={value === true} onChange={onChange} />;
+  }
+
+  if (isFileParam(f)) {
+    return <FileField param={f} value={String(value)} error={error} required={common.isRequired} onChange={onChange} />;
   }
 
   if (f.is_select && f.ref_meta_id) {

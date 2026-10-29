@@ -9,6 +9,7 @@ import { Button } from '@/components/base/buttons/button';
 import { FormView } from './FormView';
 import { primaryKey, title, type MetaDef } from './definitions';
 import { addDays, parseLocal as parse, swatchFor, ymd, type Swatch } from './palette';
+import { t } from '@/i18n';
 
 const MAX_CHIPS = 3;
 
@@ -44,7 +45,7 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
   const key = primaryKey(params);
   const formId = meta.ref_meta_id;
   // json_config.item_label names one entry, e.g. "class".
-  const item = field('item_label', 'event')!;
+  const item = field('item_label', t('event'))!;
 
   const today = useMemo(() => new Date(new Date().setHours(0, 0, 0, 0)), []);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -77,7 +78,7 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
           setRows(r.data);
           setError(null);
         },
-        (err) => live && setError(err instanceof ApiError ? err.message : 'Events could not be loaded.'),
+        (err) => live && setError(err instanceof ApiError ? err.message : t('Events could not be loaded.')),
       );
     return () => {
       live = false;
@@ -93,7 +94,7 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
       const end = endField ? parse(row[endField]) : null;
       const event: CalEvent = {
         key: String(row[key]),
-        title: String(row[titleField!] ?? 'Untitled'),
+        title: String(row[titleField!] ?? t('Untitled')),
         start,
         end,
         swatch: swatchFor(colors, colorField ? row[colorField] : null),
@@ -108,7 +109,7 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
     return map;
   }, [rows, startField, endField, titleField, colorField, colors, key]);
 
-  if (!startField) return <Alert>{`"${meta.name}" doesn't say which field holds the event date. Set start_field in its config.`}</Alert>;
+  if (!startField) return <Alert>{t('"{name}" doesn\'t say which field holds the event date. Set start_field in its config.', { name: meta.name })}</Alert>;
 
   const shift = (n: number) => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + n, 1));
   const goToday = () => {
@@ -136,19 +137,19 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" color="secondary" iconLeading={ChevronLeft} aria-label="Previous month" onPress={() => shift(-1)} />
+            <Button size="sm" color="secondary" iconLeading={ChevronLeft} aria-label={t('Previous month')} onPress={() => shift(-1)} />
             <Button size="sm" color="secondary" onPress={goToday}>
-              Today
+              {t('Today')}
             </Button>
-            <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label="Next month" onPress={() => shift(1)} />
+            <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label={t('Next month')} onPress={() => shift(1)} />
             {filterParams.length > 0 && (
               <Button size="sm" color={showFilters || Object.keys(filters).length ? 'primary' : 'secondary'} iconLeading={FilterLines} aria-expanded={showFilters} onPress={() => setShowFilters((s) => !s)}>
-                {Object.keys(filters).length ? `Filters (${Object.keys(filters).length})` : 'Filters'}
+                {Object.keys(filters).length ? t('Filters ({count})', { count: Object.keys(filters).length }) : t('Filters')}
               </Button>
             )}
             {formId && (
               <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)} className="ml-auto sm:ml-2">
-                Add {item}
+                {t('Add {item}', { item })}
               </Button>
             )}
           </div>
@@ -212,7 +213,7 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
                   {events.length > MAX_CHIPS && (
                     <li>
                       <button type="button" onClick={() => setSelected(day)} className="px-1.5 text-xs font-medium text-tertiary hover:text-secondary">
-                        +{events.length - MAX_CHIPS} more
+                        {t('+{count} more', { count: events.length - MAX_CHIPS })}
                       </button>
                     </li>
                   )}
@@ -222,14 +223,14 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
           })}
         </div>
 
-        <section aria-label="Selected day" className="border-t border-secondary px-4 py-4 sm:px-5">
+        <section aria-label={t('Selected day')} className="border-t border-secondary px-4 py-4 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-md font-semibold text-primary">
               {selected.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </h3>
             {formId && (
               <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => setEditing(null)}>
-                Add on this day
+                {t('Add on this day')}
               </Button>
             )}
           </div>
@@ -251,13 +252,13 @@ export function CalendarView({ def, scope, initialFilters }: { def: MetaDef; sco
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm text-tertiary">{rows ? 'Nothing planned.' : 'Loading…'}</p>
+            <p className="mt-2 text-sm text-tertiary">{rows ? t('Nothing planned.') : t('Loading…')}</p>
           )}
         </section>
       </div>
 
       {editing !== undefined && formId && (
-        <Modal title={editing ? `Edit ${item}` : `New ${item}`} onClose={() => setEditing(undefined)} size="lg">
+        <Modal title={editing ? t('Edit {item}', { item }) : t('New {item}', { item })} onClose={() => setEditing(undefined)} size="lg">
           <FormView
             metaId={formId}
             recordId={editing}
@@ -281,6 +282,6 @@ function span(e: CalEvent): string {
   const short = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const timed = !!(e.start.getHours() || e.start.getMinutes());
   if (e.end && ymd(e.end) !== ymd(e.start)) return `${short(e.start)} – ${short(e.end)}`;
-  if (!timed) return 'All day';
+  if (!timed) return t('All day');
   return e.end ? `${time(e.start)} – ${time(e.end)}` : time(e.start);
 }

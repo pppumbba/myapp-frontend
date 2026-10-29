@@ -1,4 +1,4 @@
-import type { ComponentPropsWithRef, HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import type { ComponentPropsWithRef, CSSProperties, HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import { createContext, isValidElement, useContext } from "react";
 import { ArrowDown, ChevronSelectorVertical, Copy01, Edit01, HelpCircle, Trash01 } from "@untitledui/icons";
 import type {
@@ -53,6 +53,7 @@ const TableCardRoot = ({
     size = "md",
     ...props
 }: HTMLAttributes<HTMLDivElement> & {
+    ref?: Ref<HTMLDivElement>;
     /** Controls the density of the card and every descendant header, row and cell. */
     size?: "sm" | "md";
 }) => {
@@ -112,14 +113,16 @@ const TableCardHeader = ({ title, badge, description, contentTrailing, className
 interface TableRootProps extends AriaTableProps, Omit<ComponentPropsWithRef<"table">, "className" | "slot" | "style"> {
     /** Controls the density of the header, rows and cells. The size of a wrapping `TableCard.Root` takes precedence. */
     size?: "sm" | "md";
+    /** The style of the box the table scrolls in, e.g. a fixed height to scroll rows under the header. */
+    scrollStyle?: CSSProperties;
 }
 
-const TableRoot = ({ className, size = "md", ...props }: TableRootProps) => {
+const TableRoot = ({ className, size = "md", scrollStyle, ...props }: TableRootProps) => {
     const context = useContext(TableContext);
 
     return (
         <TableContext.Provider value={{ size: context?.size ?? size }}>
-            <div className="overflow-x-auto">
+            <div className={scrollStyle?.height ? "overflow-auto overscroll-contain" : "overflow-x-auto"} style={scrollStyle}>
                 <AriaTable className={(state) => cx("w-full overflow-x-hidden", typeof className === "function" ? className(state) : className)} {...props} />
             </div>
         </TableContext.Provider>

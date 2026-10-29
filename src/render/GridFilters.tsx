@@ -8,6 +8,8 @@ import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { optionsOf } from './definitions';
 import { LookupField } from './LookupField';
+import { t } from '@/i18n';
+import { cx } from '@/utils/cx';
 
 export type Filters = Record<string, string>;
 
@@ -24,11 +26,14 @@ export function GridFilters({
   applied,
   onApply,
   statuses,
+  dropdown,
 }: {
   params: MetaParam[];
   applied: Filters;
   onApply: (filters: Filters) => void;
   statuses?: WfmStatus[];
+  /** Shown in a dropdown from the Filters button: narrower, in at most two columns. */
+  dropdown?: boolean;
 }) {
   const [draft, setDraft] = useState<Filters>(applied);
 
@@ -38,8 +43,12 @@ export function GridFilters({
   }
 
   return (
-    <form onSubmit={onSubmit} className="border-b border-secondary bg-secondary_alt px-4 py-3 sm:px-5" aria-label="Filters">
-      <div className="grid gap-x-3 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-4">
+    <form
+      onSubmit={onSubmit}
+      className={dropdown ? 'p-4' : 'border-b border-secondary bg-secondary_alt px-4 py-3 sm:px-5'}
+      aria-label={t('Filters')}
+    >
+      <div className={cx('grid gap-x-3 gap-y-2.5', dropdown ? params.length > 1 && 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
         {params.map((p) => (
           <FilterField key={p.field_path} param={p} statuses={p.field_path === 'status_id' ? statuses : undefined} value={draft[p.field_path] ?? ''} onChange={(v) => setDraft((d) => ({ ...d, [p.field_path]: v }))} />
         ))}
@@ -53,10 +62,10 @@ export function GridFilters({
             onApply({});
           }}
         >
-          Clear
+          {t('Clear')}
         </Button>
         <Button size="sm" type="submit">
-          Apply filters
+          {t('Apply filters')}
         </Button>
       </div>
     </form>
@@ -88,15 +97,15 @@ function FilterField({
   const common = { label, size: 'sm' as const, value, onChange };
 
   if (statuses) {
-    return <ComboField {...common} placeholder="Any" items={statuses.map((s) => ({ id: String(s.id), label: s.label_name || s.name }))} />;
+    return <ComboField {...common} placeholder={t('Any')} items={statuses.map((s) => ({ id: String(s.id), label: s.label_name || s.name }))} />;
   }
 
   if (p.is_select && p.ref_meta_id) {
-    return <LookupField {...common} param={p} placeholder="Any" />;
+    return <LookupField {...common} param={p} placeholder={t('Any')} />;
   }
 
   if (options) {
-    return <ComboField {...common} placeholder="Any" items={options} />;
+    return <ComboField {...common} placeholder={t('Any')} items={options} />;
   }
 
   if (p.data_type === 'boolean') {
@@ -107,9 +116,9 @@ function FilterField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         options={[
-          { value: '', label: 'Any' },
-          { value: '1', label: 'Yes' },
-          { value: '0', label: 'No' },
+          { value: '', label: t('Any') },
+          { value: '1', label: t('Yes') },
+          { value: '0', label: t('No') },
         ]}
       />
     );
@@ -121,5 +130,5 @@ function FilterField({
   }
 
   const type = p.data_type === 'integer' || p.data_type === 'decimal' ? 'number' : 'text';
-  return <Input label={label} size="sm" type={type} value={value} onChange={onChange} placeholder={type === 'text' ? 'Contains…' : undefined} />;
+  return <Input label={label} size="sm" type={type} value={value} onChange={onChange} placeholder={type === 'text' ? t('Contains…') : undefined} />;
 }

@@ -11,11 +11,12 @@ import { Toggle } from '@/components/base/toggle/toggle';
 import { clearRenderCache, useMetaDef, visibleParams, type MetaDef } from '../../render/definitions';
 import { drilldownOf, type Drilldown } from '../../render/drilldown';
 import { ImportView } from '../../render/ImportView';
-import { ReportView } from '../../render/ReportView';
 import { StatementView, aggregateOf } from '../../render/StatementView';
+import { DocumentDesigner } from './DocumentDesigner';
 import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
+import { t, tLabels } from '@/i18n';
 
 /*
  * Builder panels for the meta-level settings in json_config: a grid's drilldown, a
@@ -34,13 +35,13 @@ function useParams(metaId: number) {
   const [params, setParams] = useState<MetaParam[] | null>(null);
   useEffect(() => {
     if (!metaId) return setParams([]);
-    metaApi.params(metaId).then(setParams, () => setParams([]));
+    metaApi.params(metaId, true).then(setParams, () => setParams([]));
   }, [metaId]);
   return params;
 }
 
 /** The fields of a row, as drilldown sources. */
-const fieldSources = (params: MetaParam[]) => params.filter((p) => p.data_type !== 'detail' && p.data_type !== 'subgrid').map((p) => ({ id: p.field_path, label: `${p.label_name || p.field_path} (this row)` }));
+const fieldSources = (params: MetaParam[]) => params.filter((p) => p.data_type !== 'detail' && p.data_type !== 'subgrid').map((p) => ({ id: p.field_path, label: t('{field} (this row)', { field: p.label_name || p.field_path }) }));
 
 function Panel({ title, description, actions, children }: { title: string; description: string; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -62,7 +63,7 @@ function SavedPreview({ metaId, render }: { metaId: number; render: (def: MetaDe
   const { def } = useMetaDef(metaId);
   return (
     <div className="mt-6">
-      <p className="mb-2 text-sm font-medium text-secondary">Preview (saved settings)</p>
+      <p className="mb-2 text-sm font-medium text-secondary">{t("Preview (saved settings)")}</p>
       {def ? render(def) : <div className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />}
     </div>
   );
@@ -90,7 +91,7 @@ function useSaving() {
       await task();
       setVersion((v) => v + 1);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The settings could not be saved.');
+      setError(err instanceof ApiError ? err.message : t("The settings could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -108,14 +109,14 @@ export function GridDrilldownPanel({ meta, options }: { meta: Meta; options: Met
 
   return (
     <Panel
-      title="Drilldown"
-      description="A button on each row opens another meta, given values from that row. For one column only, set drilldown in that column's config."
+      title={t("Drilldown")}
+      description={t("A button on each row opens another meta, given values from that row. For one column only, set drilldown in that column's config.")}
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
           await saveConfig(meta.id, { drilldown: drill });
           setSaved(JSON.stringify(drill));
         })}>
-          {dirty ? 'Save drilldown' : 'Saved'}
+          {dirty ? t("Save drilldown") : t("Saved")}
         </Button>
       }
     >
@@ -172,11 +173,11 @@ export function StatementDesigner({ meta, options }: { meta: Meta; options: Meta
   return (
     <>
       <Panel
-        title="Statement"
-        description="Group the records, total the columns that add up, and pick what a row opens. Add columns and filters in the rows below."
+        title={t("Statement")}
+        description={t("Group the records, total the columns that add up, and pick what a row opens. Add columns and filters in the rows below.")}
         actions={
           <Button size="sm" isDisabled={!params} isLoading={busy} showTextWhileLoading onPress={save}>
-            Save settings
+            {t("Save settings")}
           </Button>
         }
       >
@@ -186,68 +187,68 @@ export function StatementDesigner({ meta, options }: { meta: Meta; options: Meta
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
-              <Field title="Group by" hint="Outer group first; each group gets a subtotal.">
+              <Field title={t("Group by")} hint={t("Outer group first; each group gets a subtotal.")}>
                 {groups.map((g, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="w-14 shrink-0 text-xs text-tertiary">Level {i + 1}</span>
+                    <span className="w-14 shrink-0 text-xs text-tertiary">{t('Level {n}', { n: i + 1 })}</span>
                     <div className="min-w-0 flex-1">
-                      <ComboField aria-label={`Group level ${i + 1}`} size="sm" items={fields} value={g} onChange={(v) => setGroups(groups.map((x, j) => (j === i ? v : x)))} />
+                      <ComboField aria-label={t('Group level {n}', { n: i + 1 })} size="sm" items={fields} value={g} onChange={(v) => setGroups(groups.map((x, j) => (j === i ? v : x)))} />
                     </div>
-                    <IconAction icon={Trash01} danger label={`Remove group level ${i + 1}`} onPress={() => setGroups(groups.filter((_, j) => j !== i))} />
+                    <IconAction icon={Trash01} danger label={t('Remove group level {n}', { n: i + 1 })} onPress={() => setGroups(groups.filter((_, j) => j !== i))} />
                   </div>
                 ))}
                 <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => setGroups([...groups, ''])}>
-                  Add a group level
+                  {t("Add a group level")}
                 </Button>
               </Field>
 
-              <Field title="Order within groups">
+              <Field title={t("Order within groups")}>
                 {sort.map((s, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <ComboField aria-label={`Order by ${i + 1}`} size="sm" items={fields} value={s.field} onChange={(field) => setSort(sort.map((x, j) => (j === i ? { ...x, field } : x)))} />
+                      <ComboField aria-label={t('Order by {n}', { n: i + 1 })} size="sm" items={fields} value={s.field} onChange={(field) => setSort(sort.map((x, j) => (j === i ? { ...x, field } : x)))} />
                     </div>
                     <NativeSelect
-                      aria-label={`Direction ${i + 1}`}
+                      aria-label={t('Direction {n}', { n: i + 1 })}
                       size="sm"
                       value={s.dir}
                       onChange={(e) => setSort(sort.map((x, j) => (j === i ? { ...x, dir: e.target.value as 'asc' | 'desc' } : x)))}
                       options={[
-                        { value: 'asc', label: 'Ascending' },
-                        { value: 'desc', label: 'Descending' },
+                        { value: 'asc', label: t("Ascending") },
+                        { value: 'desc', label: t("Descending") },
                       ]}
                     />
-                    <IconAction icon={Trash01} danger label={`Remove order ${i + 1}`} onPress={() => setSort(sort.filter((_, j) => j !== i))} />
+                    <IconAction icon={Trash01} danger label={t('Remove order {n}', { n: i + 1 })} onPress={() => setSort(sort.filter((_, j) => j !== i))} />
                   </div>
                 ))}
                 <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => setSort([...sort, { field: '', dir: 'asc' }])}>
-                  Add an order
+                  {t("Add an order")}
                 </Button>
               </Field>
 
-              <Toggle label="List the records under each group" hint="Off: one line per group, with its totals." isSelected={details} onChange={setDetails} />
+              <Toggle label={t("List the records under each group")} hint={t("Off: one line per group, with its totals.")} isSelected={details} onChange={setDetails} />
             </div>
 
             <div className="space-y-6">
-              <Field title="Totals" hint="Shown for each group and for the whole statement.">
+              <Field title={t("Totals")} hint={t("Shown for each group and for the whole statement.")}>
                 <div className="divide-y divide-secondary rounded-lg ring-1 ring-secondary">
                   {columns.map((p) => (
                     <div key={p.field_path} className="flex items-center justify-between gap-3 px-3 py-1.5">
                       <span className="min-w-0 truncate text-sm text-secondary">{p.label_name || p.field_path}</span>
                       <NativeSelect
-                        aria-label={`Total of ${p.label_name || p.field_path}`}
+                        aria-label={t('Total of {field}', { field: p.label_name || p.field_path })}
                         size="sm"
                         value={totals[p.field_path] ?? ''}
                         onChange={(e) => setTotals({ ...totals, [p.field_path]: e.target.value })}
-                        options={AGGREGATE_CHOICES}
+                        options={tLabels(AGGREGATE_CHOICES)}
                       />
                     </div>
                   ))}
-                  {!columns.length && <p className="px-3 py-3 text-sm text-tertiary">Add columns below first.</p>}
+                  {!columns.length && <p className="px-3 py-3 text-sm text-tertiary">{t("Add columns below first.")}</p>}
                 </div>
               </Field>
 
-              <Field title="A record opens" hint="Its first column becomes a link.">
+              <Field title={t("A record opens")} hint={t("Its first column becomes a link.")}>
                 <DrilldownEditor value={drill} onChange={setDrill} options={options} sources={fieldSources(params)} selfId={meta.id} />
               </Field>
             </div>
@@ -260,44 +261,9 @@ export function StatementDesigner({ meta, options }: { meta: Meta; options: Meta
   );
 }
 
-/** A report's heading and footer, with a preview of a real record below. */
+/** A report's document: laid out in the designer, printed by the server as PDF. */
 export function ReportDesigner({ meta }: { meta: Meta }) {
-  const params = useParams(meta.id);
-  const config = meta.json_config ?? {};
-  const str = (k: string) => (typeof config[k] === 'string' ? (config[k] as string) : '');
-  const [form, setForm] = useState({ title: str('title'), number_field: str('number_field'), issuer: str('issuer'), note: str('note') });
-  const { busy, error, version, run } = useSaving();
-  const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  return (
-    <>
-      <Panel
-        title="Report"
-        description="The document's heading and footer. Fields print in the order of the rows below: a detail row prints its lines, { &quot;total&quot;: true } prints under them, and a signature row leaves a line to sign."
-        actions={
-          <Button size="sm" isLoading={busy} showTextWhileLoading onPress={() => run(() => saveConfig(meta.id, { ...form, number_field: form.number_field || null }))}>
-            Save settings
-          </Button>
-        }
-      >
-        {error && <div className="mb-4"><Alert>{error}</Alert></div>}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Title" placeholder={meta.name} value={form.title} onChange={set('title')} hint="Printed large at the top, e.g. Purchase order." />
-          <ComboField
-            label="Number shown by the title"
-            placeholder="None"
-            items={(params ?? []).filter((p) => p.data_type !== 'detail' && p.data_type !== 'signature').map((p) => ({ id: p.field_path, label: p.label_name || p.field_path }))}
-            value={form.number_field}
-            onChange={set('number_field')}
-          />
-          <Input label="Issuer" placeholder="Company · department" value={form.issuer} onChange={set('issuer')} hint="A small line above the title." />
-          <Input label="Note" placeholder="Terms, or what to quote on invoices" value={form.note} onChange={set('note')} hint="Printed at the bottom." />
-        </div>
-      </Panel>
-
-      <SavedPreview key={version} metaId={meta.id} render={(def) => <ReportView def={def} />} />
-    </>
-  );
+  return <DocumentDesigner meta={meta} />;
 }
 
 const IMPORT_MODES = [
@@ -335,37 +301,37 @@ export function ExcelImportDesigner({ meta }: { meta: Meta }) {
   return (
     <>
       <Panel
-        title="Excel import"
-        description="Records go into this meta's table. Each row below is a column of the file: its label is the heading, its field path the table column, and its type, required flag, options and lookup check every value."
+        title={t("Excel import")}
+        description={t("Records go into this meta's table. Each row below is a column of the file: its label is the heading, its field path the table column, and its type, required flag, options and lookup check every value.")}
         actions={
           <Button size="sm" isDisabled={!params} isLoading={busy} showTextWhileLoading onPress={save}>
-            Save settings
+            {t("Save settings")}
           </Button>
         }
       >
         {error && <div className="mb-4"><Alert>{error}</Alert></div>}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
-            <NativeSelect label="Each row" value={mode} onChange={(e) => setMode(e.target.value)} options={IMPORT_MODES} />
+            <NativeSelect label={t("Each row")} value={mode} onChange={(e) => setMode(e.target.value)} options={tLabels(IMPORT_MODES)} />
             {mode !== 'insert' && (
-              <Field title="Match records by" hint="Rows whose values here equal a record's update it. None set: the unique columns, else the primary key.">
+              <Field title={t("Match records by")} hint={t("Rows whose values here equal a record's update it. None set: the unique columns, else the primary key.")}>
                 {keys.map((k, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <ComboField aria-label={`Match column ${i + 1}`} size="sm" items={fields} value={k} onChange={(v) => setKeys(keys.map((x, j) => (j === i ? v : x)))} />
+                      <ComboField aria-label={t('Match column {n}', { n: i + 1 })} size="sm" items={fields} value={k} onChange={(v) => setKeys(keys.map((x, j) => (j === i ? v : x)))} />
                     </div>
-                    <IconAction icon={Trash01} danger label={`Remove match column ${i + 1}`} onPress={() => setKeys(keys.filter((_, j) => j !== i))} />
+                    <IconAction icon={Trash01} danger label={t('Remove match column {n}', { n: i + 1 })} onPress={() => setKeys(keys.filter((_, j) => j !== i))} />
                   </div>
                 ))}
                 <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => setKeys([...keys, ''])}>
-                  Add a column
+                  {t("Add a column")}
                 </Button>
               </Field>
             )}
           </div>
           <div className="grid content-start gap-4 sm:grid-cols-2">
-            <Input label="Sheet" placeholder="The first one" value={sheet} onChange={setSheet} hint="Its name, or its position (1, 2, …)." />
-            <Input label="Headings on row" type="number" value={headerRow} onChange={setHeaderRow} hint="Rows under it are imported." />
+            <Input label={t("Sheet")} placeholder={t("The first one")} value={sheet} onChange={setSheet} hint={t("Its name, or its position (1, 2, …).")} />
+            <Input label={t("Headings on row")} type="number" value={headerRow} onChange={setHeaderRow} hint={t("Rows under it are imported.")} />
           </div>
         </div>
       </Panel>
@@ -398,11 +364,11 @@ export function MatrixDesigner({ meta, options }: { meta: Meta; options: MetaOpt
   return (
     <>
       <Panel
-        title="Matrix"
-        description={`One value for each pair of records from two grids, kept in ${table}, one row per pair. In a workspace, scope keeps both grids to its record.`}
+        title={t("Matrix")}
+        description={t('One value for each pair of records from two grids, kept in {table}, one row per pair. In a workspace, scope keeps both grids to its record.', { table })}
         actions={
           <Button size="sm" isLoading={busy} showTextWhileLoading onPress={() => run(() => saveConfig(meta.id, { ...config }))}>
-            Save settings
+            {t("Save settings")}
           </Button>
         }
       >
@@ -413,65 +379,65 @@ export function MatrixDesigner({ meta, options }: { meta: Meta; options: MetaOpt
         )}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
-            <Field title="Rows" hint="The grid listed down the side, e.g. items or KPIs, and the field each row is shown by.">
-              <NativeSelect aria-label="Rows grid" value={String(config.rows?.meta_id ?? '')} onChange={(e) => set('rows', { ...config.rows, meta_id: Number(e.target.value) || undefined })} options={[{ value: '', label: 'Pick a grid…' }, ...grids]} />
-              <ComboField aria-label="Row label" size="sm" placeholder="name" items={rowFields} value={config.rows?.label ?? ''} onChange={(v) => set('rows', { ...config.rows, label: v })} />
+            <Field title={t("Rows")} hint={t("The grid listed down the side, e.g. items or KPIs, and the field each row is shown by.")}>
+              <NativeSelect aria-label={t("Rows grid")} value={String(config.rows?.meta_id ?? '')} onChange={(e) => set('rows', { ...config.rows, meta_id: Number(e.target.value) || undefined })} options={[{ value: '', label: t("Pick a grid…") }, ...grids]} />
+              <ComboField aria-label={t("Row label")} size="sm" placeholder="name" items={rowFields} value={config.rows?.label ?? ''} onChange={(v) => set('rows', { ...config.rows, label: v })} />
             </Field>
-            <Field title="Columns" hint="The grid across the top, e.g. bidders, and the field each column is shown by.">
-              <NativeSelect aria-label="Columns grid" value={String(config.columns?.meta_id ?? '')} onChange={(e) => set('columns', { ...config.columns, meta_id: Number(e.target.value) || undefined })} options={[{ value: '', label: 'Pick a grid…' }, ...grids]} />
-              <ComboField aria-label="Column label" size="sm" placeholder="name" items={columnFields} value={config.columns?.label ?? ''} onChange={(v) => set('columns', { ...config.columns, label: v })} />
+            <Field title={t("Columns")} hint={t("The grid across the top, e.g. bidders, and the field each column is shown by.")}>
+              <NativeSelect aria-label={t("Columns grid")} value={String(config.columns?.meta_id ?? '')} onChange={(e) => set('columns', { ...config.columns, meta_id: Number(e.target.value) || undefined })} options={[{ value: '', label: t("Pick a grid…") }, ...grids]} />
+              <ComboField aria-label={t("Column label")} size="sm" placeholder="name" items={columnFields} value={config.columns?.label ?? ''} onChange={(v) => set('columns', { ...config.columns, label: v })} />
             </Field>
           </div>
           <div className="space-y-6">
-            <Field title="Value table columns" hint={`Columns of ${table}: the row’s id, the column’s id, and the value.`}>
+            <Field title={t("Value table columns")} hint={t('Columns of {table}: the row’s id, the column’s id, and the value.', { table })}>
               <div className="grid gap-2 sm:grid-cols-3">
-                <Input aria-label="Row id column" size="sm" placeholder="item_id" value={cell.row ?? ''} onChange={(v) => set('cell', { ...cell, row: v })} />
-                <Input aria-label="Column id column" size="sm" placeholder="bidder_id" value={cell.column ?? ''} onChange={(v) => set('cell', { ...cell, column: v })} />
-                <Input aria-label="Value column" size="sm" placeholder="unit_price" value={cell.value ?? ''} onChange={(v) => set('cell', { ...cell, value: v })} />
+                <Input aria-label={t("Row id column")} size="sm" placeholder="item_id" value={cell.row ?? ''} onChange={(v) => set('cell', { ...cell, row: v })} />
+                <Input aria-label={t("Column id column")} size="sm" placeholder="bidder_id" value={cell.column ?? ''} onChange={(v) => set('cell', { ...cell, column: v })} />
+                <Input aria-label={t("Value column")} size="sm" placeholder="unit_price" value={cell.value ?? ''} onChange={(v) => set('cell', { ...cell, value: v })} />
               </div>
               <NativeSelect
-                aria-label="Value type"
+                aria-label={t("Value type")}
                 value={cell.type ?? 'decimal'}
                 onChange={(e) => set('cell', { ...cell, type: e.target.value as Matrix['type'] })}
                 options={[
-                  { value: 'decimal', label: 'Number' },
-                  { value: 'integer', label: 'Whole number' },
-                  { value: 'string', label: 'Text' },
+                  { value: 'decimal', label: t("Number") },
+                  { value: 'integer', label: t("Whole number") },
+                  { value: 'string', label: t("Text") },
                 ]}
               />
             </Field>
-            <Field title="Comparing" hint="Which value in a row is best, and what each column adds up to. Weight is a rows field, e.g. quantity or a KPI’s weight.">
+            <Field title={t("Comparing")} hint={t("Which value in a row is best, and what each column adds up to. Weight is a rows field, e.g. quantity or a KPI’s weight.")}>
               <div className="grid gap-2 sm:grid-cols-3">
                 <NativeSelect
-                  aria-label="Best value"
+                  aria-label={t("Best value")}
                   value={config.best ?? ''}
                   onChange={(e) => set('best', (e.target.value || null) as Matrix['best'])}
                   options={[
-                    { value: '', label: 'No best' },
-                    { value: 'min', label: 'Lowest is best' },
-                    { value: 'max', label: 'Highest is best' },
+                    { value: '', label: t("No best") },
+                    { value: 'min', label: t("Lowest is best") },
+                    { value: 'max', label: t("Highest is best") },
                   ]}
                 />
                 <NativeSelect
-                  aria-label="Column total"
+                  aria-label={t("Column total")}
                   value={config.total ?? ''}
                   onChange={(e) => set('total', (e.target.value || null) as Matrix['total'])}
                   options={[
-                    { value: '', label: 'No total' },
-                    { value: 'sum', label: 'Sum' },
-                    { value: 'avg', label: 'Average' },
-                    { value: 'weighted', label: 'Weighted average' },
-                    { value: 'amount', label: 'Value × weight, summed' },
+                    { value: '', label: t("No total") },
+                    { value: 'sum', label: t("Sum") },
+                    { value: 'avg', label: t("Average") },
+                    { value: 'weighted', label: t("Weighted average") },
+                    { value: 'amount', label: t("Value × weight, summed") },
                   ]}
                 />
-                <ComboField aria-label="Weight" size="sm" placeholder="Weight" items={rowFields} value={config.weight ?? ''} onChange={(v) => set('weight', v || null)} />
+                <ComboField aria-label={t("Weight")} size="sm" placeholder={t("Weight")} items={rowFields} value={config.weight ?? ''} onChange={(v) => set('weight', v || null)} />
               </div>
             </Field>
           </div>
         </div>
       </Panel>
       {!!config.rows?.meta_id && !!config.columns?.meta_id && (
-        <Panel title="Preview" description="Every record of both grids; a workspace shows only its record’s.">
+        <Panel title={t("Preview")} description={t("Every record of both grids; a workspace shows only its record’s.")}>
           <MatrixPreview key={version} metaId={meta.id} />
         </Panel>
       )}
@@ -499,15 +465,15 @@ export function WorkspaceDesigner({ meta }: { meta: Meta }) {
 
   return (
     <Panel
-      title="Workspace"
+      title={t("Workspace")}
       description={
         meta.ref_meta_id
-          ? 'The record’s name and the fields shown above the sections. Add each section as a row below: refer it to a grid or matrix, with config { "scope": { "tender_id": "id" } }.'
-          : 'Set “Refers to” to the form of the record this workspace is about.'
+          ? t("The record’s name and the fields shown above the sections. Add each section as a row below: refer it to a grid or matrix, with config { \"scope\": { \"tender_id\": \"id\" } }.")
+          : t("Set “Refers to” to the form of the record this workspace is about.")
       }
       actions={
         <Button size="sm" isDisabled={!meta.ref_meta_id} isLoading={busy} showTextWhileLoading onPress={() => run(() => saveConfig(meta.id, { title_field: titleField || null, header: header.filter(Boolean) }))}>
-          Save settings
+          {t("Save settings")}
         </Button>
       }
     >
@@ -517,20 +483,20 @@ export function WorkspaceDesigner({ meta }: { meta: Meta }) {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Field title="Named by" hint="The field shown as the record’s title.">
-          <ComboField aria-label="Title field" size="sm" items={formFields} value={titleField} onChange={setTitleField} />
+        <Field title={t("Named by")} hint={t("The field shown as the record’s title.")}>
+          <ComboField aria-label={t("Title field")} size="sm" items={formFields} value={titleField} onChange={setTitleField} />
         </Field>
-        <Field title="Shown at the top" hint="In this order. None: the form’s first six fields.">
+        <Field title={t("Shown at the top")} hint={t("In this order. None: the form’s first six fields.")}>
           {header.map((h, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <ComboField aria-label={`Header field ${i + 1}`} size="sm" items={formFields} value={h} onChange={(v) => setHeader(header.map((x, j) => (j === i ? v : x)))} />
+                <ComboField aria-label={t('Header field {n}', { n: i + 1 })} size="sm" items={formFields} value={h} onChange={(v) => setHeader(header.map((x, j) => (j === i ? v : x)))} />
               </div>
-              <IconAction icon={Trash01} danger label="Remove this field" onPress={() => setHeader(header.filter((_, j) => j !== i))} />
+              <IconAction icon={Trash01} danger label={t("Remove this field")} onPress={() => setHeader(header.filter((_, j) => j !== i))} />
             </div>
           ))}
           <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => setHeader([...header, ''])}>
-            Add a field
+            {t("Add a field")}
           </Button>
         </Field>
       </div>
@@ -541,31 +507,32 @@ export function WorkspaceDesigner({ meta }: { meta: Meta }) {
 const FILTER_LAYOUTS = [
   { value: 'panel', label: 'Panel above the grid', hint: 'Opens with the Filters button; applies with Apply filters.' },
   { value: 'sidebar', label: 'Sidebar beside the grid', hint: 'Always open and applied as they change; lists show how many records each value has.' },
+  { value: 'dropdown', label: 'Dropdown from the button', hint: 'Opens over the grid with the Filters button and closes when they are applied.' },
 ];
 
-/** Where a grid's filters sit: a panel above it (the default), or a sidebar beside it (json_config.filter_layout). */
+/** Where a grid's filters sit: a panel above it (the default), a sidebar beside it, or a dropdown from the Filters button (json_config.filter_layout). */
 export function GridFilterLayoutPanel({ meta }: { meta: Meta }) {
   const params = useParams(meta.id);
-  const [layout, setLayout] = useState(meta.json_config?.filter_layout === 'sidebar' ? 'sidebar' : 'panel');
+  const [layout, setLayout] = useState(FILTER_LAYOUTS.some((l) => l.value === meta.json_config?.filter_layout) ? String(meta.json_config?.filter_layout) : 'panel');
   const [saved, setSaved] = useState(layout);
   const { busy, error, run } = useSaving();
   const filters = (params ?? []).filter((p) => p.is_criteria).length;
 
   return (
     <Panel
-      title="Filters"
-      description={filters ? `${filters} ${filters === 1 ? 'field is a filter' : 'fields are filters'} (Use as filter on the rows below).` : 'No field is a filter yet: turn on “Use as filter” on the rows below.'}
+      title={t("Filters")}
+      description={filters ? t('{count} fields are filters (Use as filter on the rows below).', { count: filters }) : t("No field is a filter yet: turn on “Use as filter” on the rows below.")}
       actions={
         <Button size="sm" isDisabled={layout === saved} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
           await saveConfig(meta.id, { filter_layout: layout });
           setSaved(layout);
         })}>
-          {layout === saved ? 'Saved' : 'Save'}
+          {layout === saved ? t("Saved") : t("Save")}
         </Button>
       }
     >
       {error && <div className="mb-4"><Alert>{error}</Alert></div>}
-      <div role="radiogroup" aria-label="Where the filters sit" className="grid max-w-3xl gap-3 sm:grid-cols-2">
+      <div role="radiogroup" aria-label={t("Where the filters sit")} className="grid max-w-4xl gap-3 sm:grid-cols-3">
         {FILTER_LAYOUTS.map((l) => (
           <button
             key={l.value}
@@ -575,10 +542,64 @@ export function GridFilterLayoutPanel({ meta }: { meta: Meta }) {
             onClick={() => setLayout(l.value)}
             className={`rounded-lg p-4 text-left outline-focus-ring ring-1 transition duration-100 ease-linear focus-visible:outline-2 ${layout === l.value ? 'bg-brand-primary_alt ring-2 ring-brand' : 'ring-secondary hover:bg-primary_hover'}`}
           >
-            <p className="text-sm font-semibold text-primary">{l.label}</p>
-            <p className="mt-1 text-sm text-tertiary">{l.hint}</p>
+            <p className="text-sm font-semibold text-primary">{t(l.label)}</p>
+            <p className="mt-1 text-sm text-tertiary">{t(l.hint)}</p>
           </button>
         ))}
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * How a grid's table looks: a # column (json_config.row_numbers), how many leading columns
+ * stay in view when it scrolls sideways (json_config.frozen_columns), and a fixed size in px
+ * (json_config.height, width) that its rows scroll inside, both ways.
+ */
+export function GridColumnsPanel({ meta }: { meta: Meta }) {
+  const config = meta.json_config ?? {};
+  const [rowNumbers, setRowNumbers] = useState(config.row_numbers === true);
+  const [frozen, setFrozen] = useState(config.frozen_columns ? String(config.frozen_columns) : '0');
+  const [height, setHeight] = useState(config.height ? String(config.height) : '');
+  const [width, setWidth] = useState(config.width ? String(config.width) : '');
+  const state = JSON.stringify([rowNumbers, frozen, height, width]);
+  const [saved, setSaved] = useState(state);
+  const { busy, error, run } = useSaving();
+  const dirty = state !== saved;
+  const px = (v: string) => (Number(v) > 0 ? Math.round(Number(v)) : null);
+  const params = useParams(meta.id);
+  const count = params ? visibleParams(params).length : 0;
+  const nested = (params ?? []).filter((p) => p.data_type === 'subgrid' && p.json_config?.display === 'nested').length;
+
+  return (
+    <Panel
+      title={t("Columns")}
+      description={`${t("Row numbers, frozen columns and the grid's size.")} ${nested ? t('Each row also has an arrow that opens its nested subgrid; it freezes with the columns.') : t('To open a subgrid inside each row, give it {code}.', { code: '{ "display": "nested" }' })}`}
+      actions={
+        <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
+          await saveConfig(meta.id, { row_numbers: rowNumbers, frozen_columns: Number(frozen) || null, height: px(height), width: px(width) });
+          setSaved(state);
+        })}>
+          {dirty ? t("Save") : t("Saved")}
+        </Button>
+      }
+    >
+      {error && <div className="mb-4"><Alert>{error}</Alert></div>}
+      <div className="flex max-w-3xl flex-col gap-5 sm:flex-row sm:items-end">
+        <Toggle label={t("Row numbers")} hint={t("A # column counting the rows, across pages.")} isSelected={rowNumbers} onChange={setRowNumbers} />
+        <div className="sm:w-64">
+          <NativeSelect
+            label={t("Frozen columns")}
+            hint={t("Stay in view when the table scrolls sideways.")}
+            value={frozen}
+            onChange={(e) => setFrozen(e.target.value)}
+            options={[{ value: '0', label: t("None") }, ...Array.from({ length: Math.min(count, 5) }, (_, i) => ({ value: String(i + 1), label: t('First {n}', { n: i + 1 }) }))]}
+          />
+        </div>
+      </div>
+      <div className="mt-5 grid max-w-3xl gap-5 sm:grid-cols-2">
+        <Input label={t("Height (px)")} type="number" placeholder={t("Fits the window")} value={height} onChange={setHeight} hint={t("Fixed: rows scroll under a header that stays on top.")} />
+        <Input label={t("Width (px)")} type="number" placeholder={t("Fills the page")} value={width} onChange={setWidth} hint={t("Fixed, never wider than the screen: columns scroll sideways.")} />
       </div>
     </Panel>
   );
@@ -600,24 +621,24 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
 
   return (
     <Panel
-      title="Form"
-      description="The buttons beside Save. Save and add saves and starts the next record; Save and print saves and prints the record with a report on the same table."
+      title={t("Form")}
+      description={t("The buttons beside Save. Save and add saves and starts the next record; Save and print saves and prints the record with a report on the same table.")}
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
           await saveConfig(meta.id, { print_meta_id: printId ? Number(printId) : null, save_and_add: saveAndAdd });
           setSaved(JSON.stringify([printId, saveAndAdd]));
         })}>
-          {dirty ? 'Save settings' : 'Saved'}
+          {dirty ? t("Save settings") : t("Saved")}
         </Button>
       }
     >
       {error && <div className="mb-4"><Alert>{error}</Alert></div>}
       <div className="grid max-w-3xl gap-6 sm:grid-cols-2">
-        <Field title="Save and print" hint={reports.length ? 'The report that prints the saved record. None: no Save and print button.' : 'Make a report meta on this table first.'}>
-          <NativeSelect aria-label="Print with" value={printId} onChange={(e) => setPrintId(e.target.value)} options={[{ value: '', label: 'No printing' }, ...reports.map((r) => ({ value: String(r.id), label: `${r.name} (${r.code})` }))]} />
+        <Field title={t("Save and print")} hint={reports.length ? t("The report that prints the saved record. None: no Save and print button.") : t("Make a report meta on this table first.")}>
+          <NativeSelect aria-label={t("Print with")} value={printId} onChange={(e) => setPrintId(e.target.value)} options={[{ value: '', label: t("No printing") }, ...reports.map((r) => ({ value: String(r.id), label: `${r.name} (${r.code})` }))]} />
         </Field>
-        <Field title="Save and add" hint="Shown in dialogs opened from a grid and when editing a record. A form on its own page already starts a new record after Save.">
-          <Toggle label="Show Save and add" isSelected={saveAndAdd} onChange={setSaveAndAdd} />
+        <Field title={t("Save and add")} hint={t("Shown in dialogs opened from a grid and when editing a record. A form on its own page already starts a new record after Save.")}>
+          <Toggle label={t("Show Save and add")} isSelected={saveAndAdd} onChange={setSaveAndAdd} />
         </Field>
       </div>
     </Panel>
@@ -656,8 +677,8 @@ export function StageQueryPanel({ meta, onParamsChanged }: { meta: Meta; onParam
 
   return (
     <Panel
-      title="Stage query"
-      description="The SQL runs with its parameters' values, all statements together. It runs from its own screen (Open), as a step of a form's process flow, or on a schedule once for each row of a grid."
+      title={t("Stage query")}
+      description={t("The SQL runs with its parameters' values, all statements together. It runs from its own screen (Open), as a step of a form's process flow, or on a schedule once for each row of a grid.")}
       actions={
         missing.length > 0 && (
           <Button size="sm" iconLeading={Plus} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
@@ -668,7 +689,7 @@ export function StageQueryPanel({ meta, onParamsChanged }: { meta: Meta; onParam
             setVersion((v) => v + 1);
             onParamsChanged();
           })}>
-            Add {missing.length === 1 ? 'its parameter' : `${missing.length} parameters`}
+            {missing.length === 1 ? t('Add its parameter') : t('Add {count} parameters', { count: missing.length })}
           </Button>
         )
       }
@@ -677,20 +698,20 @@ export function StageQueryPanel({ meta, onParamsChanged }: { meta: Meta; onParam
       {sql.trim() ? (
         <pre className="max-h-72 overflow-auto rounded-lg bg-secondary p-4 font-mono text-sm whitespace-pre-wrap text-primary ring-1 ring-secondary ring-inset">{sql}</pre>
       ) : (
-        <p className="text-sm text-tertiary">No SQL yet. Edit the meta to write it.</p>
+        <p className="text-sm text-tertiary">{t("No SQL yet. Edit the meta to write it.")}</p>
       )}
       <div className="mt-4 space-y-2 text-sm">
         <p className="text-secondary">
-          <span className="font-medium">Parameters in the SQL: </span>
-          {names.length === 0 ? <span className="text-tertiary">none</span> : names.map((n) => (
+          <span className="font-medium">{t("Parameters in the SQL:")} </span>
+          {names.length === 0 ? <span className="text-tertiary">{t("none")}</span> : names.map((n) => (
             <code key={n} className={`mr-1.5 inline-block rounded px-1.5 py-0.5 font-mono text-xs ring-1 ring-inset ${defined.has(n) ? 'bg-secondary text-secondary ring-secondary' : 'bg-warning-primary text-warning-primary ring-secondary'}`}>
               :{n}
             </code>
           ))}
         </p>
-        {missing.length > 0 && <p className="text-warning-primary">{missing.map((n) => `:${n}`).join(', ')} {missing.length === 1 ? 'has' : 'have'} no parameter yet, so {missing.length === 1 ? 'it is' : 'they are'} always empty (null).</p>}
-        {unused.length > 0 && <p className="text-tertiary">Not used by the SQL: {unused.map((p) => p.field_path).join(', ')}.</p>}
-        <p className="text-xs text-quaternary">:user_id and :today are always there. A parameter's default value is used when it is left empty; a required one must be filled in.</p>
+        {missing.length > 0 && <p className="text-warning-primary">{t('{names} has no parameter yet, so it is always empty (null).', { names: missing.map((n) => `:${n}`).join(', ') })}</p>}
+        {unused.length > 0 && <p className="text-tertiary">{t('Not used by the SQL: {names}.', { names: unused.map((p) => p.field_path).join(', ') })}</p>}
+        <p className="text-xs text-quaternary">{t(":user_id and :today are always there. A parameter's default value is used when it is left empty; a required one must be filled in.")}</p>
       </div>
     </Panel>
   );

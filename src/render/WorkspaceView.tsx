@@ -16,6 +16,7 @@ import { MetaView } from './MetaView';
 import { RecordPicker, ReportView } from './ReportView';
 import { StatementView } from './StatementView';
 import { primaryKey, rowLabel, title, useMetaDef, type MetaDef } from './definitions';
+import { t } from '@/i18n';
 
 type Section = MetaParam & { ref_meta_id: number };
 
@@ -47,7 +48,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
     setError(null);
     dataApi.get(mainDef.meta.id, picked).then(
       (r) => live && setRecord(r),
-      (err) => live && setError(err instanceof ApiError ? err.message : 'This record could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t('This record could not be loaded.')),
     );
     return () => {
       live = false;
@@ -61,7 +62,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
     return wanted ? wanted.map((f) => params.find((p) => p.field_path === f)).filter((p): p is MetaParam => !!p) : params.slice(0, 6);
   }, [mainDef, config.header, titleField]);
 
-  if (!def.meta.ref_meta_id) return <Alert>This workspace needs a form for its record (Refers to).</Alert>;
+  if (!def.meta.ref_meta_id) return <Alert>{t('This workspace needs a form for its record (Refers to).')}</Alert>;
   if (mainError) return <Alert>{mainError}</Alert>;
   if (!mainDef) return <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
 
@@ -74,7 +75,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
         <RecordPicker def={mainDef} labelField={titleField} label={noun} value={picked} onChange={setPicked} />
         {current && can(mainDef.meta.id, 'edit') && (
           <Button size="sm" color="secondary" iconLeading={Edit01} onPress={() => setEditing(true)}>
-            Edit {noun.toLowerCase()}
+            {t('Edit {name}', { name: noun.toLowerCase() })}
           </Button>
         )}
       </div>
@@ -82,7 +83,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
       {error && <Alert>{error}</Alert>}
       {!picked ? (
         <div className="rounded-xl border border-dashed border-primary px-5 py-12 text-center">
-          <p className="text-sm font-semibold text-secondary">Pick a {noun.toLowerCase()} to work on</p>
+          <p className="text-sm font-semibold text-secondary">{t('Pick a {name} to work on', { name: noun.toLowerCase() })}</p>
           <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>
         </div>
       ) : !current ? (
@@ -107,10 +108,10 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
           </header>
 
           {sections.length === 0 ? (
-            <Alert>This workspace has no sections yet. Add params that refer to grids or matrices.</Alert>
+            <Alert>{t('This workspace has no sections yet. Add params that refer to grids or matrices.')}</Alert>
           ) : (
             <Tabs>
-              <TabList type="underline" size="sm" aria-label={`${noun} sections`} className="mb-5">
+              <TabList type="underline" size="sm" aria-label={t('{name} sections', { name: noun })} className="mb-5">
                 {sections.map((s) => (
                   <Tab key={s.id} id={String(s.id)} label={s.label_name || s.param_name} />
                 ))}
@@ -126,7 +127,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
       )}
 
       {editing && current && (
-        <Modal title={`Edit ${noun.toLowerCase()}`} onClose={() => setEditing(false)} size="lg">
+        <Modal title={t('Edit {name}', { name: noun.toLowerCase() })} onClose={() => setEditing(false)} size="lg">
           <FormView
             metaId={mainDef.meta.id}
             recordId={picked}

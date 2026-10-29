@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Logo } from '../components/AppShell';
 import { TypePreview, typeLook } from '../components/TypePreview';
+import { t } from '@/i18n';
 
 // The building blocks a user will assemble, shown as a loose stack on the brand panel.
 const blocks: { code: string; label: string; offset: string }[] = [
@@ -31,7 +32,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
         <div className="absolute -top-24 -right-24 size-80 rounded-full bg-brand-500/30 blur-2xl" />
         <div className="absolute -bottom-32 -left-16 size-96 rounded-full bg-brand-400/20 blur-3xl" />
         <p className="relative max-w-md text-display-sm font-semibold text-white">
-          Build the apps your business runs on, one screen at a time.
+          {t("Build the apps your business runs on, one screen at a time.")}
         </p>
         <div className="relative mt-12 space-y-4">
           {blocks.map((b) => (
@@ -39,7 +40,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
               <div className="w-20 shrink-0 rounded-lg p-1.5" style={{ background: typeLook(b.code).tint }}>
                 <TypePreview code={b.code} className="w-full" />
               </div>
-              <span className="text-sm font-semibold text-primary">{b.label}</span>
+              <span className="text-sm font-semibold text-primary">{t(b.label)}</span>
             </div>
           ))}
         </div>

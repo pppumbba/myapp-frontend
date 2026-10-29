@@ -3,6 +3,7 @@ import { sessionValue } from '../lib/sessionApi';
 import type { Meta } from '../lib/metaApi';
 import type { Values } from './formValues';
 import type { Line } from './DetailLines';
+import { t } from '@/i18n';
 
 /**
  * A form's scripts, written in JavaScript on its meta and run in the browser:
@@ -70,7 +71,7 @@ class ScriptStop extends Error {}
 /** A script that could not run, with the kind it was, for the message. */
 export class ScriptFailure extends Error {
   constructor(kind: string, cause: unknown) {
-    super(`The form's ${kind.replace('_', ' ')} script failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    super(t("The form's {script} script failed: {cause}", { script: t(kind.replace('_', ' ')), cause: cause instanceof Error ? cause.message : String(cause) }));
   }
 }
 
@@ -178,7 +179,7 @@ export async function runScript(
   try {
     const fn = compile(scripts.var_fnc ?? '', body);
     const returned = await fn(...NAMES.map((n) => api[n]));
-    if (kind === 'before_save' && returned === false) return { state: next, messages, stopped: messages.pop() ?? 'The form stopped the save.' };
+    if (kind === 'before_save' && returned === false) return { state: next, messages, stopped: messages.pop() ?? t('The form stopped the save.') };
     return { state: next, messages };
   } catch (err) {
     if (err instanceof ScriptStop) return { state: next, messages, stopped: err.message };

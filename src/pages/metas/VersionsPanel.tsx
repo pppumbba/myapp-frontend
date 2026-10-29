@@ -9,6 +9,7 @@ import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
+import { t } from '@/i18n';
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
@@ -32,7 +33,8 @@ const show = (v: unknown) => (v === null || v === undefined || v === '' ? '—' 
 /**
  * Version control for a meta: save it as a version with a note, see what changed since any
  * version, and restore one. Restoring saves unsaved changes as a version first, so it can
- * always be undone. onRestored reloads the page's panels.
+ * always be undone. A change saved over what someone else left keeps that as an "Auto"
+ * version first. onRestored reloads the page's panels.
  */
 export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: () => void }) {
   const [versions, setVersions] = useState<MetaVersion[] | null>(null);
@@ -54,7 +56,7 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
       setCurrent(res.current_version);
       setChanged(res.changed);
     } catch (err) {
-      setError(message(err, 'The versions could not be loaded.'));
+      setError(message(err, t("The versions could not be loaded.")));
     }
   }
 
@@ -71,7 +73,7 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
       setNote('');
       await load();
     } catch (err) {
-      setError(message(err, 'The version could not be saved.'));
+      setError(message(err, t("The version could not be saved.")));
     } finally {
       setSaving(false);
     }
@@ -87,7 +89,7 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
       onRestored();
       await load();
     } catch (err) {
-      setError(message(err, 'The version could not be restored.'));
+      setError(message(err, t("The version could not be restored.")));
       setRestoring(null);
     } finally {
       setRestoreBusy(false);
@@ -103,25 +105,25 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
         <div className="flex items-center gap-2">
           <GitCommit className="size-5 text-fg-quaternary" aria-hidden="true" />
           <h2 id="versions-title" className="text-md font-semibold text-primary">
-            Versions
+            {t("Versions")}
           </h2>
           {versions &&
             (changed ? (
               <Badge type="pill-color" color="warning" size="sm">
-                {list.length ? 'Unsaved changes' : 'Never saved'}
+                {list.length ? t("Unsaved changes") : t("Never saved")}
               </Badge>
             ) : (
               <Badge type="pill-color" color="success" size="sm">
-                Same as version {current}
+                {t('Same as version {n}', { n: current })}
               </Badge>
             ))}
         </div>
         <form onSubmit={onSave} className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <div className="min-w-0 flex-1 sm:w-72">
-            <Input aria-label="What changed" placeholder="What changed? (optional)" value={note} onChange={setNote} size="sm" />
+            <Input aria-label={t("What changed")} placeholder={t("What changed? (optional)")} value={note} onChange={setNote} size="sm" />
           </div>
           <Button size="sm" type="submit" isDisabled={!changed} isLoading={saving} showTextWhileLoading>
-            Save version
+            {t("Save version")}
           </Button>
         </form>
       </div>
@@ -135,7 +137,8 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
         {restored && (
           <div role="status" className="mb-3 rounded-lg bg-success-primary p-3 text-sm text-success-primary ring-1 ring-success-secondary ring-inset">
             <p className="font-medium">
-              Restored version {restored.version}.{restored.saved_first && ` Your changes before it are kept as version ${restored.saved_first}.`}
+              {t('Restored version {n}.', { n: restored.version })}
+              {restored.saved_first && ` ${t('Your changes before it are kept as version {n}.', { n: restored.saved_first })}`}
             </p>
             {restored.warnings.length > 0 && (
               <ul className="mt-1 list-disc pl-5 text-warning-primary">
@@ -149,7 +152,7 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
         {!versions ? (
           <div className="h-16 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
         ) : list.length === 0 ? (
-          <p className="py-2 text-sm text-tertiary">No versions yet. Save one to be able to compare and go back to it later.</p>
+          <p className="py-2 text-sm text-tertiary">{t("No versions yet. Save one to be able to compare and go back to it later.")}</p>
         ) : (
           <ol className="divide-y divide-secondary">
             {visible.map((v) => (
@@ -157,10 +160,15 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
                 <span className="w-10 shrink-0 text-sm font-semibold text-primary tabular-nums">v{v.version_no}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-secondary">
-                    {v.note || <span className="text-quaternary">No note</span>}
+                    {v.note || <span className="text-quaternary">{t("No note")}</span>}
+                    {v.is_auto && (
+                      <Badge type="color" color="gray" size="sm" className="ml-2">
+                        {t("Auto")}
+                      </Badge>
+                    )}
                     {v.version_no === current && (
                       <Badge type="color" color="success" size="sm" className="ml-2">
-                        Current
+                        {t("Current")}
                       </Badge>
                     )}
                   </p>
@@ -169,15 +177,15 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
                     {v.creator && ` · ${v.creator.name}`}
                   </p>
                 </div>
-                <IconAction icon={SwitchHorizontal01} label={`What changed since version ${v.version_no}`} onPress={() => setComparing(v)} />
-                <IconAction icon={ClockRewind} label={`Restore version ${v.version_no}`} onPress={() => setRestoring(v)} />
+                <IconAction icon={SwitchHorizontal01} label={t('What changed since version {n}', { n: v.version_no })} onPress={() => setComparing(v)} />
+                <IconAction icon={ClockRewind} label={t('Restore version {n}', { n: v.version_no })} onPress={() => setRestoring(v)} />
               </li>
             ))}
           </ol>
         )}
         {list.length > 5 && (
           <Button size="sm" color="link-gray" onPress={() => setShowAll((s) => !s)}>
-            {showAll ? 'Show fewer' : `Show all ${list.length}`}
+            {showAll ? t("Show fewer") : t('Show all {count}', { count: list.length })}
           </Button>
         )}
       </div>
@@ -186,13 +194,13 @@ export function VersionsPanel({ meta, onRestored }: { meta: Meta; onRestored: ()
 
       {restoring && (
         <ConfirmDialog
-          title={`Restore version ${restoring.version_no}?`}
+          title={t('Restore version {n}?', { n: restoring.version_no })}
           message={
             changed
-              ? `${meta.name} goes back to how it was then. Its current state is saved as a new version first, so you can come back to it.`
-              : `${meta.name} goes back to how it was then. Its current state is already saved as version ${current}.`
+              ? t('{name} goes back to how it was then. Its current state is saved as a new version first, so you can come back to it.', { name: meta.name })
+              : t('{name} goes back to how it was then. Its current state is already saved as version {n}.', { name: meta.name, n: current })
           }
-          confirmLabel="Restore"
+          confirmLabel={t("Restore")}
           busy={restoreBusy}
           onConfirm={confirmRestore}
           onCancel={() => setRestoring(null)}
@@ -214,7 +222,7 @@ function DiffModal({ version, versions, onClose }: { version: MetaVersion; versi
     setError(null);
     versionApi.diff(version.id, against === 'current' ? 'current' : Number(against)).then(
       (d) => live && setDiff(d),
-      (err) => live && setError(message(err, 'The changes could not be worked out.')),
+      (err) => live && setError(message(err, t("The changes could not be worked out."))),
     );
     return () => {
       live = false;
@@ -225,31 +233,31 @@ function DiffModal({ version, versions, onClose }: { version: MetaVersion; versi
   const empty = diff && diff.meta.length === 0 && parts.length === 0;
 
   return (
-    <Modal title={`Changes since version ${version.version_no}`} description={version.note ?? undefined} onClose={onClose} size="lg">
+    <Modal title={t('Changes since version {n}', { n: version.version_no })} description={version.note ?? undefined} onClose={onClose} size="lg">
       <div className="space-y-5">
         <NativeSelect
-          label="Compared with"
+          label={t("Compared with")}
           value={against}
           onChange={(e) => setAgainst(e.target.value)}
-          options={[{ value: 'current', label: 'Now' }, ...versions.filter((v) => v.id !== version.id).map((v) => ({ value: String(v.id), label: `Version ${v.version_no}${v.note ? ` — ${v.note}` : ''}` }))]}
+          options={[{ value: 'current', label: t("Now") }, ...versions.filter((v) => v.id !== version.id).map((v) => ({ value: String(v.id), label: `${t('Version {n}', { n: v.version_no })}${v.note ? ` — ${v.note}` : ''}` }))]}
         />
         {error && <Alert>{error}</Alert>}
         {!diff && !error && <div className="h-32 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />}
-        {empty && <p className="text-sm text-tertiary">Nothing changed.</p>}
+        {empty && <p className="text-sm text-tertiary">{t("Nothing changed.")}</p>}
         {diff && diff.meta.length > 0 && (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-primary">Settings</h3>
+            <h3 className="mb-2 text-sm font-semibold text-primary">{t("Settings")}</h3>
             <Changes changes={diff.meta} />
           </div>
         )}
         {parts.map(([part, d]) => (
           <div key={part}>
-            <h3 className="mb-2 text-sm font-semibold text-primary">{PART_NAMES[part] ?? part}</h3>
+            <h3 className="mb-2 text-sm font-semibold text-primary">{PART_NAMES[part] ? t(PART_NAMES[part]) : part}</h3>
             <ul className="space-y-2 text-sm">
               {d.added.map((label) => (
                 <li key={`a-${label}`} className="flex items-center gap-2">
                   <Badge type="color" color="success" size="sm">
-                    Added
+                    {t("Added")}
                   </Badge>
                   <span className="text-secondary">{label}</span>
                 </li>
@@ -257,7 +265,7 @@ function DiffModal({ version, versions, onClose }: { version: MetaVersion; versi
               {d.removed.map((label) => (
                 <li key={`r-${label}`} className="flex items-center gap-2">
                   <Badge type="color" color="error" size="sm">
-                    Removed
+                    {t("Removed")}
                   </Badge>
                   <span className="text-secondary line-through">{label}</span>
                 </li>
@@ -266,7 +274,7 @@ function DiffModal({ version, versions, onClose }: { version: MetaVersion; versi
                 <li key={`c-${c.label}`} className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge type="color" color="warning" size="sm">
-                      Changed
+                      {t("Changed")}
                     </Badge>
                     <span className="text-secondary">{c.label}</span>
                   </div>
@@ -287,9 +295,9 @@ function Changes({ changes }: { changes: FieldChange[] }) {
       <table className="w-full text-left text-xs">
         <thead className="bg-secondary_alt text-quaternary">
           <tr>
-            <th className="px-3 py-1.5 font-medium">Setting</th>
-            <th className="px-3 py-1.5 font-medium">Was</th>
-            <th className="px-3 py-1.5 font-medium">Is</th>
+            <th className="px-3 py-1.5 font-medium">{t("Setting")}</th>
+            <th className="px-3 py-1.5 font-medium">{t("Was")}</th>
+            <th className="px-3 py-1.5 font-medium">{t("Is")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-secondary">

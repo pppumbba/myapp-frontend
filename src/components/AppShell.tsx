@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Clock, Grid01, HomeLine, LayersThree01, LayoutAlt01, UserSquare, Users01 } from '@untitledui/icons';
+import { Clock, Dataflow03, Database01, Globe01, Grid01, HomeLine, LayersThree01, LayoutAlt01, Package, UserSquare, Users01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { AppSidebar } from './AppSidebar';
+import { t } from '@/i18n';
 
 const everyone = [
   { href: '/', label: 'Home', icon: HomeLine },
@@ -11,8 +12,12 @@ const everyone = [
 // The builder and user management.
 const admins = [
   { href: '/metas', label: 'Metas', icon: LayersThree01 },
+  { href: '/studio', label: 'Studio', icon: Dataflow03 },
+  { href: '/query-builder', label: 'Query builder', icon: Database01 },
   { href: '/widgets', label: 'Widget library', icon: LayoutAlt01 },
+  { href: '/sites', label: 'Websites', icon: Globe01 },
   { href: '/schedules', label: 'Schedules', icon: Clock },
+  { href: '/patches', label: 'Patches', icon: Package },
   { href: '/session-values', label: 'Session values', icon: UserSquare },
   { href: '/admin', label: 'Users & roles', icon: Users01 },
 ];
@@ -32,7 +37,7 @@ export function Logo() {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark />
-      <span className="text-md font-semibold text-primary">Blue Sky</span>
+      <span className="text-md font-semibold text-primary">{t("Blue Sky")}</span>
     </span>
   );
 }
@@ -40,12 +45,12 @@ export function Logo() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const { isAdmin } = useAuth();
-  const nav = isAdmin ? [...everyone, ...admins] : everyone;
+  const nav = (isAdmin ? [...everyone, ...admins] : everyone).map((item) => ({ ...item, label: t(item.label) }));
   // /metas/12 still highlights Metas.
   const activeUrl = nav.find((item) => item.href !== '/' && pathname.startsWith(item.href))?.href ?? pathname;
 
   return (
-    <AppSidebar label="Main" logo={<Logo />} logoMark={<LogoMark />} items={nav} activeUrl={activeUrl}>
+    <AppSidebar label={t("Main")} logo={<Logo />} logoMark={<LogoMark />} items={nav} activeUrl={activeUrl}>
       {children}
     </AppSidebar>
   );

@@ -1,6 +1,8 @@
 import type { DataRow } from '../lib/dataApi';
 import type { MetaParam } from '../lib/metaApi';
 import { fillTokens } from '../lib/sessionApi';
+import { isFileParam } from '../lib/contentApi';
+import { filesOf } from './FileField';
 
 /** A form's or a line's values as its inputs hold them. */
 export type Values = Record<string, string | boolean>;
@@ -23,6 +25,8 @@ export function startValues(fields: MetaParam[], record: DataRow | null, default
   for (const f of fields) {
     const raw = record ? record[f.field_path] : (defaults?.[f.field_path] ?? (f.default_value == null ? null : fillTokens(f.default_value)));
     if (f.data_type === 'boolean') values[f.field_path] = isTrue(raw);
+    // A file field keeps its files as JSON; a new record starts without any.
+    else if (isFileParam(f) || f.data_type === 'document') values[f.field_path] = record && filesOf(raw).length ? JSON.stringify(raw) : '';
     else if (raw === null || raw === undefined) values[f.field_path] = '';
     else values[f.field_path] = inputValue(f, raw);
   }
@@ -34,7 +38,12 @@ export function toPayload(fields: MetaParam[], values: Values): DataRow {
   const out: DataRow = {};
   for (const f of fields) {
     const v = values[f.field_path];
-    if (typeof v === 'boolean') out[f.field_path] = v;
+    // A document field's PDF is made by the server when the record saves.
+    if (f.data_type === 'document') continue;
+    if (isFileParam(f)) {
+      const files = filesOf(v).map((x) => ({ id: x.id, description: x.description ?? null }));
+      out[f.field_path] = f.data_type === 'multifile' ? files : (files[0] ?? null);
+    } else if (typeof v === 'boolean') out[f.field_path] = v;
     else if (v === '' || v === undefined) out[f.field_path] = null;
     else if (f.data_type === 'integer') out[f.field_path] = parseInt(v, 10);
     else if (f.data_type === 'decimal') out[f.field_path] = Number(v);

@@ -9,6 +9,8 @@ export interface MetaVersion {
   code: string;
   name: string;
   note: string | null;
+  /** Saved by itself before a change, not by someone with a note. */
+  is_auto: boolean;
   created_at: string;
   creator: { id: number; name: string } | null;
 }

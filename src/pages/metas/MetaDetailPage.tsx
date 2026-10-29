@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../../lib/metaApi';
 import { AppShell } from '../../components/AppShell';
-import { ArrowLeft, Edit01, PlayCircle, Trash01 } from '@untitledui/icons';
+import { ArrowLeft, Dataflow03, Edit01, PlayCircle, Trash01 } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { BadgeWithDot } from '@/components/base/badges/badges';
@@ -13,15 +13,19 @@ import { MetaFormModal } from './MetaFormModal';
 import { ChartDesigner } from './ChartDesigner';
 import { DashboardDesigner } from './DashboardDesigner';
 import { MetaActionsPanel } from './MetaActionsPanel';
-import { ExcelImportDesigner, FormSettingsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
+import { ExcelImportDesigner, FormSettingsPanel, GridColumnsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
 import { MetaParamsPanel } from './MetaParamsPanel';
 import { ProcessFlowPanel } from './ProcessFlowPanel';
 import { VersionsPanel } from './VersionsPanel';
 import { NotificationDesigner } from './NotificationDesigner';
 import { PageDesigner } from './PageDesigner';
+import { QueryDesigner } from './QueryDesigner';
+import { ThemeDesigner } from './ThemeDesigner';
+import { TranslationsPanel } from './TranslationsPanel';
 import { MetaPermissionsPanel, StatusPermissionsPanel } from './PermissionsPanel';
 import { WidgetDesigner } from './WidgetDesigner';
 import { WorkflowDesigner } from './WorkflowDesigner';
+import { t } from '@/i18n';
 
 export default function MetaDetailPage() {
   const { id } = useParams();
@@ -43,17 +47,17 @@ export default function MetaDetailPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [m, t, o] = await Promise.all([metaApi.get(metaId), metaApi.types(), metaApi.options()]);
+      const [m, item, o] = await Promise.all([metaApi.get(metaId), metaApi.types(), metaApi.options()]);
       setMeta(m);
-      setTypes(t);
+      setTypes(item);
       setOptions(o);
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 404
-          ? 'This meta no longer exists.'
+          ? t('This meta no longer exists.')
           : err instanceof ApiError
             ? err.message
-            : 'This meta could not be loaded.',
+            : t('This meta could not be loaded.'),
       );
     }
   }, [metaId]);
@@ -69,7 +73,7 @@ export default function MetaDetailPage() {
       await metaApi.remove(meta.id);
       navigate('/metas', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The meta could not be deleted.');
+      setError(err instanceof ApiError ? err.message : t('The meta could not be deleted.'));
       setDeleting(false);
       setDeleteBusy(false);
     }
@@ -81,7 +85,7 @@ export default function MetaDetailPage() {
     <AppShell>
       <Link to="/metas" className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-tertiary hover:text-tertiary_hover">
         <ArrowLeft className="size-5 text-fg-quaternary" />
-        All metas
+        {t('All metas')}
       </Link>
 
       {error && (
@@ -105,28 +109,38 @@ export default function MetaDetailPage() {
                     className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-current/15 ring-inset"
                     style={{ background: look.tint, color: look.ink }}
                   >
-                    {meta.type?.name ?? 'No type'}
+                    {meta.type?.name ?? t('No type')}
                   </span>
                   <h1 className="mt-2 text-display-xs font-semibold text-primary">{meta.name}</h1>
                   <p className="mt-1 text-sm text-tertiary">{meta.code}</p>
                 </div>
                 <div className="flex gap-3">
-                  <Button color="secondary-destructive" iconLeading={Trash01} onPress={() => setDeleting(true)} aria-label="Delete meta" />
+                  <Button color="secondary-destructive" iconLeading={Trash01} onPress={() => setDeleting(true)} aria-label={t('Delete meta')} />
                   <Button color="secondary" iconLeading={Edit01} onPress={() => setEditing(true)}>
-                    Edit
+                    {t('Edit')}
                   </Button>
-                  {meta.type?.code && (
+                  {meta.type?.code === 'app' && (
+                    <Button color="secondary" iconLeading={Dataflow03} onPress={() => navigate(`/studio/${meta.id}`)}>
+                      {t('Open in studio')}
+                    </Button>
+                  )}
+                  {meta.type?.code === 'website' && (
+                    <Button color="secondary" iconLeading={Dataflow03} onPress={() => navigate(`/sites/${meta.id}`)}>
+                      {t('Open in website manager')}
+                    </Button>
+                  )}
+                  {meta.type?.code && meta.type.code !== 'website' && (
                     <Button iconLeading={PlayCircle} onPress={() => navigate(`/run/${meta.id}`)}>
-                      Open
+                      {t('Open')}
                     </Button>
                   )}
                 </div>
               </div>
               {meta.description && <p className="max-w-prose text-md text-tertiary">{meta.description}</p>}
               <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                <Detail term="Table" value={meta.table_name} />
+                <Detail term={t('Table')} value={meta.table_name} />
                 <Detail
-                  term="Refers to"
+                  term={t('Refers to')}
                   value={
                     meta.ref_meta ? (
                       <Link to={`/metas/${meta.ref_meta.id}`} className="font-semibold text-brand-secondary hover:text-brand-secondary_hover">
@@ -136,10 +150,10 @@ export default function MetaDetailPage() {
                   }
                 />
                 <Detail
-                  term="Status"
+                  term={t('Status')}
                   value={
                     <BadgeWithDot type="pill-color" size="sm" color={meta.is_active ? 'success' : 'gray'}>
-                      {meta.is_active ? 'Active' : 'Inactive'}
+                      {meta.is_active ? t('Active') : t('Inactive')}
                     </BadgeWithDot>
                   }
                 />
@@ -163,6 +177,7 @@ export default function MetaDetailPage() {
               <MetaActionsPanel key={`actions-${meta.id}`} meta={meta} options={options} />
               <GridDrilldownPanel key={`drilldown-${meta.id}`} meta={meta} options={options} />
               <GridFilterLayoutPanel key={`filter-layout-${meta.id}`} meta={meta} />
+              <GridColumnsPanel key={`columns-${meta.id}`} meta={meta} />
             </>
           )}
           {meta.type?.code === 'form' && <FormSettingsPanel key={`form-settings-${meta.id}`} meta={meta} options={options} />}
@@ -191,6 +206,10 @@ export default function MetaDetailPage() {
                 <NotificationDesigner key={`notification-${meta.id}`} meta={meta} options={options} />
               ) : meta.type?.code === 'page' || meta.type?.code === 'widget_template' ? (
                 <PageDesigner key={`page-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'theme' ? (
+                <ThemeDesigner key={`theme-${meta.id}`} meta={meta} options={options} />
+              ) : meta.type?.code === 'query' ? (
+                <QueryDesigner key={`query-${meta.id}`} meta={meta} />
               ) : meta.type?.code === 'matrix' ? (
                 <MatrixDesigner key={`matrix-${meta.id}`} meta={meta} options={options} />
               ) : meta.type?.code === 'widget' ? (
@@ -201,6 +220,7 @@ export default function MetaDetailPage() {
               {meta.type?.code === 'form' && <ProcessFlowPanel key={`process-flow-${meta.id}`} meta={meta} options={options} />}
             </>
           )}
+          {meta.type?.code !== 'theme' && <TranslationsPanel key={`translations-${meta.id}-${paramsVersion}`} meta={meta} />}
 
           </div>
 
@@ -219,9 +239,9 @@ export default function MetaDetailPage() {
 
           {deleting && (
             <ConfirmDialog
-              title={`Delete ${meta.name}?`}
-              message={`Everything inside it is deleted too. Other metas that link to it will lose that link. This can't be undone.`}
-              confirmLabel="Delete meta"
+              title={t('Delete {name}?', { name: meta.name })}
+              message={t("Everything inside it is deleted too. Other metas that link to it will lose that link. This can't be undone.")}
+              confirmLabel={t('Delete meta')}
               busy={deleteBusy}
               onConfirm={confirmDelete}
               onCancel={() => setDeleting(false)}
@@ -237,7 +257,7 @@ function Detail({ term, value }: { term: string; value: ReactNode }) {
   return (
     <div>
       <dt className="text-sm text-tertiary">{term}</dt>
-      <dd className="mt-0.5 font-medium text-primary">{value || <span className="font-normal text-quaternary">Not set</span>}</dd>
+      <dd className="mt-0.5 font-medium text-primary">{value || <span className="font-normal text-quaternary">{t('Not set')}</span>}</dd>
     </div>
   );
 }

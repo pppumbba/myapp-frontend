@@ -10,6 +10,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { cx } from '@/utils/cx';
 import { optionsOf, useLookupLabels } from './definitions';
 import { asFilter, type Filters } from './GridFilters';
+import { t } from '@/i18n';
 
 /** A list shows this many values until "Show all". */
 const SHORT_LIST = 6;
@@ -78,15 +79,15 @@ export function GridSidebar({
   const active = Object.keys(filters).length;
 
   return (
-    <aside aria-label="Filters" className="rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+    <aside aria-label={t('Filters')} className="rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary lg:absolute lg:inset-0 lg:overflow-y-auto">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-primary">
           <FilterLines className="size-4 text-fg-quaternary" aria-hidden="true" />
-          Filters
+          {t('Filters')}
         </h2>
         {active > 0 && (
           <Button size="sm" color="link-gray" onPress={() => onChange({})}>
-            Clear all
+            {t('Clear all')}
           </Button>
         )}
       </div>
@@ -137,8 +138,8 @@ function choicesOf(p: MetaParam, statuses: WfmStatus[] | undefined, facets: Face
     const yes = count('1') + count('true');
     const no = count('0') + count('false');
     return [
-      { value: '1', label: 'Yes', count: yes },
-      { value: '0', label: 'No', count: no },
+      { value: '1', label: t('Yes'), count: yes },
+      { value: '0', label: t('No'), count: no },
     ];
   }
   const statusNames = new Map((statuses ?? []).map((s) => [String(s.id), s.label_name || s.name]));
@@ -159,7 +160,7 @@ function FacetList({ label, choices, value, onPick }: { label: string; choices: 
     <div>
       <p className="mb-1.5 text-xs font-semibold tracking-wide text-tertiary uppercase">{label}</p>
       {choices.length === 0 ? (
-        <p className="text-sm text-quaternary">Nothing to pick.</p>
+        <p className="text-sm text-quaternary">{t('Nothing to pick.')}</p>
       ) : (
         <ul className="-mx-2 space-y-0.5">
           {visible.map((c) => {
@@ -185,7 +186,7 @@ function FacetList({ label, choices, value, onPick }: { label: string; choices: 
       )}
       {choices.length > SHORT_LIST && (
         <Button size="sm" color="link-gray" className="mt-1" onPress={() => setAll((a) => !a)}>
-          {all ? 'Show fewer' : `Show all ${choices.length}`}
+          {all ? t('Show fewer') : t('Show all {count}', { count: choices.length })}
         </Button>
       )}
     </div>
@@ -202,5 +203,5 @@ function TypedFilter({ label, type, value, onChange }: { label: string; type: 't
     if (settled !== value) onChange(settled);
   }, [settled]);
 
-  return <Input label={label} size="sm" type={type} value={text} onChange={setText} placeholder={type === 'text' ? 'Contains…' : undefined} />;
+  return <Input label={label} size="sm" type={type} value={text} onChange={setText} placeholder={type === 'text' ? t('Contains…') : undefined} />;
 }

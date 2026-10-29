@@ -12,8 +12,9 @@ import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { LookupField } from './LookupField';
 import { optionsOf, title, type MetaDef } from './definitions';
+import { t } from '@/i18n';
 
-const rows = (n: number) => `${n} ${n === 1 ? 'row' : 'rows'}`;
+const rows = (n: number) => t('{count} rows', { count: n });
 
 /**
  * A stage query's screen: a field for each of its named parameters (its params), then Run.
@@ -61,7 +62,7 @@ export function StageQueryView({
         onRan?.(result);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The query could not run.');
+      setError(err instanceof ApiError ? err.message : t('The query could not run.'));
     } finally {
       setBusy(false);
     }
@@ -97,15 +98,15 @@ export function StageQueryView({
       {checked && (
         <div role="status" className="space-y-3 rounded-lg bg-warning-primary p-4 ring-1 ring-secondary ring-inset">
           <p className="text-sm font-medium text-warning-primary">
-            {checked.affected === 0 ? 'Nothing to change: no rows match.' : `This will change ${rows(checked.affected)}. Run it?`}
+            {checked.affected === 0 ? t('Nothing to change: no rows match.') : t('This will change {rows}. Run it?', { rows: rows(checked.affected) })}
           </p>
           {checked.affected > 0 && (
             <div className="flex gap-2">
               <Button size="sm" isLoading={busy} showTextWhileLoading onPress={() => go(false)}>
-                Yes, run it
+                {t('Yes, run it')}
               </Button>
               <Button size="sm" color="secondary" isDisabled={busy} onPress={() => setChecked(null)}>
-                Cancel
+                {t('Cancel')}
               </Button>
             </div>
           )}
@@ -115,13 +116,13 @@ export function StageQueryView({
       {done && (
         <div role="status" className="flex items-center gap-2 rounded-lg bg-success-primary p-4 ring-1 ring-success-secondary ring-inset">
           <CheckCircle className="size-5 text-fg-success-primary" aria-hidden="true" />
-          <p className="text-sm font-medium text-success-primary">Done: {rows(done.affected)} changed.</p>
+          <p className="text-sm font-medium text-success-primary">{t('Done: {rows} changed.', { rows: rows(done.affected) })}</p>
         </div>
       )}
 
       <div className="modal-footer flex justify-end border-t border-secondary pt-4">
         <Button type="submit" iconLeading={Zap} isLoading={busy && !checked} showTextWhileLoading isDisabled={!!checked && checked.affected > 0}>
-          Run
+          {t('Run')}
         </Button>
       </div>
     </form>
@@ -145,8 +146,8 @@ function ParamField({ param: p, value, onChange }: { param: MetaParam; value: st
         onChange={(e) => onChange(e.target.value)}
         options={[
           { value: '', label: '—' },
-          { value: '1', label: 'Yes' },
-          { value: '0', label: 'No' },
+          { value: '1', label: t('Yes') },
+          { value: '0', label: t('No') },
         ]}
       />
     );

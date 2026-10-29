@@ -10,6 +10,7 @@ import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { TextArea } from '@/components/base/textarea/textarea';
+import { t } from '@/i18n';
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const shown = (v: unknown) => (v === null || v === undefined ? 'empty' : String(v));
@@ -32,7 +33,7 @@ export default function SessionValuesPage() {
     try {
       setRows(await sessionApi.list());
     } catch (err) {
-      setError(message(err, 'The session values could not be loaded.'));
+      setError(message(err, t("The session values could not be loaded.")));
     }
   }
 
@@ -52,7 +53,7 @@ export default function SessionValuesPage() {
       await sessionApi.remove(deleting.id);
       await changed();
     } catch (err) {
-      setError(message(err, 'The session value could not be removed.'));
+      setError(message(err, t("The session value could not be removed.")));
     } finally {
       setDeleting(null);
       setDeleteBusy(false);
@@ -62,11 +63,11 @@ export default function SessionValuesPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Session values"
-        subtitle="Values worked out for each user when they sign in, such as their employee or department. Queries use them as :name; default values and presets as {name}."
+        title={t("Session values")}
+        subtitle={t("Values worked out for each user when they sign in, such as their employee or department. Queries use them as :name; default values and presets as {name}.")}
         actions={
           <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
-            New session value
+            {t("New session value")}
           </Button>
         }
       />
@@ -80,9 +81,9 @@ export default function SessionValuesPage() {
       ) : rows.length === 0 ? (
         <div className="rounded-xl bg-primary p-8 text-center ring-1 ring-secondary">
           <UserSquare className="mx-auto size-8 text-fg-quaternary" aria-hidden="true" />
-          <p className="mt-3 text-sm font-semibold text-primary">No session values yet</p>
+          <p className="mt-3 text-sm font-semibold text-primary">{t("No session values yet")}</p>
           <p className="mt-1 text-sm text-tertiary">
-            For example sessionemployeeid: <code className="text-xs">SELECT id FROM employees WHERE user_id = :userid</code> with param userid.
+            {t("For example sessionemployeeid:")} <code className="text-xs">{"SELECT id FROM employees WHERE user_id = :userid"}</code> {t("with param userid.")}
           </p>
         </div>
       ) : (
@@ -94,7 +95,7 @@ export default function SessionValuesPage() {
                   <p className="font-mono text-sm font-semibold text-primary">{r.path}</p>
                   {r.param && (
                     <Badge type="color" size="sm" color="gray">
-                      from {r.param}
+                      {t('from {param}', { param: r.param })}
                     </Badge>
                   )}
                 </div>
@@ -103,12 +104,12 @@ export default function SessionValuesPage() {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-quaternary">Yours now</p>
+                <p className="text-xs text-quaternary">{t("Yours now")}</p>
                 <p className="font-mono text-sm font-medium text-primary tabular-nums">{shown(r.value)}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <IconAction icon={Edit01} label={`Edit ${r.path}`} onPress={() => setEditing(r)} />
-                <IconAction icon={Trash01} danger label={`Remove ${r.path}`} onPress={() => setDeleting(r)} />
+                <IconAction icon={Edit01} label={t('Edit {name}', { name: r.path })} onPress={() => setEditing(r)} />
+                <IconAction icon={Trash01} danger label={t('Remove {name}', { name: r.path })} onPress={() => setDeleting(r)} />
               </div>
             </li>
           ))}
@@ -129,9 +130,9 @@ export default function SessionValuesPage() {
 
       {deleting && (
         <ConfirmDialog
-          title={`Remove ${deleting.path}?`}
-          message="Queries and defaults that use it will get an empty value."
-          confirmLabel="Remove"
+          title={t('Remove {name}?', { name: deleting.path })}
+          message={t("Queries and defaults that use it will get an empty value.")}
+          confirmLabel={t("Remove")}
           busy={deleteBusy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
@@ -169,7 +170,7 @@ function SessionValueModal({
     try {
       setTested(await sessionApi.test(query, param.trim() || null));
     } catch (err) {
-      setTested({ value: null, error: message(err, 'The query could not be tested.') });
+      setTested({ value: null, error: message(err, t("The query could not be tested.")) });
     } finally {
       setTesting(false);
     }
@@ -187,67 +188,69 @@ function SessionValueModal({
       onSaved();
     } catch (err) {
       if (err instanceof ApiError && err.errors) setFieldErrors(err.errors);
-      else setError(message(err, 'The session value could not be saved.'));
+      else setError(message(err, t("The session value could not be saved.")));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal title={row ? `Edit ${row.path}` : 'New session value'} description="Worked out for each user when they sign in." onClose={onClose} size="lg">
+    <Modal title={row ? t('Edit {name}', { name: row.path }) : t("New session value")} description={t("Worked out for each user when they sign in.")} onClose={onClose} size="lg">
       <form onSubmit={onSubmit} className="space-y-5">
         {error && <Alert>{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Path"
+            label={t("Path")}
             isRequired
             value={path}
             onChange={setPath}
             placeholder="sessionemployeeid"
             inputClassName="font-mono"
             isInvalid={!!fe('path')}
-            hint={fe('path') ?? `Queries use :${path || 'path'}; defaults {${path || 'path'}}.`}
+            hint={fe('path') ?? t('Queries use :{path}; defaults {{path}}.', { path: path || 'path' })}
           />
           <Input
-            label="Param"
+            label={t("Param")}
             value={param}
             onChange={setParam}
             placeholder="userid"
             inputClassName="font-mono"
             isInvalid={!!fe('param')}
-            hint={fe('param') ?? `The value the query gets as :${param || 'param'}: userid, email${earlier.length ? `, or ${earlier.join(', ')}` : ''}.`}
+            hint={fe('param') ?? (earlier.length
+                    ? t('The value the query gets as :{param}: userid, email, or {earlier}.', { param: param || 'param', earlier: earlier.join(', ') })
+                    : t('The value the query gets as :{param}: userid or email.', { param: param || 'param' }))}
           />
         </div>
         <TextArea
-          label="Query"
+          label={t("Query")}
           isRequired
           rows={5}
           value={query}
           onChange={setQuery}
-          placeholder={'SELECT id FROM employees WHERE user_id = :userid'}
+          placeholder={"SELECT id FROM employees WHERE user_id = :userid"}
           textAreaClassName="font-mono text-sm"
           isInvalid={!!fe('query')}
-          hint={fe('query') ?? 'A SELECT; the first column of the first row is the value. No row gives an empty value.'}
+          hint={fe('query') ?? t("A SELECT; the first column of the first row is the value. No row gives an empty value.")}
         />
         <div className="flex flex-wrap items-center gap-3">
           <Button size="sm" color="secondary" iconLeading={Play} isDisabled={!query.trim()} isLoading={testing} showTextWhileLoading onPress={test}>
-            Test as me
+            {t("Test as me")}
           </Button>
           {tested &&
             (tested.error ? (
               <p className="min-w-0 flex-1 text-sm text-error-primary">{tested.error}</p>
             ) : (
               <p className="text-sm text-secondary">
-                Your value: <span className="font-mono font-semibold text-primary">{shown(tested.value)}</span>
+                {t("Your value:")} <span className="font-mono font-semibold text-primary">{shown(tested.value)}</span>
               </p>
             ))}
         </div>
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
           <Button size="md" color="secondary" onPress={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button size="md" type="submit" isLoading={saving} showTextWhileLoading>
-            {row ? 'Save changes' : 'Add session value'}
+            {row ? t("Save changes") : t("Add session value")}
           </Button>
         </div>
       </form>

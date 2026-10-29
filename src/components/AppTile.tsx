@@ -3,6 +3,7 @@ import { ArrowRight, Edit01 } from '@untitledui/icons';
 import type { Meta } from '../lib/metaApi';
 import { Button } from '@/components/base/buttons/button';
 import { IconAction } from './ui';
+import { t } from '@/i18n';
 
 // Apps take turns with these, so they're told apart at a glance.
 const colors = ['bg-brand-solid', 'bg-utility-blue-600', 'bg-utility-purple-600', 'bg-utility-amber-600', 'bg-utility-green-600'];
@@ -23,11 +24,11 @@ export function AppTile({ app, index, showEdit = false }: { app: Meta; index: nu
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-primary">{name}</p>
-        <p className="truncate text-xs text-tertiary">{app.description || `${items} menu item${items === 1 ? '' : 's'}`}</p>
+        <p className="truncate text-xs text-tertiary">{app.description || (items === 1 ? t('1 menu item') : t('{count} menu items', { count: items }))}</p>
       </div>
-      {showEdit && <IconAction icon={Edit01} label={`Edit ${name} in the builder`} onPress={() => navigate(`/metas/${app.id}`)} />}
+      {showEdit && <IconAction icon={Edit01} label={t('Edit {name} in the builder', { name })} onPress={() => navigate(`/metas/${app.id}`)} />}
       <Button color="secondary" size="sm" iconTrailing={ArrowRight} onPress={() => navigate(`/run/${app.id}`)}>
-        Open
+        {t('Open')}
       </Button>
     </div>
   );

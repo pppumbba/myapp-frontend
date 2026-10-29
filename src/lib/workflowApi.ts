@@ -69,7 +69,8 @@ const json = (method: string, body: unknown) => ({ method, body: JSON.stringify(
 
 /** Workflows (backend: WorkflowController). */
 export const workflowApi = {
-  get: (workflowId: number) => api<WorkflowDef>(`/workflows/${workflowId}`),
+  /** translated: status names in the user's language, for screens. */
+  get: (workflowId: number, translated = false) => api<WorkflowDef>(`/workflows/${workflowId}${translated ? '?translated=1' : ''}`),
   saveLayout: (workflowId: number, layout: WorkflowLayout) => api<{ layout: WorkflowLayout }>(`/workflows/${workflowId}/layout`, json('PUT', { layout })),
 
   createStatus: (workflowId: number, input: StatusInput) => api<WfmStatus>(`/workflows/${workflowId}/statuses`, json('POST', input)),

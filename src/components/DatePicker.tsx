@@ -21,9 +21,10 @@ import {
 import { HintText } from '@/components/base/input/hint-text';
 import { Label } from '@/components/base/input/label';
 import { cx } from '@/utils/cx';
+import { t } from '@/i18n';
 
 /** "YYYY-MM-DD" (or "YYYY-MM-DDTHH:mm" with time) as a picker value; anything else is empty. */
-function toValue(value: string, withTime: boolean): DateValue | null {
+export function toValue(value: string, withTime: boolean): DateValue | null {
   if (!value) return null;
   try {
     return withTime ? parseDateTime(value.slice(0, 16)) : parseDate(value.slice(0, 10));
@@ -33,7 +34,7 @@ function toValue(value: string, withTime: boolean): DateValue | null {
 }
 
 /** A picker value back as "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm", the way the forms keep dates. */
-function toText(value: DateValue | null, withTime: boolean): string {
+export function toText(value: DateValue | null, withTime: boolean): string {
   if (!value) return '';
   return withTime ? toCalendarDateTime(value).toString().slice(0, 16) : value.toString().slice(0, 10);
 }
@@ -98,7 +99,7 @@ export function DatePicker({
           )}
         </DateInput>
         <AriaButton
-          aria-label="Open calendar"
+          aria-label={t('Open calendar')}
           className="mr-1 flex size-8 shrink-0 items-center justify-center rounded-md text-fg-quaternary outline-focus-ring transition duration-100 ease-linear hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2"
         >
           <CalendarIcon className="size-4 stroke-[2.25px]" />
@@ -125,11 +126,11 @@ export function DatePicker({
         <Dialog className="outline-hidden">
           <Calendar className="w-72 p-3">
             <header className="flex items-center justify-between pb-2">
-              <AriaButton slot="previous" aria-label="Previous month" className={navButton}>
+              <AriaButton slot="previous" aria-label={t('Previous month')} className={navButton}>
                 <ChevronLeft className="size-4 stroke-[2.25px]" />
               </AriaButton>
               <Heading className="text-sm font-semibold text-secondary" />
-              <AriaButton slot="next" aria-label="Next month" className={navButton}>
+              <AriaButton slot="next" aria-label={t('Next month')} className={navButton}>
                 <ChevronRight className="size-4 stroke-[2.25px]" />
               </AriaButton>
             </header>
@@ -183,10 +184,10 @@ function PickerFooter({ withTime, onChange }: { withTime: boolean; onChange: (va
         className={cx(footButton, 'text-brand-secondary hover:bg-brand-primary_alt')}
         onPress={() => pick(withTime ? toText(now(getLocalTimeZone()), true) : today(getLocalTimeZone()).toString())}
       >
-        {withTime ? 'Now' : 'Today'}
+        {withTime ? t('Now') : t('Today')}
       </AriaButton>
       <AriaButton className={cx(footButton, 'text-tertiary hover:bg-primary_hover')} onPress={() => pick('')}>
-        Clear
+        {t('Clear')}
       </AriaButton>
     </div>
   );

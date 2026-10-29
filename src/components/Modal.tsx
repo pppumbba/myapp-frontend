@@ -5,6 +5,7 @@ import { Button } from '@/components/base/buttons/button';
 import { CloseButton } from '@/components/base/buttons/close-button';
 import { FeaturedIcon } from '@/components/foundations/featured-icon/featured-icon';
 import { cx } from '@/utils/cx';
+import { t } from '@/i18n';
 
 type Edge = 'e' | 's' | 'se';
 
@@ -151,10 +152,10 @@ export function ConfirmDialog({
             <p className="mt-1 text-sm text-tertiary">{message}</p>
             <div className="mt-8 grid grid-cols-2 gap-3">
               <Button size="lg" color="secondary" onPress={onCancel}>
-                Keep it
+                {t('Keep it')}
               </Button>
               <Button size="lg" color="primary-destructive" isLoading={busy} showTextWhileLoading onPress={onConfirm}>
-                {busy ? 'Deleting…' : confirmLabel}
+                {busy ? t('Deleting…') : confirmLabel}
               </Button>
             </div>
           </div>

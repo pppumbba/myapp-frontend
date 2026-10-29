@@ -9,6 +9,7 @@ import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { MetaFormModal } from './metas/MetaFormModal';
+import { t } from '@/i18n';
 
 /** Only the app metas: open one to use it, or jump to the builder to change its menu. */
 export default function AppsPage() {
@@ -24,12 +25,12 @@ export default function AppsPage() {
   async function load() {
     setError(null);
     try {
-      const [m, t, o] = await Promise.all([metaApi.list(), metaApi.types(), metaApi.options()]);
+      const [m, item, o] = await Promise.all([metaApi.list(), metaApi.types(), metaApi.options()]);
       setMetas(m);
-      setTypes(t);
+      setTypes(item);
       setOptions(o);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Apps could not be loaded. Check that the API is running.');
+      setError(err instanceof ApiError ? err.message : t("Apps could not be loaded. Check that the API is running."));
     } finally {
       setLoading(false);
     }
@@ -44,17 +45,17 @@ export default function AppsPage() {
     const q = query.trim().toLowerCase();
     return apps.filter((a) => !q || (a.label_name || a.name).toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q));
   }, [apps, query]);
-  const appTypeId = types.find((t) => t.code === 'app')?.id;
+  const appTypeId = types.find((item) => item.code === 'app')?.id;
 
   return (
     <AppShell>
       <PageHeader
-        title="Apps"
-        subtitle="Each app has a menu that opens its screens. Open one to use it the way its users will."
+        title={t("Apps")}
+        subtitle={t("Each app has a menu that opens its screens. Open one to use it the way its users will.")}
         actions={
           isAdmin && (
           <Button size="sm" iconLeading={Plus} onPress={() => setCreating(true)} isDisabled={!appTypeId}>
-            New app
+            {t("New app")}
           </Button>
           )
         }
@@ -68,19 +69,19 @@ export default function AppsPage() {
 
       {apps.length > 3 && (
         <Input
-          aria-label="Search apps"
+          aria-label={t("Search apps")}
           type="search"
           size="sm"
           icon={SearchLg}
           value={query}
           onChange={setQuery}
-          placeholder="Search apps"
+          placeholder={t("Search apps")}
           className="mb-4 sm:w-72"
         />
       )}
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading apps">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("Loading apps")}>
           {Array.from({ length: 3 }, (_, i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
           ))}
@@ -93,9 +94,9 @@ export default function AppsPage() {
         </div>
       ) : (
         <div className="rounded-xl bg-primary px-6 py-10 text-center shadow-xs ring-1 ring-secondary ring-inset">
-          <p className="text-sm font-semibold text-primary">{apps.length ? 'No apps match that search.' : 'No apps yet'}</p>
+          <p className="text-sm font-semibold text-primary">{apps.length ? t("No apps match that search.") : t("No apps yet")}</p>
           <p className="mt-1 text-sm text-tertiary">
-            {apps.length ? 'Try another name.' : 'Create an app, then link grids, forms and calendars from its menu.'}
+            {apps.length ? t("Try another name.") : t("Create an app, then link grids, forms and calendars from its menu.")}
           </p>
         </div>
       )}

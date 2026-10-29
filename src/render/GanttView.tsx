@@ -9,6 +9,7 @@ import { Button } from '@/components/base/buttons/button';
 import { FormView } from './FormView';
 import { primaryKey, title, useLookup, type MetaDef } from './definitions';
 import { addDays, parseLocal, swatchFor, ymd, type Swatch } from './palette';
+import { t } from '@/i18n';
 
 const WEEKS = 12;
 const DAYS = WEEKS * 7;
@@ -62,7 +63,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
   const key = primaryKey(params);
   const formId = meta.ref_meta_id;
   // json_config.item_label names one bar, e.g. "course".
-  const item = field('item_label', 'task')!;
+  const item = field('item_label', t('task'))!;
 
   const groupParam = params.find((p) => p.field_path === groupField);
   const groupOptions = useLookup(groupParam);
@@ -91,7 +92,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
         setRows(r.data);
         setError(null);
       },
-      (err) => live && setError(err instanceof ApiError ? err.message : 'Tasks could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t("Tasks could not be loaded.")),
     );
     return () => {
       live = false;
@@ -107,10 +108,10 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
       const end = parseLocal(endField ? row[endField] : null) ?? start;
       const raw = progressField ? Number(row[progressField]) : NaN;
       const groupValue = groupField ? String(row[groupField] ?? '') : '';
-      const group = map.get(groupValue) ?? { label: labels.get(groupValue) ?? (groupValue || 'No group'), tasks: [] };
+      const group = map.get(groupValue) ?? { label: labels.get(groupValue) ?? (groupValue || t("No group")), tasks: [] };
       group.tasks.push({
         key: String(row[key]),
-        name: String(row[titleField!] ?? 'Untitled'),
+        name: String(row[titleField!] ?? t('Untitled')),
         detail: detailField && row[detailField] != null ? String(row[detailField]) : '',
         start,
         end: end < start ? start : end,
@@ -122,7 +123,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
     return [...map.values()];
   }, [rows, groupOptions, startField, endField, progressField, groupField, titleField, detailField, colorField, config.colors, key]);
 
-  if (!startField) return <Alert>{`"${meta.name}" doesn't say which field holds the start date. Set start_field in its config.`}</Alert>;
+  if (!startField) return <Alert>{t('"{name}" doesn\'t say which field holds the start date. Set start_field in its config.', { name: meta.name })}</Alert>;
 
   const to = addDays(from, DAYS - 1);
   const weeks = Array.from({ length: WEEKS }, (_, i) => addDays(from, i * 7));
@@ -149,19 +150,19 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" color="secondary" iconLeading={ChevronLeft} aria-label="Earlier weeks" onPress={() => shift(-4)} />
+            <Button size="sm" color="secondary" iconLeading={ChevronLeft} aria-label={t("Earlier weeks")} onPress={() => shift(-4)} />
             <Button size="sm" color="secondary" onPress={() => setFrom(addDays(thisMonday, -7))}>
-              Today
+              {t("Today")}
             </Button>
-            <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label="Later weeks" onPress={() => shift(4)} />
+            <Button size="sm" color="secondary" iconLeading={ChevronRight} aria-label={t("Later weeks")} onPress={() => shift(4)} />
             {filterParams.length > 0 && (
               <Button size="sm" color={showFilters || Object.keys(filters).length ? 'primary' : 'secondary'} iconLeading={FilterLines} aria-expanded={showFilters} onPress={() => setShowFilters((s) => !s)}>
-                {Object.keys(filters).length ? `Filters (${Object.keys(filters).length})` : 'Filters'}
+                {Object.keys(filters).length ? t('Filters ({count})', { count: Object.keys(filters).length }) : t("Filters")}
               </Button>
             )}
             {formId && (
               <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)} className="ml-auto sm:ml-2">
-                Add {item}
+                {t('Add {item}', { item })}
               </Button>
             )}
           </div>
@@ -173,7 +174,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
         <div className="overflow-x-auto">
           <div className="relative min-w-[56rem]">
             <div className="flex border-b border-secondary text-xs font-medium text-tertiary">
-              <div className="sticky left-0 z-20 w-48 shrink-0 border-r border-secondary bg-primary px-4 py-2 sm:w-60">Task</div>
+              <div className="sticky left-0 z-20 w-48 shrink-0 border-r border-secondary bg-primary px-4 py-2 sm:w-60">{t("Task")}</div>
               <div className="flex flex-1">
                 {weeks.map((w) => (
                   <div key={ymd(w)} className="flex-1 truncate border-l border-secondary px-1.5 py-2 first:border-l-0">
@@ -206,7 +207,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
               {!groups.length && (
                 <div className="relative flex">
                   <div className="sticky left-0 w-48 shrink-0 border-r border-secondary bg-primary sm:w-60" />
-                  <p className="flex-1 px-6 py-12 text-center text-sm text-tertiary">{rows ? 'Nothing scheduled in these weeks.' : 'Loading…'}</p>
+                  <p className="flex-1 px-6 py-12 text-center text-sm text-tertiary">{rows ? t("Nothing scheduled in these weeks.") : t("Loading…")}</p>
                 </div>
               )}
             </div>
@@ -215,7 +216,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
       </div>
 
       {editing !== undefined && formId && (
-        <Modal title={editing ? `Edit ${item}` : `New ${item}`} onClose={() => setEditing(undefined)} size="lg">
+        <Modal title={editing ? t('Edit {item}', { item }) : t('New {item}', { item })} onClose={() => setEditing(undefined)} size="lg">
           <FormView
             metaId={formId}
             recordId={editing}
@@ -236,8 +237,8 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
 
 /** One group: a header with a summary bar over all its tasks, then a row per task. */
 function GroupRows({ group, from, showHeader, onOpen }: { group: Group; from: Date; showHeader: boolean; onOpen?: (key: string) => void }) {
-  const first = new Date(Math.min(...group.tasks.map((t) => t.start.getTime())));
-  const last = new Date(Math.max(...group.tasks.map((t) => t.end.getTime())));
+  const first = new Date(Math.min(...group.tasks.map((entry) => entry.start.getTime())));
+  const last = new Date(Math.max(...group.tasks.map((entry) => entry.end.getTime())));
   const summary = place(from, first, last);
 
   return (
@@ -253,22 +254,22 @@ function GroupRows({ group, from, showHeader, onOpen }: { group: Group; from: Da
         </div>
       )}
 
-      {group.tasks.map((t) => {
-        const at = place(from, t.start, t.end);
-        const when = `${short(t.start)} – ${short(t.end)}`;
-        const done = t.progress === null ? '' : `, ${t.progress}% done`;
+      {group.tasks.map((entry) => {
+        const at = place(from, entry.start, entry.end);
+        const when = `${short(entry.start)} – ${short(entry.end)}`;
+        const done = entry.progress === null ? '' : `, ${entry.progress}% done`;
         return (
-          <div key={t.key} className="relative flex h-11 items-center">
+          <div key={entry.key} className="relative flex h-11 items-center">
             <div className="sticky left-0 z-20 flex h-full w-48 shrink-0 items-center border-r border-secondary bg-primary px-4 sm:w-60">
               <button
                 type="button"
                 disabled={!onOpen}
-                onClick={() => onOpen?.(t.key)}
+                onClick={() => onOpen?.(entry.key)}
                 className="min-w-0 flex-1 rounded-md text-left outline-focus-ring focus-visible:outline-2 enabled:hover:text-brand-secondary"
               >
-                <span className={`block truncate text-sm font-medium text-primary ${showHeader ? 'pl-3' : ''}`}>{t.name}</span>
+                <span className={`block truncate text-sm font-medium text-primary ${showHeader ? 'pl-3' : ''}`}>{entry.name}</span>
                 <span className={`block truncate text-xs text-tertiary ${showHeader ? 'pl-3' : ''}`}>
-                  {[t.detail, t.progress === null ? null : `${t.progress}%`].filter(Boolean).join(' · ') || when}
+                  {[entry.detail, entry.progress === null ? null : `${entry.progress}%`].filter(Boolean).join(' · ') || when}
                 </span>
               </button>
             </div>
@@ -277,16 +278,16 @@ function GroupRows({ group, from, showHeader, onOpen }: { group: Group; from: Da
                 <button
                   type="button"
                   disabled={!onOpen}
-                  onClick={() => onOpen?.(t.key)}
-                  title={`${t.name}: ${when}${done}`}
-                  aria-label={`${t.name}, ${when}${done}`}
-                  className={`absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-md ring-1 ring-inset outline-focus-ring focus-visible:outline-2 ${t.swatch.track}`}
+                  onClick={() => onOpen?.(entry.key)}
+                  title={`${entry.name}: ${when}${done}`}
+                  aria-label={`${entry.name}, ${when}${done}`}
+                  className={`absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-md ring-1 ring-inset outline-focus-ring focus-visible:outline-2 ${entry.swatch.track}`}
                   style={at}
                 >
-                  {t.progress !== null && <span className={`absolute inset-y-0 left-0 opacity-40 ${t.swatch.dot}`} style={{ width: `${t.progress}%` }} />}
+                  {entry.progress !== null && <span className={`absolute inset-y-0 left-0 opacity-40 ${entry.swatch.dot}`} style={{ width: `${entry.progress}%` }} />}
                   {/* Shown in full on long bars, clipped on short ones; the tooltip always has it. */}
                   <span className="relative block truncate px-2 text-left text-xs leading-6 font-medium text-primary" aria-hidden="true">
-                    {t.name}
+                    {entry.name}
                   </span>
                 </button>
               )}

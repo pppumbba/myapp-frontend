@@ -16,9 +16,10 @@ import { Toggle } from '@/components/base/toggle/toggle';
 import { DrilldownHost } from '../render/DrilldownHost';
 import { WIDGET_ICONS, WidgetBlock, widgetIcon } from '../render/WidgetView';
 import { PropsEditor } from './metas/PropsEditor';
+import { t } from '@/i18n';
 
 /** The renderers the frontend draws (backend: Widget::RENDERERS). */
-const RENDERERS = ['section', 'divider', 'spacer', 'heading', 'text', 'image', 'callout', 'button', 'links', 'stat', 'hero', 'list', 'meta', 'chart', 'iframe', 'composite', 'records'];
+const RENDERERS = ['section', 'divider', 'spacer', 'heading', 'text', 'image', 'callout', 'button', 'links', 'stat', 'hero', 'list', 'meta', 'chart', 'iframe', 'composite', 'records', 'photo', 'table', 'schedule', 'carousel', 'gallery', 'accordion', 'collapse', 'tabs', 'quote', 'webform'];
 
 /** What each renderer is for, shown under the choice. */
 const RENDERER_HINTS: Record<string, string> = {
@@ -73,7 +74,7 @@ export default function WidgetsPage() {
     try {
       setWidgets(await pageApi.widgets());
     } catch (err) {
-      setError(message(err, 'The widget library could not be loaded.'));
+      setError(message(err, t("The widget library could not be loaded.")));
     }
   }
 
@@ -94,7 +95,7 @@ export default function WidgetsPage() {
       await pageApi.removeWidget(deleting.id);
       await load();
     } catch (err) {
-      setError(message(err, 'The widget could not be removed.'));
+      setError(message(err, t("The widget could not be removed.")));
     } finally {
       setDeleting(null);
       setDeleteBusy(false);
@@ -104,11 +105,11 @@ export default function WidgetsPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Widget library"
-        subtitle="What the page builder offers. Each widget placed on a page is a widget meta pointing at one of these."
+        title={t("Widget library")}
+        subtitle={t("What the page builder offers. Each widget placed on a page is a widget meta pointing at one of these.")}
         actions={
           <Button size="sm" iconLeading={Plus} onPress={() => setEditing({ widget: null })}>
-            New widget
+            {t("New widget")}
           </Button>
         }
       />
@@ -138,21 +139,21 @@ export default function WidgetsPage() {
                         <p className="truncate text-sm font-semibold text-primary">{w.name}</p>
                         {!w.is_active && (
                           <Badge type="color" size="sm" color="gray">
-                            Inactive
+                            {t("Inactive")}
                           </Badge>
                         )}
                       </div>
                       <p className="text-xs text-quaternary">
                         {w.code} · {w.renderer}
-                        {w.metas_count ? ` · used ${w.metas_count}×` : ''}
+                        {w.metas_count ? ` · ${t('used {count}×', { count: w.metas_count })}` : ''}
                       </p>
                       {w.description && <p className="mt-1 text-sm text-tertiary">{w.description}</p>}
                     </div>
                     <div className="flex shrink-0 flex-col">
-                      {w.template_meta_id && <IconAction icon={LayoutAlt01} label={`Lay out the parts of ${w.name}`} onPress={() => navigate(`/metas/${w.template_meta_id}`)} />}
-                      <IconAction icon={Edit01} label={`Edit ${w.name}`} onPress={() => setEditing({ widget: w })} />
-                      <IconAction icon={Copy01} label={`Duplicate ${w.name}`} onPress={() => setEditing({ widget: w, copy: true })} />
-                      <IconAction icon={Trash01} danger label={`Remove ${w.name}`} onPress={() => setDeleting(w)} />
+                      {w.template_meta_id && <IconAction icon={LayoutAlt01} label={t('Lay out the parts of {name}', { name: w.name })} onPress={() => navigate(`/metas/${w.template_meta_id}`)} />}
+                      <IconAction icon={Edit01} label={t('Edit {name}', { name: w.name })} onPress={() => setEditing({ widget: w })} />
+                      <IconAction icon={Copy01} label={t('Duplicate {name}', { name: w.name })} onPress={() => setEditing({ widget: w, copy: true })} />
+                      <IconAction icon={Trash01} danger label={t('Remove {name}', { name: w.name })} onPress={() => setDeleting(w)} />
                     </div>
                   </li>
                 );
@@ -179,9 +180,9 @@ export default function WidgetsPage() {
 
       {deleting && (
         <ConfirmDialog
-          title={`Remove ${deleting.name}?`}
-          message="It disappears from the page builder. While pages still use it, it can only be made inactive."
-          confirmLabel="Remove widget"
+          title={t('Remove {name}?', { name: deleting.name })}
+          message={t("It disappears from the page builder. While pages still use it, it can only be made inactive.")}
+          confirmLabel={t("Remove widget")}
           busy={deleteBusy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
@@ -226,7 +227,7 @@ function WidgetModal({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!props) {
-      setFieldErrors({ props: ['This is not a valid JSON list.'] });
+      setFieldErrors({ props: [t("This is not a valid JSON list.")] });
       return;
     }
     const input: WidgetInput = {
@@ -247,62 +248,62 @@ function WidgetModal({
       else onSaved(await pageApi.createWidget(input), true);
     } catch (err) {
       if (err instanceof ApiError && err.errors) setFieldErrors(err.errors);
-      else setError(message(err, 'The widget could not be saved.'));
+      else setError(message(err, t("The widget could not be saved.")));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal title={widget ? `Edit ${widget.name}` : 'New widget'} onClose={onClose} size="xl">
+    <Modal title={widget ? t('Edit {name}', { name: widget.name }) : t("New widget")} onClose={onClose} size="xl">
       <form onSubmit={onSubmit} className="space-y-6">
         {error && <Alert>{error}</Alert>}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
-            <Section title="Widget">
+            <Section title={t("Widget")}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Input label="Name" isRequired value={form.name} onChange={(v) => set('name', v)} isInvalid={!!fe('name')} hint={fe('name')} />
-                <Input label="Code" isRequired value={form.code} onChange={(v) => set('code', v)} isInvalid={!!fe('code')} hint={fe('code') ?? 'Lowercase letters, digits and _.'} />
-                <Input label="Category" value={form.category} onChange={(v) => set('category', v)} hint={fe('category') ?? `e.g. ${categories.slice(0, 3).join(', ')}`} />
-                <NativeSelect label="Drawn by" value={form.renderer} onChange={(e) => set('renderer', e.target.value)} hint={fe('renderer') ?? RENDERER_HINTS[form.renderer] ?? 'The built-in renderer.'} options={RENDERERS.map((r) => ({ value: r, label: r }))} />
-                <NativeSelect label="Icon" value={form.icon} onChange={(e) => set('icon', e.target.value)} options={[{ value: '', label: 'Default' }, ...WIDGET_ICONS.map((i) => ({ value: i, label: i }))]} />
+                <Input label={t("Name")} isRequired value={form.name} onChange={(v) => set('name', v)} isInvalid={!!fe('name')} hint={fe('name')} />
+                <Input label={t("Code")} isRequired value={form.code} onChange={(v) => set('code', v)} isInvalid={!!fe('code')} hint={fe('code') ?? t("Lowercase letters, digits and _.")} />
+                <Input label={t("Category")} value={form.category} onChange={(v) => set('category', v)} hint={fe('category') ?? t('e.g. {examples}', { examples: categories.slice(0, 3).join(', ') })} />
+                <NativeSelect label={t("Drawn by")} value={form.renderer} onChange={(e) => set('renderer', e.target.value)} hint={fe('renderer') ?? (RENDERER_HINTS[form.renderer] && t(RENDERER_HINTS[form.renderer])) ?? t("The built-in renderer.")} options={RENDERERS.map((r) => ({ value: r, label: r }))} />
+                <NativeSelect label={t("Icon")} value={form.icon} onChange={(e) => set('icon', e.target.value)} options={[{ value: '', label: t("Default") }, ...WIDGET_ICONS.map((i) => ({ value: i, label: i }))]} />
                 <div className="self-end pb-2">
-                  <Toggle label="Active" hint="Offered in the page builder." isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
+                  <Toggle label={t("Active")} hint={t("Offered in the page builder.")} isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
                 </div>
               </div>
-              <TextArea label="Description" rows={2} value={form.description} onChange={(v) => set('description', v)} />
+              <TextArea label={t("Description")} rows={2} value={form.description} onChange={(v) => set('description', v)} />
             </Section>
-            <Section title="Settings">
+            <Section title={t("Settings")}>
               <div className="-mt-2 flex items-center justify-between gap-2">
-                <p className="text-sm text-tertiary">What people fill in when they place this widget.</p>
+                <p className="text-sm text-tertiary">{t("What people fill in when they place this widget.")}</p>
                 <Button size="sm" color="link-gray" isDisabled={asJson && props === null} onPress={() => setAsJson((j) => !j)}>
-                  {asJson ? 'Edit as a form' : 'Edit as JSON'}
+                  {asJson ? t("Edit as a form") : t("Edit as JSON")}
                 </Button>
               </div>
               {fe('props') && <p className="text-sm text-error-primary">{fe('props')}</p>}
               {asJson || props === null ? (
                 <TextArea
-                  label="Props"
+                  label={t("Props")}
                   rows={12}
                   value={form.props}
                   onChange={(v) => set('props', v)}
                   textAreaClassName="font-mono text-xs"
                   isInvalid={props === null}
-                  hint={props === null ? 'Not valid JSON yet.' : 'A list of { key, label, type, default }.'}
+                  hint={props === null ? t("Not valid JSON yet.") : t("A list of { key, label, type, default }.")}
                 />
               ) : (
                 <PropsEditor value={props} onChange={(next) => set('props', JSON.stringify(next, null, 2))} />
               )}
               {form.renderer === 'composite' && (
                 <p className="text-sm text-tertiary">
-                  {widget?.template_meta_id ? 'Its parts use these as {{key}}. ' : 'Add the widget, then lay out its parts. '}
-                  Write <code className="font-mono text-xs">{'{{key}}'}</code> in a part’s settings to fill it from this widget’s setting.
+                  {widget?.template_meta_id ? t("Its parts use these as {{key}}. ") : t("Add the widget, then lay out its parts. ")}
+                  {t('Write')} <code className="font-mono text-xs">{'{{key}}'}</code> {t('in a part’s settings to fill it from this widget’s setting.')}
                 </p>
               )}
             </Section>
           </div>
           <div>
-            <p className="mb-2 text-sm font-medium text-secondary">Preview with the defaults</p>
+            <p className="mb-2 text-sm font-medium text-secondary">{t("Preview with the defaults")}</p>
             <div className="rounded-xl bg-secondary_alt p-4 ring-1 ring-secondary">
               <DrilldownHost>
                 <WidgetBlock widget={draft} config={propValues(draft, null)} />
@@ -312,10 +313,10 @@ function WidgetModal({
         </div>
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
           <Button size="md" color="secondary" onPress={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button size="md" type="submit" isLoading={saving} showTextWhileLoading>
-            {widget ? 'Save changes' : 'Add widget'}
+            {widget ? t("Save changes") : t("Add widget")}
           </Button>
         </div>
       </form>

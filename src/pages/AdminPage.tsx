@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { Edit01, Plus, SearchLg, Trash01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
@@ -10,7 +11,9 @@ import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
+import { LanguagesCard } from './LanguagesCard';
 import { TextArea } from '@/components/base/textarea/textarea';
+import { t } from '@/i18n';
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
@@ -26,7 +29,7 @@ export default function AdminPage() {
     try {
       setRoles(await accessApi.roles());
     } catch (err) {
-      setError(message(err, 'Roles could not be loaded.'));
+      setError(message(err, t("Roles could not be loaded.")));
     }
   }
 
@@ -36,7 +39,7 @@ export default function AdminPage() {
 
   return (
     <AppShell>
-      <PageHeader title="Users & roles" subtitle="Give people roles here. What a role may open, change or move is set on each meta in the builder." />
+      <PageHeader title={t("Users & roles")} subtitle={t("Give people roles here. What a role may open, change or move is set on each meta in the builder.")} />
       {error && (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -45,6 +48,9 @@ export default function AdminPage() {
       <div className="grid gap-5 xl:grid-cols-[2fr_3fr]">
         <RolesCard roles={roles} onChanged={loadRoles} />
         <UsersCard roles={roles} onChanged={loadRoles} />
+      </div>
+      <div className="mt-5 max-w-3xl">
+        <LanguagesCard />
       </div>
     </AppShell>
   );
@@ -79,7 +85,7 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
       await accessApi.removeRole(deleting.id);
       onChanged();
     } catch (err) {
-      setError(message(err, 'The role could not be deleted.'));
+      setError(message(err, t("The role could not be deleted.")));
     } finally {
       setBusy(false);
       setDeleting(null);
@@ -88,11 +94,11 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
 
   return (
     <Card
-      title="Roles"
-      description="Administrators may do everything."
+      title={t("Roles")}
+      description={t("Administrators may do everything. Open a role to see and set everything about it in one place.")}
       actions={
         <Button size="sm" color="secondary" iconLeading={Plus} onPress={() => setEditing(null)}>
-          New role
+          {t("New role")}
         </Button>
       }
     >
@@ -105,13 +111,15 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
         {roles.map((r) => (
           <li key={r.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-primary">{r.name}</p>
+              <Link to={`/admin/roles/${r.id}`} className="block truncate text-sm font-semibold text-primary hover:underline">
+                {r.name}
+              </Link>
               <p className="truncate text-xs text-tertiary">
                 {r.code} · {r.users_count ?? 0} {r.users_count === 1 ? 'person' : 'people'}
               </p>
             </div>
-            <IconAction icon={Edit01} label={`Edit ${r.name}`} onPress={() => setEditing(r)} />
-            {r.code !== 'admin' && <IconAction icon={Trash01} danger label={`Delete ${r.name}`} onPress={() => setDeleting(r)} />}
+            <IconAction icon={Edit01} label={t('Edit {name}', { name: r.name })} onPress={() => setEditing(r)} />
+            {r.code !== 'admin' && <IconAction icon={Trash01} danger label={t('Delete {name}', { name: r.name })} onPress={() => setDeleting(r)} />}
           </li>
         ))}
       </ul>
@@ -128,9 +136,9 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
       )}
       {deleting && (
         <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          message="People lose this role, and its permissions on metas and statuses are removed. A meta left with no permissions is open to everyone."
-          confirmLabel="Delete role"
+          title={t('Delete {name}?', { name: deleting.name })}
+          message={t("People lose this role, and its permissions on metas and statuses are removed. A meta left with no permissions is for admins only.")}
+          confirmLabel={t("Delete role")}
           busy={busy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
@@ -140,7 +148,7 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
   );
 }
 
-function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () => void; onSaved: () => void }) {
+export function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState(role?.code ?? '');
   const [name, setName] = useState(role?.name ?? '');
   const [description, setDescription] = useState(role?.description ?? '');
@@ -161,33 +169,33 @@ function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () 
       onSaved();
     } catch (err) {
       if (err instanceof ApiError && err.errors) setFieldErrors(err.errors);
-      else setError(message(err, 'The role could not be saved.'));
+      else setError(message(err, t("The role could not be saved.")));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal title={role ? `Edit ${role.name}` : 'New role'} onClose={onClose} size="sm">
+    <Modal title={role ? t('Edit {name}', { name: role.name }) : t("New role")} onClose={onClose} size="sm">
       <form onSubmit={onSubmit} className="space-y-4">
         {error && <Alert>{error}</Alert>}
-        <Input label="Name" isRequired value={name} onChange={setName} isInvalid={!!fe('name')} hint={fe('name')} />
+        <Input label={t("Name")} isRequired value={name} onChange={setName} isInvalid={!!fe('name')} hint={fe('name')} />
         <Input
-          label="Code"
+          label={t("Code")}
           isRequired
           value={code}
           onChange={setCode}
           isDisabled={role?.code === 'admin'}
           isInvalid={!!fe('code')}
-          hint={fe('code') ?? 'Lowercase letters, numbers, - and _.'}
+          hint={fe('code') ?? t("Lowercase letters, numbers, - and _.")}
         />
-        <TextArea label="Description" value={description} onChange={setDescription} rows={3} />
+        <TextArea label={t("Description")} value={description} onChange={setDescription} rows={3} />
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button size="sm" type="submit" isLoading={busy} showTextWhileLoading>
-            Save role
+            {t("Save role")}
           </Button>
         </div>
       </form>
@@ -207,7 +215,7 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
     const timer = window.setTimeout(() => {
       accessApi.users(search).then(
         (r) => live && setUsers(r.data),
-        (err) => live && setError(message(err, 'People could not be loaded.')),
+        (err) => live && setError(message(err, t("People could not be loaded."))),
       );
     }, 250);
     return () => {
@@ -224,9 +232,9 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
   }
 
   return (
-    <Card title="People" description="Everyone with an account, and their roles.">
+    <Card title={t("People")} description={t("Everyone with an account, and their roles.")}>
       <div className="px-4 pt-4 sm:px-5">
-        <Input aria-label="Search people" placeholder="Search by name or email" icon={SearchLg} value={search} onChange={setSearch} />
+        <Input aria-label={t("Search people")} placeholder={t("Search by name or email")} icon={SearchLg} value={search} onChange={setSearch} />
       </div>
       {error && (
         <div className="px-4 pt-4 sm:px-5">
@@ -239,11 +247,11 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-primary">
                 {u.name}
-                {u.id === me?.id && <span className="font-normal text-tertiary"> (you)</span>}
+                {u.id === me?.id && <span className="font-normal text-tertiary"> {t("(you)")}</span>}
               </p>
               <p className="truncate text-xs text-tertiary">{u.email}</p>
               <div className="mt-1.5 flex flex-wrap gap-1">
-                {u.roles.length === 0 && <span className="text-xs text-quaternary">No roles</span>}
+                {u.roles.length === 0 && <span className="text-xs text-quaternary">{t("No roles")}</span>}
                 {u.roles.map((r) => (
                   <Badge key={r.id} type="pill-color" size="sm" color={r.code === 'admin' ? 'brand' : 'gray'}>
                     {r.name}
@@ -252,11 +260,11 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
               </div>
             </div>
             <Button size="sm" color="secondary" onPress={() => setEditing(u)}>
-              Roles
+              {t("Roles")}
             </Button>
           </li>
         ))}
-        {users?.length === 0 && <li className="px-4 py-6 text-center text-sm text-tertiary sm:px-5">No one matches.</li>}
+        {users?.length === 0 && <li className="px-4 py-6 text-center text-sm text-tertiary sm:px-5">{t("No one matches.")}</li>}
       </ul>
 
       {editing && <UserRolesModal user={editing} roles={roles} onClose={() => setEditing(null)} onSaved={saved} />}
@@ -293,13 +301,13 @@ function UserRolesModal({
     try {
       onSaved(await accessApi.setUserRoles(user.id, [...picked]));
     } catch (err) {
-      setError(message(err, 'The roles could not be saved.'));
+      setError(message(err, t("The roles could not be saved.")));
       setBusy(false);
     }
   }
 
   return (
-    <Modal title={`Roles for ${user.name}`} description={user.email} onClose={onClose} size="sm">
+    <Modal title={t('Roles for {name}', { name: user.name })} description={user.email} onClose={onClose} size="sm">
       <div className="space-y-4">
         {error && <Alert>{error}</Alert>}
         <div className="space-y-3">
@@ -309,10 +317,10 @@ function UserRolesModal({
         </div>
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button size="sm" isLoading={busy} showTextWhileLoading onPress={save}>
-            Save roles
+            {t("Save roles")}
           </Button>
         </div>
       </div>

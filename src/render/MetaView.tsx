@@ -12,11 +12,14 @@ import { ImportView } from './ImportView';
 import { PageView, WidgetMetaView } from './PageView';
 import { ReportView } from './ReportView';
 import { MatrixView } from './MatrixView';
+import { QueryView } from './QueryView';
 import { StageQueryView } from './StageQueryView';
 import { StatementView } from './StatementView';
 import { WorkspaceView } from './WorkspaceView';
 import { presetOf, useMetaDef, type MetaDef, type Preset } from './definitions';
+import { ThemeView } from './ThemeView';
 import { useAuth } from '../auth/AuthContext';
+import { t } from '@/i18n';
 
 // Tabs can hold tabs; stop before a meta that (by mistake) contains itself loops forever.
 const MAX_DEPTH = 4;
@@ -24,9 +27,10 @@ const MAX_DEPTH = 4;
 /**
  * Renders any non-app meta by its type. Apps are handled by AppView, which hosts these.
  * preset: values from the tab or menu item showing it (see presetOf): a grid's starting
- * and fixed filters, a form's starting and fixed values.
+ * and fixed filters, a form's starting and fixed values. fill: it is the page's main screen, so a
+ * grid reaches down to the bottom of the window.
  */
-export function MetaView({ metaId, depth = 0, preset: given }: { metaId: number; depth?: number; preset?: Preset }) {
+export function MetaView({ metaId, depth = 0, preset: given, fill }: { metaId: number; depth?: number; preset?: Preset; fill?: boolean }) {
   const { def, error } = useMetaDef(metaId);
   // Kept by value: a new object each render would reload the form it gives fixed values to.
   const presetKey = JSON.stringify(given ?? null);
@@ -38,11 +42,11 @@ export function MetaView({ metaId, depth = 0, preset: given }: { metaId: number;
 
   if (error) return <Alert>{error}</Alert>;
   if (!def) return <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
-  if (depth > MAX_DEPTH) return <Alert>These screens are nested too deeply to show.</Alert>;
+  if (depth > MAX_DEPTH) return <Alert>{t('These screens are nested too deeply to show.')}</Alert>;
 
   switch (def.meta.type?.code) {
     case 'datagrid':
-      return <GridView def={def} scope={preset?.fixed} initialFilters={preset?.filters} />;
+      return <GridView def={def} scope={preset?.fixed} initialFilters={preset?.filters} fill={fill} />;
     case 'form':
       return <FormView metaId={def.meta.id} recordId={linked} defaults={preset?.defaults} fixed={preset?.fixed} />;
     case 'calendar':
@@ -63,21 +67,25 @@ export function MetaView({ metaId, depth = 0, preset: given }: { metaId: number;
     case 'widget':
       return <WidgetMetaView def={def} />;
     case 'notification':
-      return <Alert>{`"${def.meta.name}" is a notification: it is sent by itself when its moment comes. Change it in the builder.`}</Alert>;
+      return <Alert>{t('"{name}" is a notification: it is sent by itself when its moment comes. Change it in the builder.', { name: def.meta.name })}</Alert>;
     case 'excel_import':
       return <ImportView def={def} />;
     case 'tabs':
-      return <TabsView def={def} depth={depth} />;
+      return <TabsView def={def} depth={depth} fill={fill} />;
     case 'workspace':
       return <WorkspaceView def={def} recordId={linked} />;
     case 'matrix':
       return <MatrixView def={def} />;
+    case 'query':
+      return <QueryView def={def} defaults={preset?.defaults} />;
     case 'stage_query':
       return <StageQueryView def={def} defaults={preset?.defaults} />;
+    case 'theme':
+      return <ThemeView def={def} />;
     case 'app':
-      return <Alert>An app can't be opened inside another screen. Open it on its own instead.</Alert>;
+      return <Alert>{t("An app can't be opened inside another screen. Open it on its own instead.")}</Alert>;
     default:
-      return <Alert>{`"${def.meta.name}" has no type, so there is nothing to show.`}</Alert>;
+      return <Alert>{t('"{name}" has no type, so there is nothing to show.', { name: def.meta.name })}</Alert>;
   }
 }
 
@@ -85,22 +93,22 @@ export function MetaView({ metaId, depth = 0, preset: given }: { metaId: number;
  * A tabs meta: each param is a tab showing the meta it refers to, with the values its
  * json_config gives (filters, fixed, defaults: see presetOf).
  */
-function TabsView({ def, depth }: { def: MetaDef; depth: number }) {
-  const { user } = useAuth();
-  const tabs = def.params.filter((p): p is MetaParam & { ref_meta_id: number } => p.is_show && !!p.ref_meta_id);
+function TabsView({ def, depth, fill }: { def: MetaDef; depth: number; fill?: boolean }) {
+  const { user, can } = useAuth();
+  const tabs = def.params.filter((p): p is MetaParam & { ref_meta_id: number } => p.is_show && !!p.ref_meta_id && can(p.ref_meta_id, 'view'));
 
-  if (!tabs.length) return <Alert>This tab set has no tabs that open a screen yet.</Alert>;
+  if (!tabs.length) return <Alert>{t('This tab set has no tabs that open a screen yet.')}</Alert>;
 
   return (
     <Tabs>
       <TabList type="underline" size="sm" aria-label={def.meta.name} className="mb-6">
-        {tabs.map((t) => (
-          <Tab key={t.id} id={String(t.id)} label={t.label_name || t.param_name} />
+        {tabs.map((item) => (
+          <Tab key={item.id} id={String(item.id)} label={item.label_name || item.param_name} />
         ))}
       </TabList>
-      {tabs.map((t) => (
-        <TabPanel key={t.id} id={String(t.id)}>
-          <MetaView metaId={t.ref_meta_id} depth={depth + 1} preset={presetOf(t, user)} />
+      {tabs.map((item) => (
+        <TabPanel key={item.id} id={String(item.id)}>
+          <MetaView metaId={item.ref_meta_id} depth={depth + 1} preset={presetOf(item, user)} fill={fill} />
         </TabPanel>
       ))}
     </Tabs>

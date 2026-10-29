@@ -7,6 +7,7 @@ import { workflowApi, type WfmStatus } from '../../lib/workflowApi';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
+import { t } from '@/i18n';
 
 const ABILITIES: { key: Ability; label: string }[] = [
   { key: 'view', label: 'Open' },
@@ -51,11 +52,11 @@ function SaveRow({ busy, done, dirty, error, onSave }: { busy: boolean; done: bo
       {done && !dirty && (
         <p role="status" className="flex items-center gap-1.5 text-sm font-medium text-success-primary">
           <CheckCircle className="size-4" aria-hidden="true" />
-          Saved
+          {t("Saved")}
         </p>
       )}
       <Button size="sm" isLoading={busy} showTextWhileLoading isDisabled={!dirty} onPress={onSave}>
-        Save permissions
+        {t("Save permissions")}
       </Button>
     </>
   );
@@ -63,13 +64,13 @@ function SaveRow({ busy, done, dirty, error, onSave }: { busy: boolean; done: bo
 
 const noRoles = (
   <p className="px-4 py-6 text-sm text-tertiary sm:px-5">
-    There are no roles besides Administrator yet. Add some on the Users &amp; roles page first.
+    {t("There are no roles besides Administrator yet. Add some on the Users &amp; roles page first.")}
   </p>
 );
 
 /**
  * Which roles may open this meta and add, change or delete its records. With no role
- * ticked, it's open to everyone; administrators can always do everything.
+ * ticked, only administrators can use it; they can always do everything.
  */
 export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
   const roles = useRoles();
@@ -83,7 +84,7 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
   useEffect(() => {
     accessApi.metaPermissions(meta.id).then(
       (list) => setRows(Object.fromEntries(list.map((p) => [p.role_id, p]))),
-      (err) => setLoadError(message(err, 'Permissions could not be loaded.')),
+      (err) => setLoadError(message(err, t("Permissions could not be loaded."))),
     );
   }, [meta.id]);
 
@@ -108,7 +109,7 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
       setDirty(false);
       setDone(true);
     } catch (err) {
-      setError(message(err, 'Permissions could not be saved.'));
+      setError(message(err, t("Permissions could not be saved.")));
     } finally {
       setBusy(false);
     }
@@ -118,11 +119,11 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
 
   return (
     <Panel
-      title="Who can use it"
+      title={t("Who can use it")}
       description={
         restricted
-          ? 'Only the ticked roles (and administrators) can use this meta.'
-          : 'Nothing is ticked, so everyone who is signed in can open this meta and change its records.'
+          ? t("Only the ticked roles (and administrators) can use this meta.")
+          : t("Nothing is ticked, so only administrators can open this meta.")
       }
       footer={<SaveRow busy={busy} done={done} dirty={dirty} error={error} onSave={save} />}
     >
@@ -137,11 +138,11 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
           <thead>
             <tr className="border-b border-secondary text-left text-xs font-medium text-tertiary">
               <th scope="col" className="px-4 py-2.5 font-medium sm:px-5">
-                Role
+                {t("Role")}
               </th>
               {ABILITIES.map((a) => (
                 <th key={a.key} scope="col" className="px-3 py-2.5 font-medium">
-                  {a.label}
+                  {t(a.label)}
                 </th>
               ))}
             </tr>
@@ -155,7 +156,7 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
                 {ABILITIES.map((a) => (
                   <td key={a.key} className="px-3 py-3">
                     <Checkbox
-                      aria-label={`${role.name}: ${a.label}`}
+                      aria-label={`${role.name}: ${t(a.label)}`}
                       isSelected={!!rows[role.id]?.[`can_${a.key}`]}
                       onChange={(on) => set(role.id, a.key, on)}
                     />
@@ -194,7 +195,7 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
         setStatuses(def.statuses);
         setRows(keyed(list));
       },
-      (err) => setLoadError(message(err, 'Permissions could not be loaded.')),
+      (err) => setLoadError(message(err, t("Permissions could not be loaded."))),
     );
   }, [meta.id]);
 
@@ -213,7 +214,7 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
       setDirty(false);
       setDone(true);
     } catch (err) {
-      setError(message(err, 'Permissions could not be saved.'));
+      setError(message(err, t("Permissions could not be saved.")));
     } finally {
       setBusy(false);
     }
@@ -221,8 +222,8 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
 
   return (
     <Panel
-      title="Who can move and see records"
-      description="Move in: who may move a record into the status. See: who may see records while they're in it. A status with nothing ticked is open to everyone. People who can take the next step get a notification when a record arrives."
+      title={t("Who can move and see records")}
+      description={t("Move in: who may move a record into the status. See: who may see records while they're in it. A status with nothing ticked is open to everyone. People who can take the next step get a notification when a record arrives.")}
       footer={<SaveRow busy={busy} done={done} dirty={dirty} error={error} onSave={save} />}
     >
       {loadError && (
@@ -232,14 +233,14 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
       )}
       {roles?.length === 0 && noRoles}
       {roles && roles.length > 0 && statuses.length === 0 && !loadError && (
-        <p className="px-4 py-6 text-sm text-tertiary sm:px-5">Add statuses in the designer below first.</p>
+        <p className="px-4 py-6 text-sm text-tertiary sm:px-5">{t("Add statuses in the designer below first.")}</p>
       )}
       {roles && roles.length > 0 && statuses.length > 0 && (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-secondary text-left text-xs font-medium text-tertiary">
               <th scope="col" className="px-4 py-2.5 font-medium sm:px-5">
-                Status
+                {t("Status")}
               </th>
               {roles.map((r) => (
                 <th key={r.id} scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
@@ -259,8 +260,8 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
                   return (
                     <td key={r.id} className="px-3 py-3">
                       <div className="flex flex-col gap-1.5 whitespace-nowrap">
-                        <Checkbox label="Move in" isSelected={!!row?.can_enter} onChange={(on) => set(s.id, r.id, 'can_enter', on)} aria-label={`${r.name} may move records into ${s.name}`} />
-                        <Checkbox label="See" isSelected={!!row?.can_see} onChange={(on) => set(s.id, r.id, 'can_see', on)} aria-label={`${r.name} may see records in ${s.name}`} />
+                        <Checkbox label={t("Move in")} isSelected={!!row?.can_enter} onChange={(on) => set(s.id, r.id, 'can_enter', on)} aria-label={t('{role} may move records into {status}', { role: r.name, status: s.name })} />
+                        <Checkbox label={t("See")} isSelected={!!row?.can_see} onChange={(on) => set(s.id, r.id, 'can_see', on)} aria-label={t('{role} may see records in {status}', { role: r.name, status: s.name })} />
                       </div>
                     </td>
                   );

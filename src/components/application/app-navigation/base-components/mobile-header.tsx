@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import type { PropsWithChildren, ReactNode } from "react";
 import { X as CloseIcon, Menu02 } from "@untitledui/icons";
 import {
@@ -17,7 +18,7 @@ export const MobileNavigationHeader = ({ children, logo }: PropsWithChildren<{ l
                 <div className="min-w-0">{logo}</div>
 
                 <AriaButton
-                    aria-label="Expand navigation menu"
+                    aria-label={t("Expand navigation menu")}
                     className="group flex items-center justify-center rounded-lg bg-primary p-2 text-fg-secondary outline-focus-ring hover:bg-primary_hover hover:text-fg-secondary_hover focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                     <Menu02 className="size-6 transition duration-200 ease-in-out group-aria-expanded:opacity-0" />
@@ -38,7 +39,7 @@ export const MobileNavigationHeader = ({ children, logo }: PropsWithChildren<{ l
                 {({ state }) => (
                     <>
                         <AriaButton
-                            aria-label="Close navigation menu"
+                            aria-label={t("Close navigation menu")}
                             onPress={() => state.close()}
                             className="fixed top-2.5 right-3 flex cursor-pointer items-center justify-center rounded-lg p-2 text-fg-white/70 outline-focus-ring hover:bg-white/10 hover:text-fg-white focus-visible:outline-2 focus-visible:outline-offset-2"
                         >

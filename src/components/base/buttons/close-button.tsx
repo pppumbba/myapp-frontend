@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 import { X as CloseIcon } from "@untitledui/icons";
 import { Button as AriaButton, type ButtonProps as AriaButtonProps } from "react-aria-components";
 import { cx } from "@/utils/cx";
@@ -36,7 +37,7 @@ export const CloseButton = ({ label, className, size = "sm", theme = "light", sl
         <AriaButton
             {...otherProps}
             slot={slot}
-            aria-label={label || "Close"}
+            aria-label={label || t("Close")}
             className={(state) =>
                 cx(
                     "flex cursor-pointer items-center justify-center rounded-lg p-2 transition duration-100 ease-linear focus:outline-hidden",

@@ -5,6 +5,7 @@ import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { Toggle } from '@/components/base/toggle/toggle';
 import type { AutonumberConfig } from '../../render/definitions';
+import { t } from '@/i18n';
 
 const DEFAULT_FORMAT = 'PO-{yy}{MM}{dd}{seq:3}';
 
@@ -28,7 +29,7 @@ export function AutonumberEditor({ json, fields, onChange }: { json: string; fie
     const parsed = json.trim() ? JSON.parse(json) : {};
     config = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    return <p className="text-sm text-tertiary">Fix the config JSON below to set up numbering here.</p>;
+    return <p className="text-sm text-tertiary">{t("Fix the config JSON below to set up numbering here.")}</p>;
   }
 
   const auto = (config.autonumber as AutonumberConfig | undefined) ?? null;
@@ -44,45 +45,45 @@ export function AutonumberEditor({ json, fields, onChange }: { json: string; fie
   return (
     <div className="space-y-4">
       <Toggle
-        label="Number automatically"
-        hint="Each new record gets the next number, e.g. PO-261021001, then PO-261021002."
+        label={t("Number automatically")}
+        hint={t("Each new record gets the next number, e.g. PO-261021001, then PO-261021002.")}
         isSelected={!!auto}
         onChange={(on) => save(on ? { format: DEFAULT_FORMAT } : null)}
       />
       {auto && (
         <>
           <Input
-            label="Format"
+            label={t("Format")}
             value={auto.format}
             onChange={(v) => save({ ...auto, format: v })}
             inputClassName="font-mono"
-            hint={`Today's first: ${example(auto.format)}. {yyyy} {yy} {MM} {dd} are the date, {seq:3} the number in 3 digits, {field} another field's value. The count starts again whenever the text around {seq} changes.`}
+            hint={t("Today's first: {example}. {yyyy} {yy} {MM} {dd} are the date, {seq:3} the number in 3 digits, {field} another field's value. The count starts again whenever the text around {seq} changes.", { example: example(auto.format) })}
           />
           <Toggle
-            label="Can be typed over"
-            hint="Off: the number is always given. On: people may type their own; a blank one is numbered."
+            label={t("Can be typed over")}
+            hint={t("Off: the number is always given. On: people may type their own; a blank one is numbered.")}
             isSelected={!!auto.editable}
             onChange={(v) => save({ ...auto, editable: v || undefined })}
           />
           <div className="space-y-2">
-            <p className="text-sm font-medium text-secondary">Other formats, by a field's value</p>
-            {rules.length === 0 && <p className="text-sm text-tertiary">None: every record uses the format above.</p>}
+            <p className="text-sm font-medium text-secondary">{t("Other formats, by a field's value")}</p>
+            {rules.length === 0 && <p className="text-sm text-tertiary">{t("None: every record uses the format above.")}</p>}
             {rules.map((r, i) => (
               <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_7rem_1.5fr_auto]">
                 <NativeSelect
-                  label={i === 0 ? 'When' : undefined}
-                  aria-label="Field"
+                  label={i === 0 ? t("When") : undefined}
+                  aria-label={t("Field")}
                   value={r.field}
                   onChange={(e) => setRule(i, { field: e.target.value })}
-                  options={[{ value: '', label: 'Pick a field…' }, ...fields.map((f) => ({ value: f, label: f }))]}
+                  options={[{ value: '', label: t("Pick a field…") }, ...fields.map((f) => ({ value: f, label: f }))]}
                 />
-                <Input label={i === 0 ? 'is' : undefined} aria-label="Value" value={String(r.value ?? '')} onChange={(v) => setRule(i, { value: v })} />
-                <Input label={i === 0 ? 'use' : undefined} aria-label="Format" value={r.format} onChange={(v) => setRule(i, { format: v })} inputClassName="font-mono" />
-                <IconAction icon={Trash01} danger label="Remove this format" onPress={() => save({ ...auto, rules: rules.filter((_, j) => j !== i) })} className="mb-1.5" />
+                <Input label={i === 0 ? 'is' : undefined} aria-label={t("Value")} value={String(r.value ?? '')} onChange={(v) => setRule(i, { value: v })} />
+                <Input label={i === 0 ? 'use' : undefined} aria-label={t("Format")} value={r.format} onChange={(v) => setRule(i, { format: v })} inputClassName="font-mono" />
+                <IconAction icon={Trash01} danger label={t("Remove this format")} onPress={() => save({ ...auto, rules: rules.filter((_, j) => j !== i) })} className="mb-1.5" />
               </div>
             ))}
             <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => save({ ...auto, rules: [...rules, { field: '', value: '', format: auto.format.replace(/^[A-Za-z]+/, 'S$&') }] })}>
-              Add a format
+              {t("Add a format")}
             </Button>
           </div>
         </>

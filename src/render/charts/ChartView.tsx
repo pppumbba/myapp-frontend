@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from '@untitledui/icons';
 import type { Bucket, ChartData, ChartFormat, ChartRow } from '../../lib/chartApi';
 import { cx } from '@/utils/cx';
 import { formatDate } from '../Cell';
+import { t } from '@/i18n';
 
 /*
  * Charts drawn as plain SVG, following one set of mark specs: columns at most 24px thick
@@ -30,7 +31,7 @@ const months = (m: number, y: number) => new Date(y, m - 1, 1).toLocaleDateStrin
 
 /** "item_id" -> "Item", "order_date" -> "Order date": a column named for a table header. */
 function columnName(column: string | null): string {
-  if (!column) return 'Group';
+  if (!column) return t('Group');
   const words = column.replace(/_id$/, '').replace(/_/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -80,7 +81,7 @@ function niceTicks(min: number, max: number, count = 4): number[] {
   const mag = 10 ** Math.floor(Math.log10(raw));
   const step = [1, 2, 2.5, 5, 10].map((s) => s * mag).find((s) => s >= raw) ?? raw;
   const ticks: number[] = [];
-  for (let t = Math.floor(lo / step) * step; t <= hi + step * 1e-9; t += step) ticks.push(Number(t.toPrecision(12)));
+  for (let item = Math.floor(lo / step) * step; item <= hi + step * 1e-9; item += step) ticks.push(Number(item.toPrecision(12)));
   if (ticks[ticks.length - 1] < hi) ticks.push(ticks[ticks.length - 1] + step);
   return ticks;
 }
@@ -104,7 +105,7 @@ function selectable(onSelect: OnSelect, row: ChartRow, bucket: ChartData['bucket
   return {
     role: 'button',
     tabIndex: 0,
-    'aria-label': `${rowName(row, bucket)}: open the records`,
+    'aria-label': t('{name}: open the records', { name: rowName(row, bucket) }),
     style: { cursor: 'pointer' },
     onClick: () => onSelect(row),
     onKeyDown: (e: KeyboardEvent) => {
@@ -117,7 +118,7 @@ function selectable(onSelect: OnSelect, row: ChartRow, bucket: ChartData['bucket
 }
 
 function Empty() {
-  return <div className="flex h-full min-h-24 items-center justify-center text-sm text-tertiary">Nothing to show for this period.</div>;
+  return <div className="flex h-full min-h-24 items-center justify-center text-sm text-tertiary">{t("Nothing to show for this period.")}</div>;
 }
 
 /** Swatch + name for each series; present whenever there are two or more. */
@@ -167,7 +168,8 @@ function Frame({ children, legend, chartRef, label }: { children: ReactNode; leg
   );
 }
 
-const describe = (data: ChartData) => `${data.series.map((s) => s.label).join(', ')} for ${data.rows.length} groups. The table view lists every value.`;
+const describe = (data: ChartData) =>
+  t('{series} for {count} groups. The table view lists every value.', { series: data.series.map((s) => s.label).join(', '), count: data.rows.length });
 
 /** A column from the baseline y0 to its value y1, rounded 4px at the value end only. */
 function columnPath(x: number, y0: number, y1: number, w: number): string {
@@ -196,7 +198,7 @@ function CartesianChart({ data, onSelect }: { data: ChartData; onSelect?: OnSele
   const values = data.rows.flatMap((r) => data.series.map((s) => r.values[s.key] ?? 0));
   const ticks = niceTicks(Math.min(...values), Math.max(...values));
   const [lo, hi] = [ticks[0], ticks[ticks.length - 1]];
-  const pad = { top: 8, right: 8, bottom: 22, left: Math.max(...ticks.map((t) => formatValue(t, data.format, true).length)) * 6.5 + 10 };
+  const pad = { top: 8, right: 8, bottom: 22, left: Math.max(...ticks.map((item) => formatValue(item, data.format, true).length)) * 6.5 + 10 };
   const plotW = Math.max(width - pad.left - pad.right, 0);
   const plotH = Math.max(height - pad.top - pad.bottom, 0);
   const y = (v: number) => pad.top + plotH - ((v - lo) / (hi - lo || 1)) * plotH;
@@ -219,11 +221,11 @@ function CartesianChart({ data, onSelect }: { data: ChartData; onSelect?: OnSele
     <Frame chartRef={ref} label={describe(data)} legend={<Legend series={data.series} />}>
       {width > 0 && height > 0 && (
         <svg width={width} height={height} className="block overflow-visible" onPointerLeave={() => setHover(null)}>
-          {ticks.map((t) => (
-            <g key={t}>
-              <line x1={pad.left} x2={width - pad.right} y1={y(t)} y2={y(t)} stroke={t === 0 ? AXIS : GRID} strokeOpacity={t === 0 ? 0.5 : 1} strokeWidth={1} shapeRendering="crispEdges" />
-              <text x={pad.left - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={AXIS} className="tabular-nums">
-                {formatValue(t, data.format, true)}
+          {ticks.map((item) => (
+            <g key={item}>
+              <line x1={pad.left} x2={width - pad.right} y1={y(item)} y2={y(item)} stroke={item === 0 ? AXIS : GRID} strokeOpacity={item === 0 ? 0.5 : 1} strokeWidth={1} shapeRendering="crispEdges" />
+              <text x={pad.left - 8} y={y(item)} dy="0.32em" textAnchor="end" fontSize={11} fill={AXIS} className="tabular-nums">
+                {formatValue(item, data.format, true)}
               </text>
             </g>
           ))}
@@ -468,7 +470,7 @@ function KpiFigure({ data, onSelect }: { data: ChartData; onSelect?: OnSelect })
           className="self-start rounded-md text-left text-display-sm font-semibold text-primary underline-offset-4 outline-focus-ring hover:underline focus-visible:outline-2"
         >
           {formatValue(value, data.format)}
-          <span className="sr-only">: open the records</span>
+          <span className="sr-only">{t(": open the records")}</span>
         </button>
       ) : (
         <p className="text-display-sm font-semibold text-primary">{formatValue(value, data.format)}</p>
@@ -476,8 +478,8 @@ function KpiFigure({ data, onSelect }: { data: ChartData; onSelect?: OnSelect })
       {change !== null && (
         <p className={cx('mt-1 flex items-center gap-1 text-sm font-medium', up ? 'text-success-primary' : 'text-error-primary')}>
           {up ? <ArrowUp className="size-4" aria-hidden="true" /> : <ArrowDown className="size-4" aria-hidden="true" />}
-          {`${up ? 'Up' : 'Down'} ${Math.abs(change).toFixed(change % 1 && Math.abs(change) < 10 ? 1 : 0)}%`}
-          <span className="font-normal text-tertiary">vs. the period before</span>
+          {t(up ? 'Up {percent}%' : 'Down {percent}%', { percent: Math.abs(change).toFixed(change % 1 && Math.abs(change) < 10 ? 1 : 0) })}
+          <span className="font-normal text-tertiary">{t("vs. the period before")}</span>
         </p>
       )}
     </div>
@@ -493,7 +495,7 @@ export function ChartTable({ data, onSelect }: { data: ChartData; onSelect?: OnS
         <thead className="sticky top-0 bg-primary text-left text-xs font-medium text-tertiary">
           <tr className="border-b border-secondary">
             <th scope="col" className="py-2 pr-3 font-medium">
-              {data.bucket ? 'Period' : columnName(data.group_by)}
+              {data.bucket ? t("Period") : columnName(data.group_by)}
             </th>
             {data.series.map((s) => (
               <th key={s.key} scope="col" className="py-2 pl-3 text-right font-medium">

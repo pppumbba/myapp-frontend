@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { t } from '@/i18n';
 
 /** Only signed-in users may see this. Others go to /login. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -30,7 +31,7 @@ export function GuestRoute({ children }: { children: ReactNode }) {
 function FullPageSpinner() {
   return (
     <div className="flex min-h-screen items-center justify-center text-sm text-tertiary">
-      Loading…
+      {t("Loading…")}
     </div>
   );
 }

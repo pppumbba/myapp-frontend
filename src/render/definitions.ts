@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api';
 import { dataApi, onDataWrite, type DataRow } from '../lib/dataApi';
 import { metaApi, type Meta, type MetaAction, type MetaParam } from '../lib/metaApi';
 import { workflowApi, type WorkflowDef } from '../lib/workflowApi';
+import { t } from '@/i18n';
 
 export interface MetaDef {
   meta: Meta;
@@ -32,7 +33,8 @@ export function clearRenderCache() {
 function loadDef(id: number): Promise<MetaDef> {
   let p = defs.get(id);
   if (!p) {
-    p = Promise.all([metaApi.get(id), metaApi.params(id)]).then(([meta, params]) => ({ meta, params }));
+    // Screens show names and labels in the user's language (see languageApi).
+    p = Promise.all([metaApi.get(id, true), metaApi.params(id, true, true)]).then(([meta, params]) => ({ meta, params }));
     p.catch(() => defs.delete(id));
     defs.set(id, p);
   }
@@ -53,7 +55,7 @@ export function useMetaDef(id: number | null | undefined) {
     setState({ def: null, error: null });
     loadDef(id).then(
       (def) => live && setState({ def, error: null }),
-      (err) => live && setState({ def: null, error: errorText(err, 'This screen could not be loaded.') }),
+      (err) => live && setState({ def: null, error: errorText(err, t('This screen could not be loaded.')) }),
     );
     return () => {
       live = false;
@@ -73,7 +75,7 @@ export function useMetaDefs(ids: number[]) {
     setState({ defs: null, error: null });
     Promise.all(key ? key.split(',').map((id) => loadDef(Number(id))) : []).then(
       (defs) => live && setState({ defs, error: null }),
-      (err) => live && setState({ defs: null, error: errorText(err, 'Part of this screen could not be loaded.') }),
+      (err) => live && setState({ defs: null, error: errorText(err, t('Part of this screen could not be loaded.')) }),
     );
     return () => {
       live = false;
@@ -144,7 +146,7 @@ export function useDetailTree(def: MetaDef | null) {
     setState({ tree: null, error: null });
     loadDetailTree(def).then(
       (tree) => live && setState({ tree, error: null }),
-      (err) => live && setState({ tree: null, error: errorText(err, 'Part of this screen could not be loaded.') }),
+      (err) => live && setState({ tree: null, error: errorText(err, t('Part of this screen could not be loaded.')) }),
     );
     return () => {
       live = false;
@@ -259,7 +261,7 @@ export function autonumberOf(param: MetaParam): AutonumberConfig | null {
 /** The other fields an autonumber's number depends on: its rules' fields and {field} tokens. */
 export function autonumberFields(config: AutonumberConfig): string[] {
   const formats = [config.format, ...(config.rules ?? []).map((r) => r.format)];
-  const tokens = formats.flatMap((f) => [...f.matchAll(/\{(\w+)(?::\d+)?\}/g)].map((m) => m[1])).filter((t) => !['seq', 'yyyy', 'yy', 'MM', 'dd'].includes(t));
+  const tokens = formats.flatMap((f) => [...f.matchAll(/\{(\w+)(?::\d+)?\}/g)].map((m) => m[1])).filter((item) => !['seq', 'yyyy', 'yy', 'MM', 'dd'].includes(item));
   return [...new Set([...(config.rules ?? []).map((r) => r.field), ...tokens])];
 }
 
@@ -292,6 +294,12 @@ export function subgridParams(params: MetaParam[]): (MetaParam & { ref_meta_id: 
   return params.filter((p): p is MetaParam & { ref_meta_id: number } => p.is_show && p.data_type === 'subgrid' && !!p.ref_meta_id);
 }
 
+/** A detail with json_config.one is one-to-one: at most one record points back, edited as a section of the form, not as lines. */
+export const isOneToOne = (p: MetaParam) => p.json_config?.one === true;
+
+/** A subgrid with json_config.display "nested" opens inside its row (an expand arrow per row) instead of under the grid. */
+export const isNestedSubgrid = (p: MetaParam) => p.json_config?.display === 'nested';
+
 /** A grid's toolbar buttons, in order (cached like definitions). */
 export function useActions(gridId: number) {
   const [actions, setActions] = useState<MetaAction[] | null>(null);
@@ -300,7 +308,7 @@ export function useActions(gridId: number) {
     let live = true;
     let p = actionLists.get(gridId);
     if (!p) {
-      p = metaApi.actions(gridId);
+      p = metaApi.actions(gridId, true, true);
       p.catch(() => actionLists.delete(gridId));
       actionLists.set(gridId, p);
     }
@@ -321,8 +329,27 @@ export function useActions(gridId: number) {
  * null while loading or when there is none.
  */
 export function useGridWorkflow(meta: Meta) {
-  const { def: ref } = useMetaDef(meta.ref_meta_id);
-  const workflowId = ref?.meta.type?.code === 'workflow' ? ref.meta.id : null;
+  // A grid that reuses another (its ref_meta_id is a datagrid) runs on its origin's workflow.
+  const [workflowId, setWorkflowId] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      let refId = meta.ref_meta_id;
+      for (let depth = 0; refId && depth <= 5; depth++) {
+        const ref = await loadDef(refId);
+        if (ref.meta.type?.code === 'workflow') return ref.meta.id;
+        if (ref.meta.type?.code !== 'datagrid') return null;
+        refId = ref.meta.ref_meta_id;
+      }
+      return null;
+    })().then(
+      (id) => live && setWorkflowId(id),
+      () => live && setWorkflowId(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [meta.ref_meta_id]);
   const [workflow, setWorkflow] = useState<WorkflowDef | null>(null);
 
   useEffect(() => {
@@ -333,7 +360,7 @@ export function useGridWorkflow(meta: Meta) {
     let live = true;
     let p = workflows.get(workflowId);
     if (!p) {
-      p = workflowApi.get(workflowId);
+      p = workflowApi.get(workflowId, true);
       p.catch(() => workflows.delete(workflowId));
       workflows.set(workflowId, p);
     }

@@ -6,6 +6,8 @@ import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { AuthLayout } from './AuthLayout';
+import { GoogleSignIn } from './GoogleSignIn';
+import { t } from '@/i18n';
 
 export default function Register() {
   const { register } = useAuth();
@@ -32,7 +34,7 @@ export default function Register() {
         setError(err.message);
         setFieldErrors(err.errors ?? {});
       } else {
-        setError('Something went wrong. Try again.');
+        setError(t("Something went wrong. Try again."));
       }
     } finally {
       setSubmitting(false);
@@ -43,11 +45,12 @@ export default function Register() {
   const fe = (field: string) => fieldErrors[field]?.[0];
 
   return (
-    <AuthLayout title="Create your account" subtitle="Start building apps in minutes.">
+    <AuthLayout title={t("Create your account")} subtitle={t("Start building apps in minutes.")}>
+      <GoogleSignIn />
       <form onSubmit={onSubmit} className="flex flex-col gap-5">
         {error && !Object.keys(fieldErrors).length && <Alert>{error}</Alert>}
         <Input
-          label="Name"
+          label={t("Name")}
           isRequired
           hideRequiredIndicator
           autoComplete="name"
@@ -57,7 +60,7 @@ export default function Register() {
           hint={fe('name')}
         />
         <Input
-          label="Email"
+          label={t("Email")}
           type="email"
           isRequired
           hideRequiredIndicator
@@ -66,10 +69,10 @@ export default function Register() {
           onChange={update('email')}
           isInvalid={!!fe('email')}
           hint={fe('email')}
-          placeholder="you@company.com"
+          placeholder={t("you@company.com")}
         />
         <Input
-          label="Password"
+          label={t("Password")}
           type="password"
           isRequired
           hideRequiredIndicator
@@ -80,7 +83,7 @@ export default function Register() {
           hint={fe('password')}
         />
         <Input
-          label="Confirm password"
+          label={t("Confirm password")}
           type="password"
           isRequired
           hideRequiredIndicator
@@ -89,13 +92,13 @@ export default function Register() {
           onChange={update('password_confirmation')}
         />
         <Button type="submit" size="lg" isLoading={submitting} showTextWhileLoading className="mt-1 w-full">
-          {submitting ? 'Creating account…' : 'Create account'}
+          {submitting ? t("Creating account…") : t("Create account")}
         </Button>
       </form>
       <p className="mt-8 text-center text-sm text-tertiary">
-        Already have an account?{' '}
+        {t('Already have an account?')}{' '}
         <Link to="/login" className="font-semibold text-brand-secondary hover:text-brand-secondary_hover">
-          Log in
+          {t("Log in")}
         </Link>
       </p>
     </AuthLayout>

@@ -9,9 +9,10 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
-import { filledFrom, optionsOf, primaryKey, title, visibleParams, type DetailNode } from './definitions';
+import { filledFrom, isOneToOne, optionsOf, primaryKey, title, visibleParams, type DetailNode } from './definitions';
 import { startValues, toPayload } from './formValues';
 import { LookupField } from './LookupField';
+import { t } from '@/i18n';
 
 /** Where a line keeps its own lines, by sub-detail field. A symbol, so it never mixes with field values. */
 export const SUBLINES: unique symbol = Symbol('sublines');
@@ -32,25 +33,39 @@ export function lineAmount(detail: MetaParam, line: Line): number | null {
 
 let lineSeq = 0;
 
-/** A new, empty line of this detail; its own details start with no lines. */
+/** A new, empty line of this detail; its own details start with no lines, and a one-to-one with its one blank record. */
 export function blankLine(node: DetailNode): Line {
   return {
     ...startValues(visibleParams(node.def.params), null),
     _key: `new-${++lineSeq}`,
-    [SUBLINES]: Object.fromEntries(node.children.map((c) => [c.detail.field_path, []])),
+    [SUBLINES]: Object.fromEntries(node.children.map((c) => [c.detail.field_path, isOneToOne(c.detail) ? [blankLine(c)] : []])),
   };
 }
 
-/** Saved lines (as the API sends them, each with its own lines under their fields) as editable lines. */
+/**
+ * Saved lines (as the API sends them, each with its own lines under their fields) as editable
+ * lines. A one-to-one arrives as one object or null, and is always one line: its record, or a
+ * blank one to fill in.
+ */
 export function startLines(node: DetailNode, rows: unknown): Line[] {
-  if (!Array.isArray(rows)) return [];
+  if (isOneToOne(node.detail)) return rows && typeof rows === 'object' && !Array.isArray(rows) ? toLines(node, [rows as DataRow]) : [blankLine(node)];
+  return Array.isArray(rows) ? toLines(node, rows as DataRow[]) : [];
+}
+
+function toLines(node: DetailNode, rows: DataRow[]): Line[] {
   const key = primaryKey(node.def.params);
-  return (rows as DataRow[]).map((r) => ({
+  return rows.map((r) => ({
     ...startValues(visibleParams(node.def.params), r),
     _key: `${node.detail.field_path}-${r[key]}`,
     _id: String(r[key]),
     [SUBLINES]: Object.fromEntries(node.children.map((c) => [c.detail.field_path, startLines(c, r[c.detail.field_path])])),
   }));
+}
+
+/** What the API takes for a detail: its lines, or for a one-to-one its one record. */
+export function detailPayload(node: DetailNode, lines: Line[]): DataRow[] | DataRow | null {
+  const out = linesPayload(node, lines);
+  return isOneToOne(node.detail) ? (out[0] ?? null) : out;
 }
 
 /**
@@ -64,9 +79,9 @@ export function linesPayload(node: DetailNode, lines: Line[]): DataRow[] {
     const out: DataRow = { ...(l._id ? { [key]: Number(l._id) } : {}), ...toPayload(fields, l) };
     for (const c of node.children) {
       const sub = l[SUBLINES]?.[c.detail.field_path] ?? [];
-      out[c.detail.field_path] = linesPayload(c, sub);
+      out[c.detail.field_path] = detailPayload(c, sub);
       const total = c.detail.json_config?.total_field;
-      if (typeof total === 'string' && Array.isArray(c.detail.json_config?.amount)) {
+      if (typeof total === 'string' && Array.isArray(c.detail.json_config?.amount) && !isOneToOne(c.detail)) {
         out[total] = Math.round(sub.reduce((s, x) => s + (lineAmount(c.detail, x) ?? 0), 0) * 100) / 100;
       }
     }
@@ -138,7 +153,7 @@ export function DetailLines({
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-primary">{name}</h3>
         <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => onChange([...lines, blankLine(node)])}>
-          Add line
+          {t('Add line')}
         </Button>
       </div>
 
@@ -153,16 +168,16 @@ export function DetailLines({
                   {c.is_required && !subTotals.has(c.field_path) && <span className="text-brand-tertiary"> *</span>}
                 </th>
               ))}
-              {hasAmount && <th className="px-2 py-2 text-right font-medium">Amount</th>}
+              {hasAmount && <th className="px-2 py-2 text-right font-medium">{t('Amount')}</th>}
               {children.length > 0 && <th className="px-2 py-2 font-medium">{children.map((c) => c.detail.label_name || title(c.def.meta)).join(', ')}</th>}
-              <th className="w-10" aria-label="Remove" />
+              <th className="w-10" aria-label={t('Remove')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-secondary">
             {lines.map((line, i) => {
               const at = `${prefix}${detail.field_path}.${i}.`;
               const sub = line[SUBLINES] ?? {};
-              const count = children.reduce((n, c) => n + (sub[c.detail.field_path]?.length ?? 0), 0);
+              const count = children.reduce((n, c) => n + (isOneToOne(c.detail) ? 0 : (sub[c.detail.field_path]?.length ?? 0)), 0);
               // A row whose own lines have errors stays open, so they can be seen.
               const subErrors = children.some((c) => Object.keys(errors).some((k) => k.startsWith(`${at}${c.detail.field_path}`)));
               const expanded = open.has(line._key) || subErrors;
@@ -175,13 +190,13 @@ export function DetailLines({
                       return (
                         <td key={c.field_path} className={`px-1.5 py-1.5 ${width(c)}`}>
                           {sum ? (
-                            <p className="px-1 py-2 text-right font-medium text-primary tabular-nums" title={`Adds up its ${sum.detail.label_name || 'lines'}`}>
+                            <p className="px-1 py-2 text-right font-medium text-primary tabular-nums" title={t('Adds up its {lines}', { lines: sum.detail.label_name || t('lines') })}>
                               {formatNumber((sub[sum.detail.field_path] ?? []).reduce((s, l) => s + (lineAmount(sum.detail, l) ?? 0), 0))}
                             </p>
                           ) : (
                             <LineField
                               param={c}
-                              label={`${c.label_name || c.param_name}, line ${i + 1}`}
+                              label={t('{field}, line {line}', { field: c.label_name || c.param_name, line: i + 1 })}
                               value={line[c.field_path]}
                               error={errors[`${at}${c.field_path}`]?.[0]}
                               onChange={(v, fill) => update(i, { [c.field_path]: v, ...fill })}
@@ -198,17 +213,17 @@ export function DetailLines({
                           color={subErrors ? 'link-destructive' : 'link-gray'}
                           iconLeading={expanded ? ChevronDown : ChevronRight}
                           aria-expanded={expanded}
-                          aria-label={`${expanded ? 'Hide' : 'Show'} the lines of line ${i + 1}`}
+                          aria-label={expanded ? t('Hide the lines of line {line}', { line: i + 1 }) : t('Show the lines of line {line}', { line: i + 1 })}
                           isDisabled={subErrors}
                           onPress={() => toggle(line._key)}
                           className="py-2"
                         >
-                          {count ? `${count} ${count === 1 ? 'line' : 'lines'}` : 'Add'}
+                          {count ? `${count} ${count === 1 ? 'line' : 'lines'}` : children.every((c) => isOneToOne(c.detail)) ? t('Open') : t('Add')}
                         </Button>
                       </td>
                     )}
                     <td className="py-2 pr-1.5">
-                      <IconAction icon={Trash01} danger label={`Remove line ${i + 1}`} onPress={() => onChange(lines.filter((_, j) => j !== i))} />
+                      <IconAction icon={Trash01} danger label={t('Remove line {line}', { line: i + 1 })} onPress={() => onChange(lines.filter((_, j) => j !== i))} />
                     </td>
                   </tr>
                   {expanded && (
@@ -216,7 +231,7 @@ export function DetailLines({
                       <td colSpan={span} className="bg-secondary_alt py-3 pr-3 pl-8">
                         <div className="space-y-4">
                           {children.map((c) => (
-                            <DetailLines
+                            <DetailSection
                               key={c.detail.field_path}
                               node={c}
                               lines={sub[c.detail.field_path] ?? []}
@@ -235,7 +250,7 @@ export function DetailLines({
             {!lines.length && (
               <tr>
                 <td colSpan={span} className="px-4 py-8 text-center text-sm text-tertiary">
-                  No lines yet. Add the first one.
+                  {t('No lines yet. Add the first one.')}
                 </td>
               </tr>
             )}
@@ -244,7 +259,7 @@ export function DetailLines({
             <tfoot className="border-t border-secondary bg-secondary">
               <tr>
                 <td colSpan={columns.length + 1} className="py-2.5 pl-3 text-sm font-semibold text-primary">
-                  Total{!hasAmount && <span className="tabular-nums">: {formatNumber(total)}</span>}
+                  {t('Total')}{!hasAmount && <span className="tabular-nums">: {formatNumber(total)}</span>}
                 </td>
                 {hasAmount && <td className="px-2 py-2.5 text-right text-sm font-semibold text-primary tabular-nums">{formatNumber(total)}</td>}
                 <td colSpan={children.length ? 2 : 1} />
@@ -254,6 +269,59 @@ export function DetailLines({
         </table>
       </div>
       {listError && <p className="mt-1.5 text-sm text-error-primary">{listError}</p>}
+    </section>
+  );
+}
+
+/** A detail in a form: its lines as a table, or a one-to-one's record as a section of fields. */
+export function DetailSection(props: { node: DetailNode; lines: Line[]; errors: Record<string, string[]>; prefix?: string; onChange: (lines: Line[]) => void }) {
+  return isOneToOne(props.node.detail) ? <OneRecord {...props} /> : <DetailLines {...props} />;
+}
+
+/**
+ * A one-to-one detail: the one record pointing back at this one, as labelled fields under a
+ * heading, with its own details below them. It is always the single line lines[0]. Errors
+ * arrive keyed like "terms.currency" (prefix is the part above, as for lines).
+ */
+function OneRecord({ node, lines, errors, prefix = '', onChange }: { node: DetailNode; lines: Line[]; errors: Record<string, string[]>; prefix?: string; onChange: (lines: Line[]) => void }) {
+  const { detail, def, children } = node;
+  const fields = visibleParams(def.params).filter((p) => p.field_path !== detail.json_config?.foreign_key);
+  const line = lines[0] ?? blankLine(node);
+  const at = `${prefix}${detail.field_path}.`;
+  const name = detail.label_name || title(def.meta);
+  const sub = line[SUBLINES] ?? {};
+
+  return (
+    <section aria-label={name} className="rounded-xl bg-secondary_alt p-4 ring-1 ring-secondary sm:col-span-2">
+      <h3 className="text-sm font-semibold text-primary">{name}</h3>
+      {def.meta.description && <p className="mt-0.5 text-sm text-tertiary">{def.meta.description}</p>}
+      <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+        {fields.map((f) => (
+          <div key={f.field_path} className={f.data_type === 'text' ? 'sm:col-span-2' : undefined}>
+            <p className="mb-1.5 text-sm font-medium text-secondary">
+              {f.label_name || f.param_name}
+              {f.is_required && <span className="text-brand-tertiary"> *</span>}
+            </p>
+            <LineField
+              param={f}
+              label={`${f.label_name || f.param_name}, ${name}`}
+              value={line[f.field_path]}
+              error={errors[`${at}${f.field_path}`]?.[0]}
+              onChange={(v, fill) => onChange([{ ...line, [f.field_path]: v, ...fill } as Line])}
+            />
+          </div>
+        ))}
+        {children.map((c) => (
+          <DetailSection
+            key={c.detail.field_path}
+            node={c}
+            lines={sub[c.detail.field_path] ?? []}
+            errors={errors}
+            prefix={at}
+            onChange={(next) => onChange([{ ...line, [SUBLINES]: { ...sub, [c.detail.field_path]: next } }])}
+          />
+        ))}
+      </div>
     </section>
   );
 }

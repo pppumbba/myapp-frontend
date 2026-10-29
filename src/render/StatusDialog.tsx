@@ -7,6 +7,7 @@ import { Modal } from '../components/Modal';
 import { Button } from '@/components/base/buttons/button';
 import { FormView } from './FormView';
 import { palette } from './palette';
+import { t } from '@/i18n';
 
 /** A status as a coloured pill; "No status" for a record that hasn't started. */
 export function StatusBadge({ status }: { status?: WfmStatus | null }) {
@@ -14,7 +15,7 @@ export function StatusBadge({ status }: { status?: WfmStatus | null }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${status ? swatch.chip : palette.gray.chip}`}>
       <span className={`size-1.5 rounded-full ${status ? swatch.dot : 'bg-utility-neutral-400'}`} aria-hidden="true" />
-      {status ? status.label_name || status.name : 'No status'}
+      {status ? status.label_name || status.name : t("No status")}
     </span>
   );
 }
@@ -62,7 +63,7 @@ export function StatusDialog({
     let live = true;
     workflowApi.record(workflowId, recordId, sourceId).then(
       (s) => live && setState(s),
-      (err) => live && setError(err instanceof ApiError ? err.message : 'The record’s status could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t("The record’s status could not be loaded.")),
     );
     return () => {
       live = false;
@@ -76,23 +77,23 @@ export function StatusDialog({
       await workflowApi.move(workflowId, recordId, transitionId, sourceId);
       onMoved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The status could not be changed.');
+      setError(err instanceof ApiError ? err.message : t("The status could not be changed."));
       setPending(null);
     } finally {
       setBusy(null);
     }
   }
 
-  function choose(t: RecordState['transitions'][number]) {
-    if (t.next_status.meta_id) setPending({ transitionId: t.id, status: t.next_status });
-    else move(t.id);
+  function choose(item: RecordState['transitions'][number]) {
+    if (item.next_status.meta_id) setPending({ transitionId: item.id, status: item.next_status });
+    else move(item.id);
   }
 
-  const title = recordName ? `Change status · ${recordName}` : 'Change status';
+  const title = recordName ? `Change status · ${recordName}` : t("Change status");
 
   if (pending?.status.meta_id) {
     return (
-      <Modal title={`${pending.status.name} · ${recordName || 'record'}`} description="Fill this in to finish the move." onClose={() => setPending(null)} size="lg">
+      <Modal title={`${pending.status.name} · ${recordName || 'record'}`} description={t("Fill this in to finish the move.")} onClose={() => setPending(null)} size="lg">
         {error && (
           <div className="mb-4">
             <Alert>{error}</Alert>
@@ -115,43 +116,43 @@ export function StatusDialog({
       ) : (
         <div className="space-y-5">
           <div className="flex items-center gap-2 text-sm text-tertiary">
-            Now <StatusBadge status={state.status} />
+            {t("Now")} <StatusBadge status={state.status} />
           </div>
 
-          <section aria-label="Move to">
-            <h3 className="mb-2 text-sm font-semibold text-primary">Move to</h3>
+          <section aria-label={t("Move to")}>
+            <h3 className="mb-2 text-sm font-semibold text-primary">{t("Move to")}</h3>
             {state.transitions.length ? (
               <ul className="space-y-1.5">
-                {state.transitions.map((t) => (
-                  <li key={t.id}>
+                {state.transitions.map((item) => (
+                  <li key={item.id}>
                     <button
                       type="button"
-                      disabled={!t.allowed || busy !== null}
-                      onClick={() => choose(t)}
+                      disabled={!item.allowed || busy !== null}
+                      onClick={() => choose(item)}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ring-1 ring-secondary outline-focus-ring ring-inset enabled:hover:bg-primary_hover focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <StatusBadge status={t.next_status} />
+                      <StatusBadge status={item.next_status} />
                       <span className="min-w-0 flex-1 truncate text-xs text-tertiary">
-                        {t.allowed ? (t.next_status.meta_id ? 'Asks for a few details first' : t.criteria ? `When ${t.criteria}` : '') : t.reason}
+                        {item.allowed ? (item.next_status.meta_id ? t("Asks for a few details first") : item.criteria ? t('When {criteria}', { criteria: item.criteria }) : '') : item.reason}
                       </span>
-                      {busy === t.id ? (
-                        <span className="text-xs text-tertiary">Moving…</span>
-                      ) : t.allowed ? (
+                      {busy === item.id ? (
+                        <span className="text-xs text-tertiary">{t("Moving…")}</span>
+                      ) : item.allowed ? (
                         <ArrowRight className="size-4 text-fg-quaternary" aria-hidden="true" />
                       ) : (
-                        <Lock01 className="size-4 text-fg-quaternary" aria-label="Not allowed" />
+                        <Lock01 className="size-4 text-fg-quaternary" aria-label={t("Not allowed")} />
                       )}
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-tertiary">There are no moves out of this status.</p>
+              <p className="text-sm text-tertiary">{t("There are no moves out of this status.")}</p>
             )}
           </section>
 
-          <section aria-label="History">
-            <h3 className="mb-2 text-sm font-semibold text-primary">History</h3>
+          <section aria-label={t("History")}>
+            <h3 className="mb-2 text-sm font-semibold text-primary">{t("History")}</h3>
             {state.log.length ? (
               <ol className="space-y-2 border-l border-secondary pl-4">
                 {state.log.map((l) => (
@@ -169,19 +170,19 @@ export function StatusDialog({
                     <p className="mt-0.5 text-xs text-tertiary">
                       {new Date(l.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                       {l.user && ` · ${l.user.name}`}
-                      {l.time_spent != null && ` · after ${duration(l.time_spent)}`}
+                      {l.time_spent != null && ` · ${t('after {time}', { time: duration(l.time_spent) })}`}
                     </p>
                   </li>
                 ))}
               </ol>
             ) : (
-              <p className="text-sm text-tertiary">No moves yet.</p>
+              <p className="text-sm text-tertiary">{t("No moves yet.")}</p>
             )}
           </section>
 
           <div className="modal-footer flex justify-end border-t border-secondary pt-4">
             <Button size="sm" color="secondary" onPress={onClose}>
-              Close
+              {t("Close")}
             </Button>
           </div>
         </div>

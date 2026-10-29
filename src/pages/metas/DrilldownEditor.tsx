@@ -4,16 +4,18 @@ import type { MetaOption } from '../../lib/metaApi';
 import { ComboField, type ComboOption } from '../../components/ComboField';
 import { IconAction } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
+import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { Input } from '@/components/base/input/input';
 import { useMetaDef } from '../../render/definitions';
 import type { Drilldown } from '../../render/drilldown';
+import { t } from '@/i18n';
 
 /** Metas a drilldown can open. */
 const TARGETS = ['datagrid', 'statement', 'report', 'form', 'dashboard', 'chart', 'calendar', 'gantt'];
 
 /**
- * Edits a json_config.drilldown: the meta it opens and which of its filters or parameters
- * get which value. sources are what the clicked thing offers (a row's fields, or a chart's
+ * Edits a json_config.drilldown: the meta it opens, whether in a modal or a drawer
+ * (open_in), and which of its filters or parameters get which value. sources are what the clicked thing offers (a row's fields, or a chart's
  * x, x.from, x.to, range.from, range.to). withLabel asks for the row button's text.
  */
 export function DrilldownEditor({
@@ -50,21 +52,35 @@ export function DrilldownEditor({
   return (
     <div className="space-y-2.5">
       <ComboField
-        aria-label="Drilldown opens"
+        aria-label={t('Drilldown opens')}
         size="sm"
-        placeholder="Nothing: clicking does nothing"
+        placeholder={t('Nothing: clicking does nothing')}
         items={metas}
         value={value ? String(value.meta_id) : ''}
-        onChange={(id) => onChange(id ? { meta_id: Number(id), params: value?.meta_id === Number(id) ? value.params : {}, label: value?.label ?? null } : null)}
+        onChange={(id) => onChange(id ? { meta_id: Number(id), params: value?.meta_id === Number(id) ? value.params : {}, label: value?.label ?? null, ...(value?.open_in ? { open_in: value.open_in } : {}) } : null)}
       />
       {value && (
         <>
+          <ButtonGroup
+            size="sm"
+            aria-label={t('Opens in')}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[value.open_in === 'drawer' ? 'drawer' : 'modal']}
+            onSelectionChange={(keys) => {
+              const { open_in: _, ...rest } = value;
+              onChange([...keys][0] === 'drawer' ? { ...rest, open_in: 'drawer' } : rest);
+            }}
+          >
+            <ButtonGroupItem id="modal">{t('In a modal')}</ButtonGroupItem>
+            <ButtonGroupItem id="drawer">{t('In a drawer')}</ButtonGroupItem>
+          </ButtonGroup>
           {pairs.map(([name, source], i) => (
             <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2">
               <ComboField
-                aria-label={`Parameter ${i + 1} of the opened meta`}
+                aria-label={t('Parameter {n} of the opened meta', { n: i + 1 })}
                 size="sm"
-                placeholder="Its filter…"
+                placeholder={t('Its filter…')}
                 items={names.some((n) => n.id === name) || !name ? names : [{ id: name, label: name }, ...names]}
                 value={name}
                 onChange={(n) => setPairs(pairs.map((p, j) => (j === i ? [n, p[1]] : p)))}
@@ -73,21 +89,21 @@ export function DrilldownEditor({
                 ←
               </span>
               <ComboField
-                aria-label={`Value for parameter ${i + 1}`}
+                aria-label={t('Value for parameter {n}', { n: i + 1 })}
                 size="sm"
-                placeholder="From…"
+                placeholder={t('From…')}
                 items={sources.some((s) => s.id === source) || !source ? sources : [{ id: source, label: source }, ...sources]}
                 value={source}
                 onChange={(s) => setPairs(pairs.map((p, j) => (j === i ? [p[0], s] : p)))}
               />
-              <IconAction icon={Trash01} danger label={`Remove parameter ${i + 1}`} onPress={() => setPairs(pairs.filter((_, j) => j !== i))} />
+              <IconAction icon={Trash01} danger label={t('Remove parameter {n}', { n: i + 1 })} onPress={() => setPairs(pairs.filter((_, j) => j !== i))} />
             </div>
           ))}
           <Button size="sm" color="link-color" iconLeading={Plus} isDisabled={pairs.some(([k]) => !k)} onPress={() => value && onChange({ ...value, params: { ...value.params, '': '' } })}>
-            Pass a value
+            {t('Pass a value')}
           </Button>
           {withLabel && (
-            <Input aria-label="Row button text" size="sm" placeholder="Button text, e.g. Print order (optional)" value={value.label ?? ''} onChange={(label) => onChange({ ...value, label: label || null })} />
+            <Input aria-label={t('Row button text')} size="sm" placeholder={t('Button text, e.g. Print order (optional)')} value={value.label ?? ''} onChange={(label) => onChange({ ...value, label: label || null })} />
           )}
         </>
       )}

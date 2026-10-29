@@ -11,6 +11,7 @@ import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
+import { t } from '@/i18n';
 
 const KINDS: { value: ActionKind; label: string; hint: string }[] = [
   { value: 'add', label: 'Add', hint: 'Opens the form empty (or filled by the get) to add a record.' },
@@ -32,6 +33,7 @@ interface ActionForm {
   form_meta_id: string;
   get_meta_id: string;
   needs_row: boolean;
+  show_in_toolbar: boolean;
   show_in_row: boolean;
   order_number: string;
   /** json_config.params as text: { "get parameter": "row field" }. */
@@ -41,11 +43,12 @@ interface ActionForm {
 function toForm(a: MetaAction | null, next: number): ActionForm {
   return {
     action: a?.action ?? 'add',
-    label: a?.label ?? 'Add',
+    label: a?.label ?? t('Add'),
     icon_cls: a?.icon_cls ?? '',
     form_meta_id: a?.form_meta_id ? String(a.form_meta_id) : '',
     get_meta_id: a?.get_meta_id ? String(a.get_meta_id) : '',
     needs_row: a?.needs_row ?? false,
+    show_in_toolbar: a?.show_in_toolbar ?? true,
     show_in_row: a?.show_in_row ?? false,
     order_number: String(a?.order_number ?? next),
     params: a?.json_config?.params ? JSON.stringify(a.json_config.params, null, 2) : '',
@@ -78,7 +81,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       setActions(await metaApi.actions(meta.id));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The toolbar could not be loaded.');
+      setError(err instanceof ApiError ? err.message : t('The toolbar could not be loaded.'));
     } finally {
       setLoading(false);
     }
@@ -108,7 +111,9 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
         action: kind,
         label: !f.label || f.label === usual ? KINDS.find((k) => k.value === kind)!.label : f.label,
         needs_row: needsRow,
+        // Edit and Delete sit on each row, so they stay out of the toolbar (its ⋯ menu still has them).
         show_in_row: kind === 'edit' || kind === 'delete',
+        show_in_toolbar: kind !== 'edit' && kind !== 'delete',
         params: needsRow && !f.params ? '{\n  "id": "id"\n}' : kind === 'import' ? '' : f.params,
         // A form, an import and a stage query are different kinds of meta.
         form_meta_id: targetOf(kind) === targetOf(f.action) ? f.form_meta_id : '',
@@ -123,7 +128,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
     try {
       params = form.params.trim() ? JSON.parse(form.params) : undefined;
     } catch {
-      setFieldErrors({ params: ['This is not valid JSON.'] });
+      setFieldErrors({ params: [t('This is not valid JSON.')] });
       return;
     }
     const input: MetaActionInput = {
@@ -133,6 +138,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       form_meta_id: form.form_meta_id ? Number(form.form_meta_id) : null,
       get_meta_id: form.get_meta_id ? Number(form.get_meta_id) : null,
       needs_row: form.needs_row,
+      show_in_toolbar: form.show_in_toolbar,
       show_in_row: form.show_in_row,
       order_number: Number(form.order_number) || 1,
       json_config: params ? { params } : null,
@@ -146,7 +152,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       await load();
     } catch (err) {
       if (err instanceof ApiError && err.errors) setFieldErrors(err.errors);
-      else setError(err instanceof ApiError ? err.message : 'The button could not be saved.');
+      else setError(err instanceof ApiError ? err.message : t('The button could not be saved.'));
     } finally {
       setSaving(false);
     }
@@ -160,7 +166,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       setDeleting(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The button could not be removed.');
+      setError(err instanceof ApiError ? err.message : t('The button could not be removed.'));
       setDeleting(null);
     } finally {
       setDeleteBusy(false);
@@ -172,12 +178,12 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="toolbar-heading" className="text-lg font-semibold text-primary">
-            Toolbar
+            {t('Toolbar')}
           </h2>
-          <p className="text-sm text-tertiary">Buttons on this grid. Each opens a form; a get decides the values the form opens with.</p>
+          <p className="text-sm text-tertiary">{t('Buttons on this grid. Each opens a form; a get decides the values the form opens with.')}</p>
         </div>
         <Button size="sm" iconLeading={Plus} onPress={() => open(null)}>
-          Add button
+          {t('Add button')}
         </Button>
       </div>
 
@@ -197,8 +203,8 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-primary">{a.label}</p>
                 <p className="truncate text-xs text-tertiary">
-                  {a.form ? `${a.action === 'import' ? 'Import' : a.action === 'stage_query' ? 'Stage query' : 'Form'}: ${a.form.name}` : 'No form'}
-                  {a.get ? ` · Get: ${a.get.name}` : ''}
+                  {a.form ? `${a.action === 'import' ? 'Import' : a.action === 'stage_query' ? t('Stage query') : 'Form'}: ${a.form.name}` : t('No form')}
+                  {a.get ? ` · ${t('Get: {name}', { name: a.get.name })}` : ''}
                 </p>
               </div>
               <div className="hidden flex-wrap gap-1 sm:flex">
@@ -207,96 +213,101 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
                 </Badge>
                 {a.needs_row && (
                   <Badge type="color" size="sm" color="gray">
-                    Needs a row
+                    {t('Needs a row')}
                   </Badge>
                 )}
                 {a.show_in_row && (
                   <Badge type="color" size="sm" color="gray">
-                    On each row
+                    {a.show_in_toolbar ? t('On each row') : t('Only on each row')}
+                  </Badge>
+                )}
+                {!a.show_in_toolbar && !a.show_in_row && (
+                  <Badge type="color" size="sm" color="gray">
+                    {t('Right-click only')}
                   </Badge>
                 )}
               </div>
-              <IconAction icon={Edit01} label={`Edit ${a.label}`} onPress={() => open(a)} />
-              <IconAction icon={Trash01} danger label={`Remove ${a.label}`} onPress={() => setDeleting(a)} />
+              <IconAction icon={Edit01} label={t('Edit {name}', { name: a.label })} onPress={() => open(a)} />
+              <IconAction icon={Trash01} danger label={t('Remove {name}', { name: a.label })} onPress={() => setDeleting(a)} />
             </li>
           ))}
         </ul>
       ) : (
         <p className="rounded-xl bg-primary px-4 py-5 text-sm text-tertiary ring-1 ring-secondary ring-inset">
-          No buttons yet, so this grid is read-only. Add one to open a form from it.
+          {t('No buttons yet, so this grid is read-only. Add one to open a form from it.')}
         </p>
       )}
 
       {editing !== undefined && (
-        <Modal title={editing ? `Edit ${editing.label}` : 'Add a toolbar button'} onClose={() => setEditing(undefined)} size="lg">
+        <Modal title={editing ? t('Edit {name}', { name: editing.label }) : t('Add a toolbar button')} onClose={() => setEditing(undefined)} size="lg">
           <form onSubmit={onSave} className="space-y-5">
             {error && <Alert>{error}</Alert>}
-            <Section title="Button">
+            <Section title={t('Button')}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <NativeSelect
-                  label="Does"
+                  label={t('Does')}
                   value={form.action}
                   onChange={(e) => setKind(e.target.value as ActionKind)}
-                  hint={fe('action') ?? KINDS.find((k) => k.value === form.action)?.hint}
-                  options={KINDS.map((k) => ({ label: k.label, value: k.value }))}
+                  hint={fe('action') ?? t(KINDS.find((k) => k.value === form.action)?.hint ?? '')}
+                  options={KINDS.map((k) => ({ label: t(k.label), value: k.value }))}
                 />
-                <Input label="Label" isRequired value={form.label} onChange={(v) => set('label', v)} isInvalid={!!fe('label')} hint={fe('label')} />
+                <Input label={t('Label')} isRequired value={form.label} onChange={(v) => set('label', v)} isInvalid={!!fe('label')} hint={fe('label')} />
                 <NativeSelect
-                  label="Icon"
+                  label={t('Icon')}
                   value={form.icon_cls}
                   onChange={(e) => set('icon_cls', e.target.value)}
-                  options={ICONS.map((i) => ({ label: i || 'Usual for this kind', value: i }))}
+                  options={ICONS.map((i) => ({ label: i || t('Usual for this kind'), value: i }))}
                 />
-                <Input label="Order" type="number" value={form.order_number} onChange={(v) => set('order_number', v)} isInvalid={!!fe('order_number')} hint={fe('order_number')} />
+                <Input label={t('Order')} type="number" value={form.order_number} onChange={(v) => set('order_number', v)} isInvalid={!!fe('order_number')} hint={fe('order_number')} />
               </div>
             </Section>
 
-            <Section title="Connected to">
+            <Section title={t('Connected to')}>
               <div className="grid gap-4 sm:grid-cols-2">
                 {form.action === 'import' ? (
                   <NativeSelect
-                    label="Excel import"
+                    label={t('Excel import')}
                     required
                     value={form.form_meta_id}
                     onChange={(e) => set('form_meta_id', e.target.value)}
-                    hint={fe('form_meta_id') ?? (imports.length ? 'Says which columns the file has and where they go.' : 'No Excel import metas yet. Create one on the Metas page.')}
-                    options={[{ label: 'Choose an import…', value: '' }, ...imports.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    hint={fe('form_meta_id') ?? (imports.length ? t('Says which columns the file has and where they go.') : t('No Excel import metas yet. Create one on the Metas page.'))}
+                    options={[{ label: t('Choose an import…'), value: '' }, ...imports.map((o) => ({ label: o.name, value: String(o.id) }))]}
                   />
                 ) : form.action === 'stage_query' ? (
                   <NativeSelect
-                    label="Stage query"
+                    label={t('Stage query')}
                     required
                     value={form.form_meta_id}
                     onChange={(e) => set('form_meta_id', e.target.value)}
-                    hint={fe('form_meta_id') ?? (stageQueries.length ? 'The query this button runs, after a dry-run check.' : 'No stage queries yet. Create one on the Metas page.')}
-                    options={[{ label: 'Choose a stage query…', value: '' }, ...stageQueries.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    hint={fe('form_meta_id') ?? (stageQueries.length ? t('The query this button runs, after a dry-run check.') : t('No stage queries yet. Create one on the Metas page.'))}
+                    options={[{ label: t('Choose a stage query…'), value: '' }, ...stageQueries.map((o) => ({ label: o.name, value: String(o.id) }))]}
                   />
                 ) : (
                   <NativeSelect
-                    label="Form"
+                    label={t('Form')}
                     required
                     value={form.form_meta_id}
                     onChange={(e) => set('form_meta_id', e.target.value)}
-                    hint={fe('form_meta_id') ?? (form.action === 'delete' ? 'The row is removed from this form’s table.' : 'The form this button opens.')}
-                    options={[{ label: 'Choose a form…', value: '' }, ...forms.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    hint={fe('form_meta_id') ?? (form.action === 'delete' ? t('The row is removed from this form’s table.') : t('The form this button opens.'))}
+                    options={[{ label: t('Choose a form…'), value: '' }, ...forms.map((o) => ({ label: o.name, value: String(o.id) }))]}
                   />
                 )}
                 {form.action !== 'delete' && form.action !== 'import' && (
                   <NativeSelect
-                    label="Get (opens with)"
+                    label={t('Get (opens with)')}
                     value={form.get_meta_id}
                     onChange={(e) => set('get_meta_id', e.target.value)}
                     hint={
                       fe('get_meta_id') ??
                       (!gets.length
-                        ? 'No get metas yet. Create one on the Metas page.'
+                        ? t('No get metas yet. Create one on the Metas page.')
                         : form.action === 'stage_query'
-                          ? 'Its first row fills the parameters with the same names.'
-                          : 'Decides the values the form opens with.')
+                          ? t('Its first row fills the parameters with the same names.')
+                          : t('Decides the values the form opens with.'))
                     }
                     options={[
                       {
-                        label: form.action === 'edit' ? 'The row from the form’s table' : form.action === 'stage_query' ? 'The picked row (by Parameters)' : 'Nothing (empty form)',
+                        label: form.action === 'edit' ? t('The row from the form’s table') : form.action === 'stage_query' ? t('The picked row (by Parameters)') : t('Nothing (empty form)'),
                         value: '',
                       },
                       ...gets.map((o) => ({ label: o.name, value: String(o.id) })),
@@ -306,37 +317,38 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
               </div>
               {form.action !== 'import' && (
               <TextArea
-                label="Parameters"
+                label={t('Parameters')}
                 rows={3}
                 value={form.params}
                 onChange={(v) => set('params', v)}
                 textAreaClassName="font-mono text-sm"
-                placeholder={'{ "id": "id" }'}
+                placeholder={"{ \"id\": \"id\" }"}
                 isInvalid={!!fe('params') || !!fe('json_config.params')}
                 hint={
                   fe('params') ??
                   fe('json_config.params') ??
                   (form.action === 'stage_query' && !form.get_meta_id
-                    ? 'Which field of the picked row fills each :parameter of the stage query.'
-                    : 'Which field of the picked row fills each :parameter of the get. For edit and delete, "id" is the record opened or removed.')
+                    ? t('Which field of the picked row fills each :parameter of the stage query.')
+                    : t("Which field of the picked row fills each :parameter of the get. For edit and delete, \"id\" is the record opened or removed."))
                 }
               />
               )}
             </Section>
 
-            <Section title="Placement">
+            <Section title={t('Placement')}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Toggle label="Needs a picked row" hint="Disabled until a row is picked." isSelected={form.needs_row} onChange={(v) => set('needs_row', v)} />
-                <Toggle label="Show on each row" hint="Also an icon at the end of every row." isSelected={form.show_in_row} onChange={(v) => set('show_in_row', v)} />
+                <Toggle label={t('Needs a picked row')} hint={t('Disabled until a row is picked.')} isSelected={form.needs_row} onChange={(v) => set('needs_row', v)} />
+                <Toggle label={t('Show in the toolbar')} hint={t('A button above the grid.')} isSelected={form.show_in_toolbar} onChange={(v) => set('show_in_toolbar', v)} />
+                <Toggle label={t('Show on each row')} hint={t('An icon at the end of every row.')} isSelected={form.show_in_row} onChange={(v) => set('show_in_row', v)} />
               </div>
             </Section>
 
             <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
               <Button size="md" color="secondary" onPress={() => setEditing(undefined)}>
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button size="md" type="submit" isLoading={saving} showTextWhileLoading>
-                {editing ? 'Save changes' : 'Add button'}
+                {editing ? t('Save changes') : t('Add button')}
               </Button>
             </div>
           </form>
@@ -345,9 +357,9 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
 
       {deleting && (
         <ConfirmDialog
-          title={`Remove ${deleting.label}?`}
-          message="The button disappears from the grid. The form and get it used are kept."
-          confirmLabel="Remove button"
+          title={t('Remove {name}?', { name: deleting.label })}
+          message={t('The button disappears from the grid. The form and get it used are kept.')}
+          confirmLabel={t('Remove button')}
           busy={deleteBusy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}

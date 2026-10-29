@@ -24,6 +24,7 @@ import { cx } from '@/utils/cx';
 import { ChartCard } from '../../render/DashboardView';
 import { DrilldownEditor, chartSources } from './DrilldownEditor';
 import { useMetaDef, visibleParams } from '../../render/definitions';
+import { t, tLabels } from '@/i18n';
 
 const types: { id: ChartType; label: string; icon: FC<{ className?: string }> }[] = [
   { id: 'column', label: 'Columns', icon: BarChart01 },
@@ -76,7 +77,7 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
     let live = true;
     chartApi.columns(meta.id).then(
       (c) => live && setColumns(c),
-      (err) => live && setColumnsError(err instanceof ApiError ? err.message : 'The columns could not be loaded.'),
+      (err) => live && setColumnsError(err instanceof ApiError ? err.message : t('The columns could not be loaded.')),
     );
     return () => {
       live = false;
@@ -99,7 +100,7 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
       await metaApi.update(meta.id, { json_config: config as Record<string, unknown> });
       setSaved(JSON.stringify(config));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The chart could not be saved.');
+      setError(err instanceof ApiError ? err.message : t('The chart could not be saved.'));
     } finally {
       setSaving(false);
     }
@@ -108,7 +109,7 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
   if (columnsError) {
     return (
       <Panel>
-        <Alert>{`${columnsError} Set the chart's table or query with Edit above.`}</Alert>
+        <Alert>{`${columnsError} ${t("Set the chart's table or query with Edit above.")}`}</Alert>
       </Panel>
     );
   }
@@ -117,7 +118,7 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
     <Panel
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={saving} showTextWhileLoading onPress={save}>
-          {saving ? 'Saving…' : dirty ? 'Save chart' : 'Saved'}
+          {saving ? t('Saving…') : dirty ? t('Save chart') : t('Saved')}
         </Button>
       }
     >
@@ -129,21 +130,21 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
       <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <div className="space-y-6">
           <fieldset>
-            <legend className="mb-2 text-sm font-medium text-secondary">Chart type</legend>
+            <legend className="mb-2 text-sm font-medium text-secondary">{t('Chart type')}</legend>
             <div className="grid grid-cols-4 gap-2">
-              {types.map((t) => (
+              {types.map((item) => (
                 <button
-                  key={t.id}
+                  key={item.id}
                   type="button"
-                  aria-pressed={type === t.id}
-                  onClick={() => set({ type: t.id, ...(t.id === 'kpi' ? { split: null } : {}) })}
+                  aria-pressed={type === item.id}
+                  onClick={() => set({ type: item.id, ...(item.id === 'kpi' ? { split: null } : {}) })}
                   className={cx(
                     'flex flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-xs font-medium outline-focus-ring transition duration-100 ease-linear focus-visible:outline-2',
-                    type === t.id ? 'bg-brand-primary_alt text-brand-secondary ring-2 ring-brand' : 'text-secondary ring-1 ring-secondary hover:bg-primary_hover',
+                    type === item.id ? 'bg-brand-primary_alt text-brand-secondary ring-2 ring-brand' : 'text-secondary ring-1 ring-secondary hover:bg-primary_hover',
                   )}
                 >
-                  <t.icon className="size-5" aria-hidden="true" />
-                  {t.label}
+                  <item.icon className="size-5" aria-hidden="true" />
+                  {t(item.label)}
                 </button>
               ))}
             </div>
@@ -154,26 +155,26 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
           ) : (
             <>
               {type !== 'kpi' && (
-                <Group title="Group by" hint="Each value of this column becomes a column, bar, point or slice.">
+                <Group title={t('Group by')} hint={t('Each value of this column becomes a column, bar, point or slice.')}>
                   <ComboField
-                    aria-label="Group by column"
+                    aria-label={t('Group by column')}
                     items={choices()}
                     value={config.x ?? ''}
                     onChange={(x) => set({ x: x || null, bucket: kindOf(x) === 'date' ? (config.bucket ?? 'month') : null })}
                   />
                   {kindOf(config.x) === 'date' && (
                     <NativeSelect
-                      label="Dates by"
+                      label={t('Dates by')}
                       size="sm"
                       value={config.bucket ?? ''}
                       onChange={(e) => set({ bucket: (e.target.value || null) as ChartConfig['bucket'] })}
                       options={[
-                        { value: '', label: 'Each date as it is' },
-                        { value: 'day', label: 'Day' },
-                        { value: 'week', label: 'Week' },
-                        { value: 'month', label: 'Month' },
-                        { value: 'quarter', label: 'Quarter' },
-                        { value: 'year', label: 'Year' },
+                        { value: '', label: t('Each date as it is') },
+                        { value: 'day', label: t('Day') },
+                        { value: 'week', label: t('Week') },
+                        { value: 'month', label: t('Month') },
+                        { value: 'quarter', label: t('Quarter') },
+                        { value: 'year', label: t('Year') },
                       ]}
                     />
                   )}
@@ -181,20 +182,20 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
                 </Group>
               )}
 
-              <Group title={single ? 'Value' : 'Values'} hint={single ? undefined : 'Up to four, drawn as separate series.'}>
+              <Group title={single ? t('Value') : t('Values')} hint={single ? undefined : t('Up to four, drawn as separate series.')}>
                 {(single ? measures.slice(0, 1) : measures).map((m, i) => (
                   <div key={i} className="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-2">
                     <NativeSelect
-                      aria-label={`Value ${i + 1}: how`}
+                      aria-label={t('Value {n}: how', { n: i + 1 })}
                       size="sm"
                       value={m.agg}
                       onChange={(e) => set({ measures: measures.map((x, j) => (j === i ? { ...x, agg: e.target.value as Aggregate } : x)) })}
-                      options={aggregates}
+                      options={tLabels(aggregates)}
                     />
                     <ComboField
-                      aria-label={`Value ${i + 1}: column`}
+                      aria-label={t('Value {n}: column', { n: i + 1 })}
                       size="sm"
-                      placeholder={m.agg === 'count' ? 'Rows' : 'Column…'}
+                      placeholder={m.agg === 'count' ? t('Rows') : t('Column…')}
                       items={choices(m.agg === 'sum' || m.agg === 'avg' ? ['number'] : undefined)}
                       value={m.column ?? ''}
                       onChange={(column) => set({ measures: measures.map((x, j) => (j === i ? { ...x, column: column || null } : x)) })}
@@ -203,15 +204,15 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
                     <IconAction
                       icon={Trash01}
                       danger
-                      label={`Remove value ${i + 1}`}
+                      label={t('Remove value {n}', { n: i + 1 })}
                       onPress={() => set({ measures: measures.filter((_, j) => j !== i) })}
                       className={cx('mt-1', measures.length < 2 && 'invisible')}
                     />
                     <div className="col-span-2">
                       <Input
-                        aria-label={`Value ${i + 1}: name`}
+                        aria-label={t('Value {n}: name', { n: i + 1 })}
                         size="sm"
-                        placeholder="Name shown in the legend (optional)"
+                        placeholder={t('Name shown in the legend (optional)')}
                         value={m.label ?? ''}
                         onChange={(label) => set({ measures: measures.map((x, j) => (j === i ? { ...x, label: label || null } : x)) })}
                       />
@@ -220,29 +221,29 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
                 ))}
                 {!single && measures.length < 4 && !config.split && (
                   <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => set({ measures: [...measures, { agg: 'sum' }] })}>
-                    Add value
+                    {t('Add value')}
                   </Button>
                 )}
               </Group>
 
               {!single && (
-                <Group title="Split by" hint="One series per value of this column (the first value only).">
-                  <ComboField aria-label="Split by column" placeholder="No split" items={choices(['text', 'boolean', 'number'])} value={config.split ?? ''} onChange={(split) => set({ split: split || null })} />
+                <Group title={t('Split by')} hint={t('One series per value of this column (the first value only).')}>
+                  <ComboField aria-label={t('Split by column')} placeholder={t('No split')} items={choices(['text', 'boolean', 'number'])} value={config.split ?? ''} onChange={(split) => set({ split: split || null })} />
                 </Group>
               )}
 
-              <Group title="Only rows where" hint="All of these must hold.">
+              <Group title={t('Only rows where')} hint={t('All of these must hold.')}>
                 {(config.filters ?? []).map((f, i) => {
                   const update = (patch: Partial<typeof f>) => set({ filters: config.filters!.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
                   const noValue = f.op === 'empty' || f.op === 'not_empty';
                   return (
                     <div key={i} className="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] items-start gap-2">
-                      <ComboField aria-label={`Filter ${i + 1}: column`} size="sm" items={choices()} value={f.column} onChange={(column) => update({ column })} />
-                      <NativeSelect aria-label={`Filter ${i + 1}: rule`} size="sm" value={f.op} onChange={(e) => update({ op: e.target.value as FilterOp })} options={operators} />
-                      <IconAction icon={Trash01} danger label={`Remove filter ${i + 1}`} className="mt-1" onPress={() => set({ filters: config.filters!.filter((_, j) => j !== i) })} />
+                      <ComboField aria-label={t('Filter {n}: column', { n: i + 1 })} size="sm" items={choices()} value={f.column} onChange={(column) => update({ column })} />
+                      <NativeSelect aria-label={t('Filter {n}: rule', { n: i + 1 })} size="sm" value={f.op} onChange={(e) => update({ op: e.target.value as FilterOp })} options={tLabels(operators)} />
+                      <IconAction icon={Trash01} danger label={t('Remove filter {n}', { n: i + 1 })} className="mt-1" onPress={() => set({ filters: config.filters!.filter((_, j) => j !== i) })} />
                       {!noValue && (
                         <div className="col-span-2">
-                          <Input aria-label={`Filter ${i + 1}: value`} size="sm" placeholder="Value" value={String(f.value ?? '')} onChange={(value) => update({ value })} />
+                          <Input aria-label={t('Filter {n}: value', { n: i + 1 })} size="sm" placeholder={t('Value')} value={String(f.value ?? '')} onChange={(value) => update({ value })} />
                         </div>
                       )}
                     </div>
@@ -254,53 +255,53 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
                   iconLeading={Plus}
                   onPress={() => set({ filters: [...(config.filters ?? []), { column: columns[0]?.name ?? '', op: '=', value: '' }] })}
                 >
-                  Add filter
+                  {t('Add filter')}
                 </Button>
               </Group>
 
-              <Group title="Dashboard date range" hint={type === 'kpi' ? 'The range narrows this column; the figure also compares with the period before.' : 'The range picked on a dashboard narrows this column.'}>
-                <ComboField aria-label="Date range column" placeholder="Not affected by the range" items={choices(['date'])} value={config.date_field ?? ''} onChange={(date_field) => set({ date_field: date_field || null })} />
+              <Group title={t('Dashboard date range')} hint={type === 'kpi' ? t('The range narrows this column; the figure also compares with the period before.') : t('The range picked on a dashboard narrows this column.')}>
+                <ComboField aria-label={t('Date range column')} placeholder={t('Not affected by the range')} items={choices(['date'])} value={config.date_field ?? ''} onChange={(date_field) => set({ date_field: date_field || null })} />
               </Group>
 
-              <Group title="When clicked" hint="A column, slice, point or figure opens another meta with the clicked values. Works on running dashboards, not in this preview.">
-                <DrilldownEditor value={config.drilldown ?? null} onChange={(drilldown) => set({ drilldown })} options={options} sources={chartSources} selfId={meta.id} />
+              <Group title={t('When clicked')} hint={t('A column, slice, point or figure opens another meta with the clicked values. Works on running dashboards, not in this preview.')}>
+                <DrilldownEditor value={config.drilldown ?? null} onChange={(drilldown) => set({ drilldown })} options={options} sources={tLabels(chartSources)} selfId={meta.id} />
               </Group>
 
-              <Group title="Display">
+              <Group title={t('Display')}>
                 <div className="grid grid-cols-2 gap-3">
                   <NativeSelect
-                    label="Numbers as"
+                    label={t('Numbers as')}
                     size="sm"
                     value={config.format ?? 'number'}
                     onChange={(e) => set({ format: e.target.value as ChartConfig['format'] })}
                     options={[
-                      { value: 'number', label: 'Number' },
-                      { value: 'money', label: 'Money' },
-                      { value: 'percent', label: 'Percent' },
+                      { value: 'number', label: t('Number') },
+                      { value: 'money', label: t('Money') },
+                      { value: 'percent', label: t('Percent') },
                     ]}
                   />
                   {type !== 'kpi' && (
                     <NativeSelect
-                      label="Order"
+                      label={t('Order')}
                       size="sm"
                       value={config.sort ?? ''}
                       onChange={(e) => set({ sort: (e.target.value || null) as ChartConfig['sort'] })}
                       options={[
-                        { value: '', label: 'Automatic' },
-                        { value: 'value', label: 'Biggest first' },
-                        { value: 'label', label: 'By name or date' },
+                        { value: '', label: t('Automatic') },
+                        { value: 'value', label: t('Biggest first') },
+                        { value: 'label', label: t('By name or date') },
                       ]}
                     />
                   )}
                   {type !== 'kpi' && (
                     <Input
-                      label="Show at most"
+                      label={t('Show at most')}
                       size="sm"
                       type="number"
-                      placeholder={config.bucket ? 'Every period' : type === 'pie' || type === 'donut' ? '6' : '12'}
+                      placeholder={config.bucket ? t('Every period') : type === 'pie' || type === 'donut' ? '6' : '12'}
                       value={config.limit ? String(config.limit) : ''}
                       onChange={(v) => set({ limit: v ? Math.max(1, Math.min(500, Number(v))) : null })}
-                      hint={type === 'pie' || type === 'donut' ? 'The rest add up into "Other".' : undefined}
+                      hint={type === 'pie' || type === 'donut' ? t("The rest add up into \"Other\".") : undefined}
                     />
                   )}
                 </div>
@@ -310,9 +311,9 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
         </div>
 
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <p className="mb-2 text-sm font-medium text-secondary">Preview</p>
+          <p className="mb-2 text-sm font-medium text-secondary">{t('Preview')}</p>
           <ChartCard metaId={meta.id} preview={preview} height={type === 'kpi' ? 160 : 400} className="bg-primary" />
-          <p className="mt-2 text-xs text-tertiary">{dirty ? 'Not saved yet. Dashboards show the saved chart.' : 'This is what dashboards show.'}</p>
+          <p className="mt-2 text-xs text-tertiary">{dirty ? t('Not saved yet. Dashboards show the saved chart.') : t('This is what dashboards show.')}</p>
         </div>
       </div>
     </Panel>
@@ -325,9 +326,9 @@ function Panel({ children, actions }: { children: ReactNode; actions?: ReactNode
       <div className="flex items-center justify-between gap-3 border-b border-secondary px-4 py-4 sm:px-5">
         <div>
           <h2 id="chart-designer-title" className="text-lg font-semibold text-primary">
-            Chart
+            {t('Chart')}
           </h2>
-          <p className="mt-0.5 text-sm text-tertiary">Pick what to count and how to group it. Columns come from this chart's table or query.</p>
+          <p className="mt-0.5 text-sm text-tertiary">{t("Pick what to count and how to group it. Columns come from this chart's table or query.")}</p>
         </div>
         {actions}
       </div>
@@ -363,14 +364,14 @@ function LookupPicker({
   return (
     <div className="grid grid-cols-2 gap-2">
       <ComboField
-        label="Names from"
+        label={t('Names from')}
         size="sm"
-        placeholder="Show the ids"
+        placeholder={t('Show the ids')}
         items={metas}
         value={value ? String(value.meta_id) : ''}
         onChange={(id) => onChange(id ? { meta_id: Number(id), label_field: value?.label_field ?? 'name' } : null)}
       />
-      {value && <ComboField label="Name field" size="sm" items={fields} value={value.label_field} onChange={(label_field) => onChange({ ...value, label_field: label_field || 'name' })} />}
+      {value && <ComboField label={t('Name field')} size="sm" items={fields} value={value.label_field} onChange={(label_field) => onChange({ ...value, label_field: label_field || 'name' })} />}
     </div>
   );
 }

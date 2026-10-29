@@ -8,6 +8,7 @@ import { Button } from '@/components/base/buttons/button';
 import { cx } from '@/utils/cx';
 import { formatNumber } from './Cell';
 import { title, type MetaDef } from './definitions';
+import { t } from '@/i18n';
 
 const cellKey = (row: number, column: number) => `${row}:${column}`;
 
@@ -35,7 +36,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
     setDraft({});
     matrixApi.get(def.meta.id, scope).then(
       (m) => live && setMatrix(m),
-      (err) => live && setError(err instanceof ApiError ? err.message : 'The matrix could not be loaded.'),
+      (err) => live && setError(err instanceof ApiError ? err.message : t('The matrix could not be loaded.')),
     );
     return () => {
       live = false;
@@ -74,7 +75,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
   }, [matrix, draft]);
   const leader = useMemo(() => {
     if (!totals || !matrix?.best) return null;
-    const present = totals.filter((t): t is number => t !== null);
+    const present = totals.filter((item): item is number => item !== null);
     if (present.length < 2) return null;
     return matrix.best === 'min' ? Math.min(...present) : Math.max(...present);
   }, [totals, matrix]);
@@ -84,7 +85,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
   if (!matrix.rows.length || !matrix.columns.length) {
     return (
       <div className="rounded-xl border border-dashed border-primary px-5 py-8 text-center text-sm text-tertiary">
-        {title(def.meta)} fills in once there are both rows and columns to pair up.
+        {t('{name} fills in once there are both rows and columns to pair up.', { name: title(def.meta) })}
       </div>
     );
   }
@@ -108,7 +109,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
       setMatrix(await matrixApi.save(def.meta.id, scope ?? {}, cells));
       setDraft({});
     } catch (err) {
-      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : 'The values could not be saved.');
+      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : t('The values could not be saved.'));
     } finally {
       setSaving(false);
     }
@@ -125,11 +126,11 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
           <div className="flex items-center gap-2">
             {changed > 0 && (
               <Button size="sm" color="secondary" onPress={() => setDraft({})}>
-                Discard
+                {t('Discard')}
               </Button>
             )}
             <Button size="sm" isDisabled={!changed} isLoading={saving} showTextWhileLoading onPress={save}>
-              {changed ? `Save ${changed} ${changed === 1 ? 'change' : 'changes'}` : 'Saved'}
+              {changed ? t('Save {count} changes', { count: changed }) : t('Saved')}
             </Button>
           </div>
         )}
@@ -145,13 +146,13 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
               </th>
               {matrix.weighted && (
                 <th scope="col" className="w-24 px-3 py-2 text-right font-medium">
-                  {matrix.total === 'amount' ? 'Qty' : 'Weight'}
+                  {matrix.total === 'amount' ? t('Qty') : t('Weight')}
                 </th>
               )}
               {matrix.columns.map((c, i) => (
                 <th key={c.id} scope="col" className="min-w-36 px-3 py-2 text-right font-medium">
                   <span className="inline-flex items-center gap-1">
-                    {totals && leader !== null && totals[i] === leader && <Trophy01 className="size-3.5 text-fg-warning-primary" aria-label="Leading" />}
+                    {totals && leader !== null && totals[i] === leader && <Trophy01 className="size-3.5 text-fg-warning-primary" aria-label={t('Leading')} />}
                     {c.label}
                   </span>
                 </th>
@@ -201,12 +202,12 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
             <tfoot className="border-t border-secondary bg-secondary">
               <tr>
                 <th scope="row" className="px-3 py-2.5 text-left text-sm font-semibold text-primary">
-                  {TOTAL_LABELS[matrix.total]}
+                  {t(TOTAL_LABELS[matrix.total])}
                 </th>
                 {matrix.weighted && <td />}
-                {totals.map((t, i) => (
-                  <td key={matrix.columns[i].id} className={cx('px-3 py-2.5 text-right text-sm font-semibold tabular-nums', leader !== null && t === leader ? 'text-success-primary' : 'text-primary')}>
-                    {t === null ? '—' : formatNumber(Math.round(t * 100) / 100)}
+                {totals.map((item, i) => (
+                  <td key={matrix.columns[i].id} className={cx('px-3 py-2.5 text-right text-sm font-semibold tabular-nums', leader !== null && item === leader ? 'text-success-primary' : 'text-primary')}>
+                    {item === null ? '—' : formatNumber(Math.round(item * 100) / 100)}
                   </td>
                 ))}
               </tr>
@@ -216,7 +217,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
       </div>
       {matrix.best && (
         <p className="text-xs text-quaternary">
-          Green marks the {matrix.best === 'min' ? 'lowest' : 'highest'} value in each row{totals ? ', and the leading total' : ''}.
+          {matrix.best === 'min' ? t('Green marks the lowest value in each row') : t('Green marks the highest value in each row')}{totals ? t(', and the leading total') : ''}.
         </p>
       )}
     </section>

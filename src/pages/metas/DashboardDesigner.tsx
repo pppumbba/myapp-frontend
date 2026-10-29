@@ -11,6 +11,7 @@ import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { ChartCard, DashboardGrid, HEIGHTS, WIDTHS, cardHeight, chartParams, placement, spanClass } from '../../render/DashboardView';
 import { clearRenderCache } from '../../render/definitions';
 import { MetaFormModal } from './MetaFormModal';
+import { t } from '@/i18n';
 
 const widthNames: Record<number, string> = { 3: 'Quarter', 4: 'Third', 6: 'Half', 8: 'Two thirds', 9: 'Three quarters', 12: 'Full width' };
 const heightNames: Record<number, string> = { 1: 'Short', 2: 'Medium', 3: 'Tall' };
@@ -33,7 +34,7 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
     try {
       setParams(await metaApi.params(meta.id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The layout could not be loaded.');
+      setError(err instanceof ApiError ? err.message : t("The layout could not be loaded."));
     }
   }, [meta.id]);
 
@@ -53,7 +54,7 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
       clearRenderCache();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'That change could not be saved.');
+      setError(err instanceof ApiError ? err.message : t("That change could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -104,19 +105,19 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-secondary px-4 py-4 sm:px-5">
         <div className="min-w-0">
           <h2 id="dashboard-designer-title" className="text-lg font-semibold text-primary">
-            Layout
+            {t("Layout")}
           </h2>
-          <p className="mt-0.5 text-sm text-tertiary">Charts sit on a 12-column grid, in order. Use each chart's menu to size or move it.</p>
+          <p className="mt-0.5 text-sm text-tertiary">{t("Charts sit on a 12-column grid, in order. Use each chart's menu to size or move it.")}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <div className="min-w-56 flex-1">
-            <ComboField aria-label="Chart to add" size="sm" placeholder="Pick a chart to add…" items={charts} value={picked} onChange={setPicked} />
+            <ComboField aria-label={t("Chart to add")} size="sm" placeholder={t("Pick a chart to add…")} items={charts} value={picked} onChange={setPicked} />
           </div>
           <Button size="sm" iconLeading={Plus} isDisabled={!picked || busy} onPress={() => add(Number(picked))}>
-            Add
+            {t("Add")}
           </Button>
           <Button size="sm" color="secondary" isDisabled={busy} onPress={async () => setCreating(await metaApi.types())}>
-            New chart
+            {t("New chart")}
           </Button>
         </div>
       </div>
@@ -143,30 +144,30 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
                   actions={
                     <Dropdown.Root>
                       <Dropdown.DotsButton
-                        aria-label={`Size and place ${p.label_name || chartOptions.find((o) => o.id === p.ref_meta_id)?.name || 'this chart'}`}
+                        aria-label={t('Size and place {name}', { name: p.label_name || chartOptions.find((o) => o.id === p.ref_meta_id)?.name || t('this chart') })}
                         className="mt-0.5"
                       />
                       <Dropdown.Popover className="w-56">
                         <Dropdown.Menu onAction={(key) => onAction(p, i, key)}>
-                          <Dropdown.Section aria-label="Width">
-                            <Dropdown.SectionHeader className="px-3 pt-1.5 pb-1 text-xs font-semibold text-tertiary">Width</Dropdown.SectionHeader>
+                          <Dropdown.Section aria-label={t("Width")}>
+                            <Dropdown.SectionHeader className="px-3 pt-1.5 pb-1 text-xs font-semibold text-tertiary">{t("Width")}</Dropdown.SectionHeader>
                             {WIDTHS.map((x) => (
-                              <Dropdown.Item key={x} id={`w:${x}`} label={widthNames[x]} addon={x === w ? 'Now' : `${x}/12`} isDisabled={x === w} />
+                              <Dropdown.Item key={x} id={`w:${x}`} label={t(widthNames[x])} addon={x === w ? t("Now") : `${x}/12`} isDisabled={x === w} />
                             ))}
                           </Dropdown.Section>
                           <Dropdown.Separator />
-                          <Dropdown.Section aria-label="Height">
-                            <Dropdown.SectionHeader className="px-3 pt-1.5 pb-1 text-xs font-semibold text-tertiary">Height</Dropdown.SectionHeader>
+                          <Dropdown.Section aria-label={t("Height")}>
+                            <Dropdown.SectionHeader className="px-3 pt-1.5 pb-1 text-xs font-semibold text-tertiary">{t("Height")}</Dropdown.SectionHeader>
                             {HEIGHTS.map((x) => (
-                              <Dropdown.Item key={x} id={`h:${x}`} label={heightNames[x]} addon={x === h ? 'Now' : undefined} isDisabled={x === h} />
+                              <Dropdown.Item key={x} id={`h:${x}`} label={t(heightNames[x])} addon={x === h ? t("Now") : undefined} isDisabled={x === h} />
                             ))}
                           </Dropdown.Section>
                           <Dropdown.Separator />
-                          <Dropdown.Section aria-label="Arrange">
-                            <Dropdown.Item id="earlier" icon={ArrowLeft} label="Move earlier" isDisabled={i === 0} />
-                            <Dropdown.Item id="later" icon={ArrowRight} label="Move later" isDisabled={i === placed.length - 1} />
-                            <Dropdown.Item id="edit" icon={Edit01} label="Edit chart" />
-                            <Dropdown.Item id="remove" icon={Trash01} label="Remove from dashboard" />
+                          <Dropdown.Section aria-label={t("Arrange")}>
+                            <Dropdown.Item id="earlier" icon={ArrowLeft} label={t("Move earlier")} isDisabled={i === 0} />
+                            <Dropdown.Item id="later" icon={ArrowRight} label={t("Move later")} isDisabled={i === placed.length - 1} />
+                            <Dropdown.Item id="edit" icon={Edit01} label={t("Edit chart")} />
+                            <Dropdown.Item id="remove" icon={Trash01} label={t("Remove from dashboard")} />
                           </Dropdown.Section>
                         </Dropdown.Menu>
                       </Dropdown.Popover>
@@ -178,8 +179,8 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
           </DashboardGrid>
         ) : (
           <div className="rounded-xl bg-primary px-6 py-12 text-center ring-1 ring-secondary">
-            <p className="text-md font-semibold text-primary">No charts on this dashboard yet</p>
-            <p className="mt-1 text-sm text-tertiary">Pick a chart above, or make a new one.</p>
+            <p className="text-md font-semibold text-primary">{t("No charts on this dashboard yet")}</p>
+            <p className="mt-1 text-sm text-tertiary">{t("Pick a chart above, or make a new one.")}</p>
           </div>
         )}
       </div>
@@ -189,7 +190,7 @@ export function DashboardDesigner({ meta, options }: { meta: Meta; options: Meta
           meta={null}
           types={creating}
           options={chartOptions}
-          presetTypeId={creating.find((t) => t.code === 'chart')?.id}
+          presetTypeId={creating.find((item) => item.code === 'chart')?.id}
           onClose={() => setCreating(null)}
           onSaved={async (chart) => {
             setCreating(null);

@@ -8,6 +8,7 @@ import { Popover } from '@/components/base/select/popover';
 import { SelectItem } from '@/components/base/select/select-item';
 import { SelectContext } from '@/components/base/select/select-shared';
 import { cx } from '@/utils/cx';
+import { t } from '@/i18n';
 
 export interface ComboOption {
   id: string;
@@ -28,7 +29,7 @@ export function ComboField({
   onChange,
   onSearch,
   isLoading,
-  placeholder = 'Choose…',
+  placeholder = t('Choose…'),
   size = 'md',
   isRequired,
   isInvalid,
@@ -91,7 +92,7 @@ export function ComboField({
           />
           {addon}
           <AriaButton
-            aria-label="Show choices"
+            aria-label={t('Show choices')}
             className="mr-1 flex size-8 shrink-0 items-center justify-center rounded-md text-fg-quaternary outline-focus-ring transition duration-100 ease-linear hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2"
           >
             <ChevronDown className="size-4 stroke-[2.25px]" />
@@ -107,7 +108,7 @@ export function ComboField({
         <Popover size={size} triggerRef={groupRef} style={{ width: groupRef.current?.offsetWidth }}>
           <ListBox
             className="outline-hidden"
-            renderEmptyState={() => <p className="px-3 py-2 text-sm text-tertiary">{isLoading ? 'Loading…' : 'No matches'}</p>}
+            renderEmptyState={() => <p className="px-3 py-2 text-sm text-tertiary">{isLoading ? t('Loading…') : t('No matches')}</p>}
           >
             {(item: ComboOption) => <SelectItem id={item.id} label={item.label} />}
           </ListBox>

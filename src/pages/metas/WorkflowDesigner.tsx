@@ -12,6 +12,7 @@ import { NativeSelect } from '@/components/base/select/select-native';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { palette } from '../../render/palette';
+import { t } from '@/i18n';
 
 const NODE_W = 176;
 const NODE_H = 56;
@@ -63,7 +64,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
       setLayout(Array.isArray(def.layout) ? {} : def.layout);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The workflow could not be loaded.');
+      setError(err instanceof ApiError ? err.message : t("The workflow could not be loaded."));
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
       await workflowApi.saveLayout(meta.id, next);
       setSaved('saved');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The layout could not be saved.');
+      setError(err instanceof ApiError ? err.message : t("The layout could not be saved."));
       setSaved(null);
     }
   }
@@ -145,21 +146,21 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
     const to = target ? Number(target.getAttribute('data-status-id')) : null;
     if (!to || to === d.from) return;
     try {
-      const t = await workflowApi.createTransition(meta.id, { prev_status_id: d.from, next_status_id: to, is_transition: true });
-      setTransitions((list) => [...list, t]);
+      const item = await workflowApi.createTransition(meta.id, { prev_status_id: d.from, next_status_id: to, is_transition: true });
+      setTransitions((list) => [...list, item]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The transition could not be added.');
+      setError(err instanceof ApiError ? err.message : t("The transition could not be added."));
     }
   }
 
   // Arrows between boxes; a pair joined both ways bends apart so both stay visible.
-  const edges = transitions.flatMap((t) => {
-    const from = t.prev_status_id ? rects.get(t.prev_status_id) : startRect;
-    const to = rects.get(t.next_status_id);
+  const edges = transitions.flatMap((item) => {
+    const from = item.prev_status_id ? rects.get(item.prev_status_id) : startRect;
+    const to = rects.get(item.next_status_id);
     if (!from || !to) return [];
     const fc = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
     const tc = { x: to.x + to.w / 2, y: to.y + to.h / 2 };
-    const both = transitions.some((o) => o.prev_status_id === t.next_status_id && o.next_status_id === t.prev_status_id);
+    const both = transitions.some((o) => o.prev_status_id === item.next_status_id && o.next_status_id === item.prev_status_id);
     const len = Math.hypot(tc.x - fc.x, tc.y - fc.y) || 1;
     const normal = { x: -(tc.y - fc.y) / len, y: (tc.x - fc.x) / len };
     const bend = both ? 26 : 0;
@@ -167,7 +168,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
     const a = edgePoint(from, mid.x, mid.y);
     const b = edgePoint(to, mid.x, mid.y);
     const ctrl = { x: 2 * mid.x - (a.x + b.x) / 2, y: 2 * mid.y - (a.y + b.y) / 2 };
-    return [{ t, d: `M ${a.x} ${a.y} Q ${ctrl.x} ${ctrl.y} ${b.x} ${b.y}`, mid }];
+    return [{ t: item, d: `M ${a.x} ${a.y} Q ${ctrl.x} ${ctrl.y} ${b.x} ${b.y}`, mid }];
   });
 
   async function addStatus(input: { code: string; name: string; label_name: string | null; color: string | null; meta_id: number | null }) {
@@ -192,16 +193,16 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="workflow-heading" className="text-lg font-semibold text-primary">
-            Workflow
+            {t("Workflow")}
           </h2>
           <p className="text-sm text-tertiary">
-            Drag boxes to arrange them. Drag from a box’s dot onto another box to add a transition. Double-click a box or an arrow to edit it.
+            {t("Drag boxes to arrange them. Drag from a box’s dot onto another box to add a transition. Double-click a box or an arrow to edit it.")}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {saved && <span className="text-xs text-tertiary">{saved === 'saving' ? 'Saving layout…' : 'Layout saved'}</span>}
+          {saved && <span className="text-xs text-tertiary">{saved === 'saving' ? t("Saving layout…") : t("Layout saved")}</span>}
           <Button size="sm" iconLeading={Plus} onPress={() => setEditingStatus('new')}>
-            Add status
+            {t("Add status")}
           </Button>
         </div>
       </div>
@@ -213,7 +214,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
       )}
       {!meta.table_name && (
         <div className="mb-3">
-          <Alert>Set this workflow’s table (Edit at the top) to the table its records live in. That table needs a status_id column.</Alert>
+          <Alert>{t("Set this workflow’s table (Edit at the top) to the table its records live in. That table needs a status_id column.")}</Alert>
         </div>
       )}
 
@@ -232,15 +233,15 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
                 <path d="M0 0 10 5 0 10z" className="fill-fg-brand-primary" />
               </marker>
             </defs>
-            {edges.map(({ t, d }) => (
-              <g key={t.id}>
+            {edges.map(({ t: item, d }) => (
+              <g key={item.id}>
                 <path
                   d={d}
                   fill="none"
-                  strokeWidth={hovered === t.id ? 2.25 : 1.75}
-                  strokeDasharray={t.is_transition ? undefined : '6 5'}
-                  markerEnd={`url(#${hovered === t.id ? 'wf-arrow-on' : 'wf-arrow'})`}
-                  className={hovered === t.id ? 'stroke-fg-brand-primary' : 'stroke-fg-quaternary'}
+                  strokeWidth={hovered === item.id ? 2.25 : 1.75}
+                  strokeDasharray={item.is_transition ? undefined : '6 5'}
+                  markerEnd={`url(#${hovered === item.id ? 'wf-arrow-on' : 'wf-arrow'})`}
+                  className={hovered === item.id ? 'stroke-fg-brand-primary' : 'stroke-fg-quaternary'}
                 />
                 {/* A wide invisible stroke makes the arrow easy to hit. */}
                 <path
@@ -250,11 +251,11 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
                   strokeWidth={14}
                   className="cursor-pointer"
                   style={{ pointerEvents: 'stroke' }}
-                  onPointerEnter={() => setHovered(t.id)}
+                  onPointerEnter={() => setHovered(item.id)}
                   onPointerLeave={() => setHovered(null)}
-                  onDoubleClick={() => setEditingTransition(t)}
+                  onDoubleClick={() => setEditingTransition(item)}
                 >
-                  <title>{`${statusName(t.prev_status_id)} → ${statusName(t.next_status_id)}${t.criteria ? ` when ${t.criteria}` : ''}`}</title>
+                  <title>{`${statusName(item.prev_status_id)} → ${statusName(item.next_status_id)}${item.criteria ? ` when ${item.criteria}` : ''}`}</title>
                 </path>
               </g>
             ))}
@@ -273,19 +274,19 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
           </svg>
 
           {edges
-            .filter(({ t }) => t.criteria)
-            .map(({ t, mid }) => (
+            .filter(({ t: item }) => item.criteria)
+            .map(({ t: item, mid }) => (
               <button
-                key={`label-${t.id}`}
+                key={`label-${item.id}`}
                 type="button"
-                onDoubleClick={() => setEditingTransition(t)}
-                onPointerEnter={() => setHovered(t.id)}
+                onDoubleClick={() => setEditingTransition(item)}
+                onPointerEnter={() => setHovered(item.id)}
                 onPointerLeave={() => setHovered(null)}
                 className="absolute max-w-44 -translate-x-1/2 -translate-y-1/2 truncate rounded-md bg-primary px-1.5 py-0.5 font-mono text-[11px] text-tertiary shadow-xs ring-1 ring-secondary"
                 style={{ left: mid.x, top: mid.y }}
-                title={t.criteria ?? undefined}
+                title={item.criteria ?? undefined}
               >
-                {t.criteria}
+                {item.criteria}
               </button>
             ))}
 
@@ -296,12 +297,12 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
             onPointerDown={(e) => startDrag(e, 'start', start)}
             onPointerMove={onDragMove}
             onPointerUp={endDrag}
-            title="Start: where records without a status begin"
+            title={t("Start: where records without a status begin")}
           >
-            Start
+            {t("Start")}
             <span
               role="button"
-              aria-label="Draw a transition from Start"
+              aria-label={t("Draw a transition from Start")}
               className="absolute top-1/2 -right-1.5 size-3 -translate-y-1/2 cursor-crosshair rounded-full bg-primary ring-2 ring-brand"
               style={{ touchAction: 'none' }}
               onPointerDown={(e) => startDrawing(e, null)}
@@ -331,12 +332,12 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
                   <span className="block truncate text-sm font-semibold text-primary">{s.label_name || s.name}</span>
                   <span className="block truncate font-mono text-[11px] text-quaternary">
                     {s.code}
-                    {s.meta_id ? ' · asks a form' : ''}
+                    {s.meta_id ? t(" · asks a form") : ''}
                   </span>
                 </span>
                 <span
                   role="button"
-                  aria-label={`Draw a transition from ${s.name}`}
+                  aria-label={t('Draw a transition from {name}', { name: s.name })}
                   className="absolute top-1/2 right-1 size-3 -translate-y-1/2 cursor-crosshair rounded-full bg-primary ring-2 ring-fg-quaternary hover:ring-brand"
                   style={{ touchAction: 'none' }}
                   onPointerDown={(e) => startDrawing(e, s.id)}
@@ -348,7 +349,7 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
           })}
 
           {!statuses.length && (
-            <p className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm text-tertiary">Add the first status to start drawing.</p>
+            <p className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm text-tertiary">{t("Add the first status to start drawing.")}</p>
           )}
         </div>
       </div>
@@ -384,8 +385,8 @@ export function WorkflowDesigner({ meta, options }: { meta: Meta; options: MetaO
           statusName={statusName}
           onClose={() => setEditingTransition(null)}
           onSave={async (input) => {
-            const t = await workflowApi.updateTransition(editingTransition.id, input);
-            setTransitions((list) => list.map((x) => (x.id === t.id ? t : x)));
+            const item = await workflowApi.updateTransition(editingTransition.id, input);
+            setTransitions((list) => list.map((x) => (x.id === item.id ? item : x)));
             setEditingTransition(null);
           }}
           onDelete={async () => {
@@ -413,7 +414,7 @@ function useSave() {
       await save();
     } catch (err) {
       if (err instanceof ApiError && err.errors) setFieldErrors(err.errors);
-      else setError(err instanceof ApiError ? err.message : 'This could not be saved.');
+      else setError(err instanceof ApiError ? err.message : t("This could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -451,12 +452,12 @@ function StatusEditor({
 
   return (
     <>
-      <Modal title={status ? `Edit ${status.name}` : 'Add a status'} onClose={onClose} size="md">
+      <Modal title={status ? t('Edit {name}', { name: status.name }) : t("Add a status")} onClose={onClose} size="md">
         <form onSubmit={onSubmit} className="space-y-5">
           {(save.error || remove.error) && <Alert>{save.error ?? remove.error}</Alert>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="Name"
+              label={t("Name")}
               isRequired
               value={name}
               onChange={(v) => {
@@ -466,11 +467,11 @@ function StatusEditor({
               isInvalid={!!save.fe('name')}
               hint={save.fe('name')}
             />
-            <Input label="Code" isRequired value={code} onChange={setCode} isInvalid={!!save.fe('code')} hint={save.fe('code') ?? 'Unique in this workflow.'} />
-            <Input label="Display label" value={label} onChange={setLabel} hint="Shown to people instead of the name. Optional." />
+            <Input label={t("Code")} isRequired value={code} onChange={setCode} isInvalid={!!save.fe('code')} hint={save.fe('code') ?? t("Unique in this workflow.")} />
+            <Input label={t("Display label")} value={label} onChange={setLabel} hint={t("Shown to people instead of the name. Optional.")} />
             <div>
-              <p className="mb-1.5 text-sm font-medium text-secondary">Colour</p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Colour">
+              <p className="mb-1.5 text-sm font-medium text-secondary">{t("Colour")}</p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("Colour")}>
                 {COLORS.map((c) => (
                   <button
                     key={c}
@@ -486,26 +487,26 @@ function StatusEditor({
             </div>
           </div>
           <NativeSelect
-            label="Form on entering"
+            label={t("Form on entering")}
             value={formId}
             onChange={(e) => setFormId(e.target.value)}
-            hint={save.fe('meta_id') ?? 'Opened for the record when it moves into this status, e.g. to ask why it was rejected. Saving it completes the move.'}
-            options={[{ label: 'None: move straight away', value: '' }, ...forms.map((f) => ({ label: f.name, value: String(f.id) }))]}
+            hint={save.fe('meta_id') ?? t("Opened for the record when it moves into this status, e.g. to ask why it was rejected. Saving it completes the move.")}
+            options={[{ label: t("None: move straight away"), value: '' }, ...forms.map((f) => ({ label: f.name, value: String(f.id) }))]}
           />
           <div className="flex items-center justify-between gap-3 border-t border-secondary pt-4">
             {status ? (
               <Button size="sm" color="tertiary-destructive" onPress={() => setConfirming(true)}>
-                Delete status
+                {t("Delete status")}
               </Button>
             ) : (
               <span />
             )}
             <div className="flex gap-2">
               <Button size="sm" color="secondary" onPress={onClose}>
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button size="sm" type="submit" isLoading={save.busy} showTextWhileLoading>
-                {status ? 'Save changes' : 'Add status'}
+                {status ? t("Save changes") : t("Add status")}
               </Button>
             </div>
           </div>
@@ -513,9 +514,9 @@ function StatusEditor({
       </Modal>
       {confirming && status && (
         <ConfirmDialog
-          title={`Delete ${status.name}?`}
-          message="Its transitions go too. A status records have already been in stays, to keep their history."
-          confirmLabel="Delete status"
+          title={t('Delete {name}?', { name: status.name })}
+          message={t("Its transitions go too. A status records have already been in stays, to keep their history.")}
+          confirmLabel={t("Delete status")}
           busy={remove.busy}
           onConfirm={() => remove.run(onDelete).then(() => setConfirming(false))}
           onCancel={() => setConfirming(false)}
@@ -555,8 +556,8 @@ function TransitionEditor({
   const remove = useSave();
 
   const others = transitions
-    .filter((t) => t.id !== transition.id)
-    .map((t) => ({ label: `${statusName(t.prev_status_id)} → ${statusName(t.next_status_id)}`, value: String(t.id) }));
+    .filter((item) => item.id !== transition.id)
+    .map((item) => ({ label: `${statusName(item.prev_status_id)} → ${statusName(item.next_status_id)}`, value: String(item.id) }));
   const statusOptions = statuses.map((s) => ({ label: s.name, value: String(s.id) }));
   const num = (v: string) => (v ? Number(v) : null);
 
@@ -579,49 +580,49 @@ function TransitionEditor({
     <Modal title={`${statusName(transition.prev_status_id)} → ${statusName(transition.next_status_id)}`} onClose={onClose} size="lg">
       <form onSubmit={onSubmit} className="space-y-5">
         {(save.error || remove.error) && <Alert>{save.error ?? remove.error}</Alert>}
-        <Section title="Move">
+        <Section title={t("Move")}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <NativeSelect label="From" value={from} onChange={(e) => setFrom(e.target.value)} hint={save.fe('prev_status_id')} options={[{ label: 'Start (no status yet)', value: '' }, ...statusOptions]} />
-            <NativeSelect label="To" value={to} onChange={(e) => setTo(e.target.value)} hint={save.fe('next_status_id')} options={statusOptions} />
+            <NativeSelect label={t("From")} value={from} onChange={(e) => setFrom(e.target.value)} hint={save.fe('prev_status_id')} options={[{ label: t("Start (no status yet)"), value: '' }, ...statusOptions]} />
+            <NativeSelect label={t("To")} value={to} onChange={(e) => setTo(e.target.value)} hint={save.fe('next_status_id')} options={statusOptions} />
           </div>
           <TextArea
-            label="Criteria"
+            label={t("Criteria")}
             rows={2}
             value={criteria}
             onChange={setCriteria}
             textAreaClassName="font-mono text-sm"
-            placeholder="totalAmount > 100000 && sessionUserId == createdUserId"
+            placeholder={"totalAmount > 100000 && sessionUserId == createdUserId"}
             isInvalid={!!save.fe('criteria')}
             hint={
               save.fe('criteria') ??
-              'Only offered when this holds. Use the record’s fields (totalAmount or total_amount), sessionUserId, sessionUserName, sessionUserEmail, today, now; == != > < >= <=, && || !, + - * /. Empty: always.'
+              t("Only offered when this holds. Use the record’s fields (totalAmount or total_amount), sessionUserId, sessionUserName, sessionUserEmail, today, now; == != > < >= <=, && || !, + - * /. Empty: always.")
             }
           />
-          <Toggle label="People can use it" hint="Off: only drawn in the diagram, as a dashed line." isSelected={usable} onChange={setUsable} />
+          <Toggle label={t("People can use it")} hint={t("Off: only drawn in the diagram, as a dashed line.")} isSelected={usable} onChange={setUsable} />
         </Section>
-        <Section title="Where and how it's drawn">
+        <Section title={t("Where and how it's drawn")}>
           <NativeSelect
-            label="Offered in"
+            label={t("Offered in")}
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            hint="The grid this move shows in. Everywhere: every grid run by this workflow."
-            options={[{ label: 'Everywhere', value: '' }, ...grids.map((g) => ({ label: g.name, value: String(g.id) }))]}
+            hint={t("The grid this move shows in. Everywhere: every grid run by this workflow.")}
+            options={[{ label: t("Everywhere"), value: '' }, ...grids.map((g) => ({ label: g.name, value: String(g.id) }))]}
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            <NativeSelect label="Previous in the diagram" value={prevId} onChange={(e) => setPrevId(e.target.value)} options={[{ label: 'None', value: '' }, ...others]} />
-            <NativeSelect label="Next in the diagram" value={nextId} onChange={(e) => setNextId(e.target.value)} options={[{ label: 'None', value: '' }, ...others]} />
+            <NativeSelect label={t("Previous in the diagram")} value={prevId} onChange={(e) => setPrevId(e.target.value)} options={[{ label: t("None"), value: '' }, ...others]} />
+            <NativeSelect label={t("Next in the diagram")} value={nextId} onChange={(e) => setNextId(e.target.value)} options={[{ label: t("None"), value: '' }, ...others]} />
           </div>
         </Section>
         <div className="flex items-center justify-between gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="tertiary-destructive" isLoading={remove.busy} onPress={() => remove.run(onDelete)}>
-            Delete transition
+            {t("Delete transition")}
           </Button>
           <div className="flex gap-2">
             <Button size="sm" color="secondary" onPress={onClose}>
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button size="sm" type="submit" isLoading={save.busy} showTextWhileLoading>
-              Save changes
+              {t("Save changes")}
             </Button>
           </div>
         </div>

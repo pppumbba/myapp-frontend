@@ -14,6 +14,8 @@ export interface Drilldown {
   params?: Record<string, string>;
   /** What the row button says, e.g. "Print order". */
   label?: string | null;
+  /** Where the target opens: a modal in the middle (the default) or a drawer from the right. */
+  open_in?: 'modal' | 'drawer';
 }
 
 /** What to open: the target meta, its parameter values, and what was clicked (for the breadcrumb). */
@@ -21,6 +23,8 @@ export interface DrillTarget {
   metaId: number;
   params: Record<string, string>;
   label: string;
+  /** Opens in a drawer from the right instead of a modal. */
+  drawer?: boolean;
 }
 
 export function drilldownOf(config: Record<string, unknown> | null | undefined): Drilldown | null {

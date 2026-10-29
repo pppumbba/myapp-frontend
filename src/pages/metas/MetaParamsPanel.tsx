@@ -13,29 +13,30 @@ import { Toggle } from '@/components/base/toggle/toggle';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 import { AutonumberEditor } from './AutonumberEditor';
+import { t } from '@/i18n';
 
-const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid', 'signature'];
+const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid', 'signature', 'singlefile', 'multifile', 'document'];
 
 /** What "Refers to" means depends on the type of the meta that owns the row. */
 function refHint(ownerType?: string | null): string {
   switch (ownerType) {
     case 'app':
-      return 'The screen this menu item opens.';
+      return t("The screen this menu item opens.");
     case 'datagrid':
-      return 'A lookup meta that supplies this column’s values. Optional.';
+      return t("A lookup meta that supplies this column’s values. Optional.");
     case 'form':
-      return 'A lookup or related meta for this field. Optional.';
+      return t("A lookup or related meta for this field. Optional.");
     case 'tabs':
-      return 'The screen shown inside this tab.';
+      return t("The screen shown inside this tab.");
     case 'dashboard':
-      return 'The chart placed here.';
+      return t("The chart placed here.");
     case 'excel_import':
-      return 'For a lookup: the meta whose records the file names; the import saves their ids.';
+      return t("For a lookup: the meta whose records the file names; the import saves their ids.");
     case 'statement':
     case 'report':
-      return 'A lookup meta that names this column’s values, or for a detail, the form describing one line.';
+      return t("A lookup meta that names this column’s values, or for a detail, the form describing one line.");
     default:
-      return 'Another meta this row links to. Optional.';
+      return t("Another meta this row links to. Optional.");
   }
 }
 
@@ -43,10 +44,14 @@ function refHint(ownerType?: string | null): string {
 function configHint(dataType: string, ownerType?: string | null): string {
   if (ownerType === 'excel_import') return '{ "options": ["pcs", "box"] }  or { "column": "C" } to read a column by letter  or { "header": "Heading in the file" }  or, for dates, { "format": "d/m/Y" }';
   if (ownerType === 'tabs' || ownerType === 'app') return '{ "filters": { "status": "draft" } } — filters start at it   { "fixed": { "requested_by": "{user_name}" } } — always, and new records get it   { "defaults": { "needed_by": "{today}" } } — a form starts with it.   Also {user_id}, {user_email}.';
-  if (dataType === 'subgrid') return '{ "params": { "supplier_id": "id" } }   // subgrid parameter <- field of the picked row';
-  if (dataType === 'detail') return '{ "foreign_key": "order_id", "amount": ["quantity", "unit_price"], "total_field": "total" }';
-  if (dataType === 'signature') return 'Nothing needed: a report prints a line to sign, named by this row’s label.';
-  return '{ "options": ["draft", "sent"] }  or, in a statement, { "aggregate": "sum" }  or, to open another meta from this column, { "drilldown": { "meta_id": 12, "params": { "id": "id" } } }';
+  if (dataType === 'subgrid') return '{ "params": { "supplier_id": "id" } }   // subgrid parameter <- field of the picked row.   Add "display": "nested" to open it inside each row instead of under the grid';
+  if (dataType === 'detail') return '{ "foreign_key": "order_id", "amount": ["quantity", "unit_price"], "total_field": "total" }   or one-to-one, one record shown as a section: { "foreign_key": "supplier_id", "one": true }   Add "criteria": "roleId == 1 || appMetaId == 2 || supplierTypeId == 3" to use it only when that holds';
+  if (dataType === 'singlefile' || dataType === 'multifile')
+    return t("Files dropped on the form, kept in contents and put on the record when it saves; no table column needed. Optional: { \"accept\": [\"pdf\", \"jpg\"], \"max_size\": 10240 (KB), \"max_files\": 5, \"public\": false, \"type_id\": 1 }.");
+  if (dataType === 'document')
+    return t("Set Ref meta to a report meta: the form opens its page to fill in, where only the fields this form lets you change can be changed. Each save keeps the PDF on the record. No table column needed. Optional: { \"keep_pdf\": false } to not keep it, \"public\", \"type_id\".");
+  if (dataType === 'signature') return t("Nothing needed: a report prints a line to sign, named by this row’s label.");
+  return '{ "options": ["draft", "sent"] }  or, in a statement or a grid footer, { "aggregate": "sum" } (count, sum, avg, min, max)  or, to open another meta from this column, { "drilldown": { "meta_id": 12, "params": { "id": "id" } } }';
 }
 
 function rowLabel(p: MetaParam): string {
@@ -100,6 +105,7 @@ interface ParamForm {
   is_mandatory_criteria: boolean;
   is_primary: boolean;
   is_label: boolean;
+  is_parent: boolean;
   display_field: string;
   value_field: string;
   default_value: string;
@@ -125,6 +131,7 @@ function emptyParam(order: number, parentId: number | null): ParamForm {
     is_mandatory_criteria: false,
     is_primary: false,
     is_label: false,
+    is_parent: false,
     display_field: '',
     value_field: '',
     default_value: '',
@@ -150,6 +157,7 @@ function toParamForm(p: MetaParam): ParamForm {
     is_mandatory_criteria: p.is_mandatory_criteria,
     is_primary: p.is_primary,
     is_label: p.is_label,
+    is_parent: !!p.is_parent,
     display_field: p.display_field ?? '',
     value_field: p.value_field ?? '',
     default_value: p.default_value ?? '',
@@ -175,6 +183,7 @@ function toParamInput(f: ParamForm): MetaParamInput {
     is_mandatory_criteria: f.is_criteria && f.is_mandatory_criteria,
     is_primary: f.is_primary,
     is_label: f.is_label,
+    is_parent: f.is_parent,
     display_field: f.is_select ? f.display_field.trim() || null : null,
     value_field: f.is_select ? f.value_field.trim() || null : null,
     default_value: f.default_value || null,
@@ -205,7 +214,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
     try {
       setTree(await metaApi.params(meta.id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : `The ${noun}s could not be loaded.`);
+      setError(err instanceof ApiError ? err.message : t('The {rows} could not be loaded.', { rows: t(`${noun}s`) }));
     } finally {
       setLoading(false);
     }
@@ -238,7 +247,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
     try {
       if (form.json_config.trim()) JSON.parse(form.json_config);
     } catch {
-      setFieldErrors({ json_config: ['This is not valid JSON.'] });
+      setFieldErrors({ json_config: [t("This is not valid JSON.")] });
       setSaving(false);
       return;
     }
@@ -253,7 +262,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
         setFieldErrors(err.errors ?? {});
         if (!err.errors) setError(err.message);
       } else {
-        setError(`The ${noun} could not be saved.`);
+        setError(t('The {row} could not be saved.', { row: t(noun) }));
       }
     } finally {
       setSaving(false);
@@ -268,7 +277,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
       setDeleting(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : `The ${noun} could not be deleted.`);
+      setError(err instanceof ApiError ? err.message : t('The {row} could not be deleted.', { row: t(noun) }));
       setDeleting(null);
     } finally {
       setDeleteBusy(false);
@@ -288,12 +297,12 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 id="rows-heading" className="text-lg font-semibold text-primary">
-            {capitalize(noun)}s
+            {t(capitalize(`${noun}s`))}
           </h2>
           <p className="mt-1 text-sm text-tertiary">{refHint(meta.type?.code)}</p>
         </div>
         <Button size="md" iconLeading={Plus} onPress={() => openNew(null)}>
-          Add {noun}
+          {t('Add {row}', { row: t(noun) })}
         </Button>
       </div>
 
@@ -311,10 +320,10 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
         </div>
       ) : tree.length === 0 ? (
         <div className="rounded-xl border border-dashed border-primary bg-primary px-6 py-12 text-center">
-          <p className="text-md font-semibold text-primary">No {noun}s yet</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-tertiary">Add the first one. You can nest more inside it afterwards.</p>
+          <p className="text-md font-semibold text-primary">{t('No {rows} yet', { rows: t(`${noun}s`) })}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-tertiary">{t("Add the first one. You can nest more inside it afterwards.")}</p>
           <Button iconLeading={Plus} color="secondary" className="mt-5" onPress={() => openNew(null)}>
-            Add {noun}
+            {t('Add {row}', { row: t(noun) })}
           </Button>
         </div>
       ) : (
@@ -336,26 +345,26 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
 
       {editing !== undefined && (
         <Modal
-          title={editing === 'new' ? `Add ${noun}` : `Edit ${rowLabel(editing)}`}
-          description={`In ${meta.name}`}
+          title={editing === 'new' ? t('Add {row}', { row: t(noun) }) : t('Edit {name}', { name: rowLabel(editing) })}
+          description={t('In {name}', { name: meta.name })}
           onClose={() => setEditing(undefined)}
           size="lg"
         >
           <form onSubmit={onSave} className="space-y-8">
             {error && <Alert>{error}</Alert>}
 
-            <Section title="Basics">
+            <Section title={t("Basics")}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Label"
+                  label={t("Label")}
                   autoFocus
                   value={form.label_name}
                   onChange={(v) => set('label_name', v)}
                   isInvalid={!!fe('label_name')}
-                  hint={fe('label_name') ?? 'What people see.'}
+                  hint={fe('label_name') ?? t("What people see.")}
                 />
                 <Input
-                  label="Param name"
+                  label={t("Param name")}
                   isRequired
                   value={form.param_name}
                   onChange={(v) => set('param_name', v)}
@@ -363,34 +372,34 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                   hint={fe('param_name')}
                 />
                 <Input
-                  label="Field path"
+                  label={t("Field path")}
                   isRequired
                   value={form.field_path}
                   onChange={(v) => set('field_path', v)}
                   isInvalid={!!fe('field_path')}
-                  hint={fe('field_path') ?? 'Column or key in the data, e.g. customer.name'}
+                  hint={fe('field_path') ?? t("Column or key in the data, e.g. customer.name")}
                 />
                 <NativeSelect
-                  label="Data type"
+                  label={t("Data type")}
                   value={form.data_type}
                   onChange={(e) => set('data_type', e.target.value)}
                   hint={fe('data_type')}
-                  options={dataTypes.map((t) => ({ label: t, value: t }))}
+                  options={dataTypes.map((item) => ({ label: item, value: item }))}
                 />
               </div>
             </Section>
 
-            <Section title="Placement">
+            <Section title={t("Placement")}>
               <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
                 <NativeSelect
-                  label="Inside"
+                  label={t("Inside")}
                   value={form.parent_id}
                   onChange={(e) => set('parent_id', e.target.value)}
                   hint={fe('parent_id')}
-                  options={[{ label: 'Top level', value: '' }, ...parentChoices.map((c) => ({ label: c.label, value: String(c.id) }))]}
+                  options={[{ label: t("Top level"), value: '' }, ...parentChoices.map((c) => ({ label: c.label, value: String(c.id) }))]}
                 />
                 <Input
-                  label="Order"
+                  label={t("Order")}
                   type="number"
                   value={String(form.order_number)}
                   onChange={(v) => set('order_number', Number(v))}
@@ -400,46 +409,46 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
               </div>
             </Section>
 
-            <Section title="Link and display">
+            <Section title={t("Link and display")}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <NativeSelect
-                  label="Refers to"
+                  label={t("Refers to")}
                   value={form.ref_meta_id}
                   onChange={(e) => set('ref_meta_id', e.target.value)}
                   hint={fe('ref_meta_id') ?? refHint(meta.type?.code)}
                   options={[
-                    { label: 'Nothing', value: '' },
+                    { label: t("Nothing"), value: '' },
                     ...options
                       .filter((o) => o.id !== meta.id)
                       .map((o) => ({ label: `${o.name} (${o.type ?? 'no type'})`, value: String(o.id) })),
                   ]}
                 />
                 <Input
-                  label="Render as"
+                  label={t("Render as")}
                   value={form.render_type}
                   onChange={(v) => set('render_type', v)}
                   isInvalid={!!fe('render_type')}
-                  hint={fe('render_type') ?? 'e.g. text, select, date, checkbox'}
+                  hint={fe('render_type') ?? t("e.g. text, select, date, checkbox")}
                 />
                 <Input
-                  label="Default value"
+                  label={t("Default value")}
                   value={form.default_value}
                   onChange={(v) => set('default_value', v)}
                   isInvalid={!!fe('default_value')}
                   hint={fe('default_value')}
                 />
                 <Input
-                  label="Icon"
+                  label={t("Icon")}
                   value={form.icon_cls}
                   onChange={(v) => set('icon_cls', v)}
                   isInvalid={!!fe('icon_cls')}
-                  hint={fe('icon_cls') ?? 'Icon class name, for menu items.'}
+                  hint={fe('icon_cls') ?? t("Icon class name, for menu items.")}
                 />
               </div>
             </Section>
 
             {['form', 'excel_import'].includes(meta.type?.code ?? '') && ['string', 'integer'].includes(form.data_type) && (
-              <Section title="Autonumber">
+              <Section title={t("Autonumber")}>
                 <AutonumberEditor
                   json={form.json_config}
                   fields={tree.map((p) => p.field_path).filter((f) => f !== form.field_path)}
@@ -448,47 +457,48 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
               </Section>
             )}
 
-            <Section title="Behaviour">
+            <Section title={t("Behaviour")}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Toggle label="Visible" hint="Shown on the screen." isSelected={form.is_show} onChange={(v) => set('is_show', v)} />
-                <Toggle label="Required" hint="Must have a value." isSelected={form.is_required} onChange={(v) => set('is_required', v)} />
-                <Toggle label="Lookup" hint="Picked from a list." isSelected={form.is_select} onChange={(v) => set('is_select', v)} />
-                <Toggle label="Use as filter" hint="Offered as a search filter." isSelected={form.is_criteria} onChange={(v) => set('is_criteria', v)} />
-                <Toggle label="Primary key" hint="Identifies each record." isSelected={form.is_primary} onChange={(v) => set('is_primary', v)} />
-                <Toggle label="Names the record" hint="Shown for a record in lookups and pickers." isSelected={form.is_label} onChange={(v) => set('is_label', v)} />
+                <Toggle label={t("Visible")} hint={t("Shown on the screen.")} isSelected={form.is_show} onChange={(v) => set('is_show', v)} />
+                <Toggle label={t("Required")} hint={t("Must have a value.")} isSelected={form.is_required} onChange={(v) => set('is_required', v)} />
+                <Toggle label={t("Lookup")} hint={t("Picked from a list.")} isSelected={form.is_select} onChange={(v) => set('is_select', v)} />
+                <Toggle label={t("Use as filter")} hint={t("Offered as a search filter.")} isSelected={form.is_criteria} onChange={(v) => set('is_criteria', v)} />
+                <Toggle label={t("Primary key")} hint={t("Identifies each record.")} isSelected={form.is_primary} onChange={(v) => set('is_primary', v)} />
+                <Toggle label={t("Names the record")} hint={t("Shown for a record in lookups and pickers.")} isSelected={form.is_label} onChange={(v) => set('is_label', v)} />
+                <Toggle label={t("Parent of the record")} hint={t("Holds the id of the record it sits under, in the same table (e.g. parent_id): grids show the records as a tree.")} isSelected={form.is_parent} onChange={(v) => set('is_parent', v)} />
                 {form.is_select && (
                   <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
-                    <Input label="Shows field" value={form.display_field} onChange={(v) => set('display_field', v)} isInvalid={!!fe('display_field')} hint={fe('display_field') ?? 'Of the looked-up record. Empty: the field that names it, else name.'} />
-                    <Input label="Stores field" value={form.value_field} onChange={(v) => set('value_field', v)} isInvalid={!!fe('value_field')} hint={fe('value_field') ?? 'Of the looked-up record. Empty: id.'} />
+                    <Input label={t("Shows field")} value={form.display_field} onChange={(v) => set('display_field', v)} isInvalid={!!fe('display_field')} hint={fe('display_field') ?? t("Of the looked-up record. Empty: the field that names it, else name.")} />
+                    <Input label={t("Stores field")} value={form.value_field} onChange={(v) => set('value_field', v)} isInvalid={!!fe('value_field')} hint={fe('value_field') ?? t("Of the looked-up record. Empty: id.")} />
                   </div>
                 )}
                 {form.is_criteria && (
                   <Toggle
-                    label="Required filter"
-                    hint="No records show until it has a value."
+                    label={t("Required filter")}
+                    hint={t("No records show until it has a value.")}
                     isSelected={form.is_mandatory_criteria}
                     onChange={(v) => set('is_mandatory_criteria', v)}
                   />
                 )}
               </div>
               <TextArea
-                label="Config (JSON)"
+                label={t("Config (JSON)")}
                 rows={4}
                 value={form.json_config}
                 onChange={(v) => set('json_config', v)}
                 textAreaClassName="font-mono text-sm"
                 placeholder={configHint(form.data_type, meta.type?.code)}
                 isInvalid={!!fe('json_config')}
-                hint={fe('json_config') ?? "Optional settings, e.g. options for a list or a subgrid's params. Links to other metas are kept in meta_meta_map and shown here."}
+                hint={fe('json_config') ?? t("Optional settings, e.g. options for a list or a subgrid's params. Links to other metas are kept in meta_meta_map and shown here.")}
               />
             </Section>
 
             <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
               <Button size="lg" color="secondary" onPress={() => setEditing(undefined)}>
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button size="lg" type="submit" isLoading={saving} showTextWhileLoading>
-                {saving ? 'Saving…' : editing === 'new' ? `Add ${noun}` : 'Save changes'}
+                {saving ? t("Saving…") : editing === 'new' ? t('Add {row}', { row: t(noun) }) : t("Save changes")}
               </Button>
             </div>
           </form>
@@ -497,13 +507,13 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
 
       {deleting && (
         <ConfirmDialog
-          title={`Delete ${rowLabel(deleting)}?`}
+          title={t('Delete {name}?', { name: rowLabel(deleting) })}
           message={
             descendantIds(deleting).size > 0
-              ? `Everything nested inside it (${descendantIds(deleting).size}) is deleted too. This can't be undone.`
-              : "This can't be undone."
+              ? t("Everything nested inside it ({count}) is deleted too. This can't be undone.", { count: descendantIds(deleting).size })
+              : t("This can't be undone.")
           }
-          confirmLabel={`Delete ${noun}`}
+          confirmLabel={t('Delete {row}', { row: t(noun) })}
           busy={deleteBusy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
@@ -529,13 +539,13 @@ function RowFacts({ node, optionName }: { node: MetaParam; optionName: Map<numbe
       <Badge type="color" size="sm" color="gray">{node.data_type}</Badge>
       {node.ref_meta_id && (
         <BadgeWithIcon type="color" size="sm" color="brand" iconLeading={Link01}>
-          {optionName.get(node.ref_meta_id) ?? `Meta ${node.ref_meta_id}`}
+          {optionName.get(node.ref_meta_id) ?? t('Meta {id}', { id: node.ref_meta_id })}
         </BadgeWithIcon>
       )}
-      {node.is_required && <Badge type="color" size="sm" color="warning">Required</Badge>}
-      {node.is_select && <Badge type="color" size="sm" color="success">Lookup</Badge>}
-      {node.is_primary && <Badge type="color" size="sm" color="indigo">Primary key</Badge>}
-      {!node.is_show && <Badge type="color" size="sm" color="gray">Hidden</Badge>}
+      {node.is_required && <Badge type="color" size="sm" color="warning">{t("Required")}</Badge>}
+      {node.is_select && <Badge type="color" size="sm" color="success">{t("Lookup")}</Badge>}
+      {node.is_primary && <Badge type="color" size="sm" color="indigo">{t("Primary key")}</Badge>}
+      {!node.is_show && <Badge type="color" size="sm" color="gray">{t("Hidden")}</Badge>}
     </div>
   );
 }
@@ -556,8 +566,8 @@ function RowCard({ node, accent, noun, optionName, onAdd, onEdit, onDelete }: Ro
           <p className="truncate text-sm text-tertiary">{node.field_path}</p>
         </div>
         <div className="-mt-1 -mr-2 flex shrink-0 gap-0.5">
-          <IconAction icon={Edit01} label={`Edit ${rowLabel(node)}`} onPress={() => onEdit(node)} />
-          <IconAction icon={Trash01} danger label={`Delete ${rowLabel(node)}`} onPress={() => onDelete(node)} />
+          <IconAction icon={Edit01} label={t('Edit {name}', { name: rowLabel(node) })} onPress={() => onEdit(node)} />
+          <IconAction icon={Trash01} danger label={t('Delete {name}', { name: rowLabel(node) })} onPress={() => onDelete(node)} />
         </div>
       </div>
 
@@ -584,7 +594,7 @@ function RowCard({ node, accent, noun, optionName, onAdd, onEdit, onDelete }: Ro
 
       <div className="mt-auto px-3 pt-3 pb-3">
         <Button color="tertiary" size="sm" iconLeading={Plus} className="w-full" onPress={() => onAdd(node.id)}>
-          Add inside
+          {t("Add inside")}
         </Button>
       </div>
     </article>
@@ -602,14 +612,14 @@ function NestedRow({ node, depth, noun, optionName, onAdd, onEdit, onDelete }: R
         </div>
         <span className="hidden shrink-0 text-xs text-tertiary sm:inline">{node.data_type}</span>
         {node.ref_meta_id && (
-          <span className="shrink-0 text-fg-brand-secondary" title={`Links to ${optionName.get(node.ref_meta_id) ?? 'another meta'}`}>
+          <span className="shrink-0 text-fg-brand-secondary" title={t('Links to {name}', { name: optionName.get(node.ref_meta_id) ?? t('another meta') })}>
             <Link01 className="size-3.5" />
           </span>
         )}
         <div className="flex shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-          <IconAction icon={Plus} label={`Add ${noun} inside ${rowLabel(node)}`} onPress={() => onAdd(node.id)} />
-          <IconAction icon={Edit01} label={`Edit ${rowLabel(node)}`} onPress={() => onEdit(node)} />
-          <IconAction icon={Trash01} danger label={`Delete ${rowLabel(node)}`} onPress={() => onDelete(node)} />
+          <IconAction icon={Plus} label={t('Add {row} inside {name}', { row: t(noun), name: rowLabel(node) })} onPress={() => onAdd(node.id)} />
+          <IconAction icon={Edit01} label={t('Edit {name}', { name: rowLabel(node) })} onPress={() => onEdit(node)} />
+          <IconAction icon={Trash01} danger label={t('Delete {name}', { name: rowLabel(node) })} onPress={() => onDelete(node)} />
         </div>
       </div>
       {children.length > 0 && (

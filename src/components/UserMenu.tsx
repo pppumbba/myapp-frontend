@@ -7,6 +7,7 @@ import { initials } from '../lib/initials';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { cx } from '@/utils/cx';
+import { t } from '@/i18n';
 
 const pages: Record<string, string> = { profile: '/profile', home: '/', apps: '/apps', metas: '/metas', admin: '/admin' };
 
@@ -32,7 +33,7 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <Dropdown.Root>
       <AriaButton
-        aria-label={`Account menu for ${user?.name ?? 'you'}`}
+        aria-label={user?.name ? t('Account menu for {name}', { name: user.name }) : t('Account menu')}
         className={({ isPressed, isFocusVisible }) =>
           cx(
             'flex items-center rounded-lg outline-focus-ring transition duration-100 ease-linear hover:bg-primary_hover',
@@ -64,19 +65,19 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
         </div>
         <Dropdown.Menu onAction={onAction}>
           <Dropdown.Section>
-            <Dropdown.Item id="profile" icon={User01} label="Profile" />
-            <Dropdown.Item id="home" icon={HomeLine} label="Home" />
-            <Dropdown.Item id="apps" icon={Grid01} label="Apps" />
+            <Dropdown.Item id="profile" icon={User01} label={t('Profile')} />
+            <Dropdown.Item id="home" icon={HomeLine} label={t('Home')} />
+            <Dropdown.Item id="apps" icon={Grid01} label={t('Apps')} />
           </Dropdown.Section>
           {isAdmin && (
             <Dropdown.Section>
-              <Dropdown.Item id="metas" icon={LayersThree01} label="Metas" />
-              <Dropdown.Item id="admin" icon={Users01} label="Users & roles" />
+              <Dropdown.Item id="metas" icon={LayersThree01} label={t('Metas')} />
+              <Dropdown.Item id="admin" icon={Users01} label={t('Users & roles')} />
             </Dropdown.Section>
           )}
           <Dropdown.Separator />
           <Dropdown.Section>
-            <Dropdown.Item id="logout" icon={LogOut01} label="Log out" />
+            <Dropdown.Item id="logout" icon={LogOut01} label={t('Log out')} />
           </Dropdown.Section>
         </Dropdown.Menu>
       </Dropdown.Popover>

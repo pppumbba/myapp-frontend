@@ -12,6 +12,7 @@ import { useDebounced } from '@/hooks/use-debounced';
 import { cx } from '@/utils/cx';
 import { ColumnValue } from './Cell';
 import { lookupFields, lookupOption, rowLabel, title, useLookup, useMetaDef, visibleParams, type LookupOption } from './definitions';
+import { t } from '@/i18n';
 
 
 /**
@@ -115,7 +116,7 @@ export function LookupField({
         addon={
           <AriaButton
             slot={null}
-            aria-label={`Browse ${label ?? ariaLabel ?? 'records'}`}
+            aria-label={t('Browse {name}', { name: label ?? ariaLabel ?? t('records') })}
             onPress={() => setBrowsing(true)}
             className="flex size-8 shrink-0 items-center justify-center rounded-md text-fg-quaternary outline-focus-ring transition duration-100 ease-linear hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2"
           >
@@ -158,7 +159,7 @@ function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: nu
     setError(null);
     dataApi.list(refId, { search, page, per_page: PER_PAGE }).then(
       (r) => live && setResult(r),
-      () => live && setError('These records could not be loaded.'),
+      () => live && setError(t('These records could not be loaded.')),
     );
     return () => {
       live = false;
@@ -168,8 +169,8 @@ function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: nu
   const name = def ? title(def.meta) : 'records';
 
   return (
-    <Modal title={`Choose from ${name}`} onClose={onClose} size="xl">
-      <Input aria-label={`Search ${name}`} icon={SearchLg} placeholder="Search" value={query} onChange={setQuery} autoFocus />
+    <Modal title={t('Choose from {name}', { name })} onClose={onClose} size="xl">
+      <Input aria-label={t('Search {name}', { name })} icon={SearchLg} placeholder={t('Search')} value={query} onChange={setQuery} autoFocus />
 
       <div className="mt-4">
         {defError || error ? (
@@ -223,7 +224,7 @@ function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: nu
                 {!result.data.length && (
                   <tr>
                     <td colSpan={columns.length || 1} className="px-4 py-10 text-center text-tertiary">
-                      {search ? `Nothing matches “${search}”.` : 'There are no records yet.'}
+                      {search ? t('Nothing matches “{search}”.', { search }) : t('There are no records yet.')}
                     </td>
                   </tr>
                 )}
@@ -236,14 +237,14 @@ function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: nu
       {result && result.last_page > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3">
           <p className="text-sm text-tertiary">
-            Page {result.current_page} of {result.last_page}
+            {t('Page {page} of {pages}', { page: result.current_page, pages: result.last_page })}
           </p>
           <div className="flex gap-2">
             <Button size="sm" color="secondary" iconLeading={ChevronLeft} isDisabled={page <= 1} onPress={() => setPage(page - 1)}>
-              Previous
+              {t('Previous')}
             </Button>
             <Button size="sm" color="secondary" iconTrailing={ChevronRight} isDisabled={page >= result.last_page} onPress={() => setPage(page + 1)}>
-              Next
+              {t('Next')}
             </Button>
           </div>
         </div>
