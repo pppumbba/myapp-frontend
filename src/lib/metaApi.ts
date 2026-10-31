@@ -35,6 +35,8 @@ export interface Meta {
   is_log?: boolean;
   /** Anyone may open it and add records through it, signed in or not (a portal: /portal/:id). */
   is_public?: boolean;
+  /** Every signed-in user may view it, without a role (e.g. the market app and its screens). */
+  is_open?: boolean;
   description: string | null;
   table_name: string | null;
   query_string: string | null;
@@ -174,7 +176,7 @@ export const metaApi = {
     downloadFile(`/meta-transfer/export?${new URLSearchParams([...ids.map((id) => ['ids[]', String(id)]), ['with_used', withUsed ? '1' : '0']])}`, 'metas.metas.json'),
   /** Puts a file's metas into this app; a code already here is replaced, skipped or copied. dryRun only says what would happen. */
   importFile: (pkg: unknown, existing: ImportExisting, dryRun: boolean) =>
-    api<ImportResult>('/meta-transfer/import', { method: 'POST', body: JSON.stringify({ package: pkg, existing, dry_run: dryRun }) }),
+    api<ImportResult>('/meta-transfer/import', { method: 'POST', body: JSON.stringify({ package: pkg, existing, dry_run: dryRun }), notify: !dryRun }),
 
   tags: () => api<Tag[]>('/tags'),
   /** A name already taken gives back that tag. */

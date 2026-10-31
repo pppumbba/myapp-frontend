@@ -8,6 +8,7 @@ import { ThemeProvider } from './components/ThemeProvider';
 import { bootLocale, useLocale } from './i18n';
 import { siteHost } from './lib/siteApi';
 import { SiteHostApp } from './pages/sites/SiteView';
+import { Notices } from './components/Notices';
 import './index.css';
 
 /** Lets Untitled UI (React Aria) links navigate inside the app instead of reloading the page. */
@@ -37,7 +38,14 @@ bootLocale().finally(() =>
           <AuthProvider>
             <ThemeProvider>
               <LocaleRoot>
-                {host ? <SiteHostApp host={host} /> : <App />}
+                {host ? (
+                  <SiteHostApp host={host} />
+                ) : (
+                  <>
+                    <App />
+                    <Notices />
+                  </>
+                )}
               </LocaleRoot>
             </ThemeProvider>
           </AuthProvider>

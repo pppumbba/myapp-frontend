@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../lib/api';
 import { propValues, type Page, type PageItem, type Widget } from '../../lib/pageApi';
 import { fillItems, loadTemplate, openParams, parseTable, photoRatio, useOpen, useSchedule, WidgetBlock, type ScheduleSlot } from '../../render/WidgetView';
 import { Carousel, Gallery, picturesOf, ratioOf, rowsOf, Tabs } from '../../render/widgetParts';
 import { SiteForm } from './SiteForm';
+import { SiteSocialContext, SocialLinks } from './SiteSocial';
 import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
 
@@ -47,6 +48,7 @@ export function SiteItems({ items, depth = 0 }: { items: PageItem[]; depth?: num
 function SiteBlock({ widget, config, children, depth }: { widget: Widget; config: Record<string, unknown> | null | undefined; children?: ReactNode; depth: number }) {
   const v = propValues(widget, config);
   const { can, open } = useOpen();
+  const social = useContext(SiteSocialContext);
   const align = str(v.align);
 
   switch (widget.renderer) {
@@ -423,6 +425,16 @@ function SiteBlock({ widget, config, children, depth }: { widget: Widget; config
               panel: 'hm-tabs__panel hm-prose',
             }}
           />
+        </div>
+      );
+    }
+
+    case 'social': {
+      const Title = depth > 0 ? 'h3' : 'h2';
+      return (
+        <div className={cx('hm-head', align === 'center' && 'hm-head--center', align === 'right' && 'hm-head--right')}>
+          {str(v.title) && <Title>{str(v.title)}</Title>}
+          <SocialLinks social={social} labels={v.labels !== false} className={cx(align === 'center' && 'hm-social--center', align === 'right' && 'hm-social--right')} />
         </div>
       );
     }

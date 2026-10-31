@@ -3,7 +3,7 @@ import { Plus, SearchLg } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../lib/metaApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { AppTile } from '../components/AppTile';
 import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -48,7 +48,7 @@ export default function AppsPage() {
   const appTypeId = types.find((item) => item.code === 'app')?.id;
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Apps")}
         subtitle={t("Each app has a menu that opens its screens. Open one to use it the way its users will.")}
@@ -114,6 +114,6 @@ export default function AppsPage() {
           }}
         />
       )}
-    </AppShell>
+    </>
   );
 }

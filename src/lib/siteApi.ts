@@ -7,6 +7,10 @@ import type { ThemeSettings } from './theme';
 export type SiteHeaderStyle = 'masthead' | 'edge' | 'pill' | 'slab' | 'banner';
 export type SiteFooterStyle = 'letter' | 'mast' | 'statement' | 'colophon' | 'columns';
 
+/** Social networks a site can link to, in the order they show (Sites::SOCIALS). */
+export const SOCIAL_NETWORKS = ['instagram', 'facebook', 'youtube', 'tiktok', 'x', 'linkedin'] as const;
+export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number];
+
 export interface SiteSettings {
   title: string | null;
   tagline: string | null;
@@ -23,6 +27,8 @@ export interface SiteSettings {
   footer_style: SiteFooterStyle;
   footer: string | null;
   lang: string;
+  /** The site's pages on social networks (only the ones set). */
+  social: Partial<Record<SocialNetwork, string>>;
 }
 
 export type PageStatus = 'draft' | 'live' | 'changed' | 'down';
@@ -34,7 +40,9 @@ export interface SitePage {
   page_meta_id: number | null;
   page: { id: number; code: string; name: string } | null;
   label: string | null;
+  /** In the header's menu. */
   in_menu: boolean;
+  in_footer: boolean;
   slug: string;
   title: string | null;
   description: string | null;
@@ -94,6 +102,7 @@ export interface SitePageInput {
   description?: string | null;
   image?: string | null;
   in_menu: boolean;
+  in_footer: boolean;
   children: SitePageInput[];
 }
 
@@ -137,15 +146,19 @@ export interface NavItem {
   children: NavItem[];
 }
 
-/** A site as a visitor's browser draws it: its look, its menu, and the page at the address (null: none there). */
+/** A site as a visitor's browser draws it: its look, its menus, and the page at the address (null: none there). */
 export interface PublicSite {
   site: SiteSettings & { id: number; code: string; name: string; title: string; theme: ThemeSettings; host: string | null };
+  /** The header's menu. */
   nav: NavItem[];
+  footer_nav: NavItem[];
   page: {
     path: string;
     title: string;
     description: string | null;
     image: string | null;
+    /** The published pages under this one. */
+    children: { label: string; path: string; description: string | null }[];
     items: PageItem[];
     /** Composite widgets' parts, by template meta id. */
     templates: Record<string, PageItem[]>;

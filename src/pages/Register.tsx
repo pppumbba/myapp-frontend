@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { returnPath } from '../auth/routes';
 import { ApiError } from '../lib/api';
 import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -28,7 +29,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await register(form);
-      navigate('/', { replace: true });
+      navigate(returnPath(), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

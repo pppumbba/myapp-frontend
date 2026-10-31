@@ -10,6 +10,7 @@ import { DrilldownHost } from '../../render/DrilldownHost';
 import { LinkBaseContext, seedTemplates } from '../../render/WidgetView';
 import { SiteItems } from './SiteBlocks';
 import { href, SiteFooter, SiteHeader } from './SiteChrome';
+import { SiteSocialContext } from './SiteSocial';
 import { siteLook } from './looks';
 import './looks.css';
 import './site.css';
@@ -81,7 +82,7 @@ function useSiteFont(href: string | null) {
  * widgets, its footer. base is where the site's addresses start ("" on its own domain, /site/{code} else).
  */
 export function SiteView({ data, base, banner }: { data: PublicSite; base: string; banner?: ReactNode }) {
-  const { nav, page } = data;
+  const { nav, footer_nav, page } = data;
   const { search } = useLocation();
   // ?look=, ?header= and ?footer= try another one on the page without saving it.
   const query = new URLSearchParams(search);
@@ -106,9 +107,26 @@ export function SiteView({ data, base, banner }: { data: PublicSite; base: strin
         <div className="container">
           {page ? (
             <LinkBaseContext.Provider value={base}>
-              <DrilldownHost>
-                <SiteItems items={page.items} />
-              </DrilldownHost>
+              <SiteSocialContext.Provider value={site.social}>
+                <DrilldownHost>
+                  <SiteItems items={page.items} />
+                </DrilldownHost>
+              </SiteSocialContext.Provider>
+              {page.children.length > 0 && (
+                <nav className="hm-index hm-subpages" aria-labelledby="subpages-title">
+                  <h2 id="subpages-title">{t('In this section')}</h2>
+                  <ul className="hm-index__list">
+                    {page.children.map((child) => (
+                      <li key={child.path}>
+                        <Link to={href(base, child.path)} className="hm-index__row">
+                          <span className="hm-index__label">{child.label}</span>
+                          {child.description && <span className="hm-index__text">{child.description}</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
             </LinkBaseContext.Provider>
           ) : (
             <div className="hm-missing">
@@ -125,7 +143,7 @@ export function SiteView({ data, base, banner }: { data: PublicSite; base: strin
         </div>
       </main>
 
-      <SiteFooter {...chrome} />
+      <SiteFooter {...chrome} nav={footer_nav ?? nav} />
     </div>
   );
 }

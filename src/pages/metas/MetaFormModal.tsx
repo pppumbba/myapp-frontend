@@ -69,6 +69,7 @@ interface FormState {
   is_active: boolean;
   is_log: boolean;
   is_public: boolean;
+  is_open: boolean;
   tag_ids: number[];
   scripts: Record<ScriptColumn, string>;
   service: Record<ServiceColumn, string>;
@@ -112,6 +113,7 @@ function initialState(meta: Meta | null, presetTypeId?: number): FormState {
     is_active: meta?.is_active ?? true,
     is_log: meta?.is_log ?? false,
     is_public: meta?.is_public ?? false,
+    is_open: meta?.is_open ?? false,
     tag_ids: meta?.tags?.map((item) => item.id) ?? [],
     scripts: Object.fromEntries(SCRIPTS.map((sc) => [sc.column, meta?.[sc.column] ?? ''])) as Record<ScriptColumn, string>,
     service: Object.fromEntries(SERVICE_COLUMNS.map((c) => [c, meta?.[c] ?? ''])) as Record<ServiceColumn, string>,
@@ -131,6 +133,7 @@ function toInput(f: FormState): MetaInput {
     is_active: f.is_active,
     is_log: f.is_log,
     is_public: f.is_public,
+    is_open: f.is_open,
     tag_ids: f.tag_ids,
     ...Object.fromEntries(SCRIPTS.map((sc) => [sc.column, f.scripts[sc.column].trim() ? f.scripts[sc.column] : null])),
     ...Object.fromEntries(SERVICE_COLUMNS.map((c) => [c, f.service[c].trim() || null])),
@@ -511,6 +514,12 @@ export function MetaFormModal({
             }
             isSelected={form.is_public}
             onChange={(v) => set('is_public', v)}
+          />
+          <Toggle
+            label={t('Open to everyone signed in')}
+            hint={t('Every signed-in user may open it, without a role. They may only view; what they may do inside is up to the screen, e.g. the market app.')}
+            isSelected={form.is_open}
+            onChange={(v) => set('is_open', v)}
           />
           {(typeCode === 'form' || typeCode === 'excel_import' || typeCode === 'matrix') && (
             <Toggle

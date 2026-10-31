@@ -152,12 +152,15 @@ function TreeToggle({ depth, count, open, loading, name, onToggle }: { depth: nu
 }
 
 /** A row as the table lists it: a record, or the row under an expanded record that holds its nested subgrids. */
-type BodyItem = DataRow & { _key: string; _depth?: number; _nestedOf?: DataRow; _footer?: true; _filler?: true };
+type BodyItem = DataRow & { _key: string; _depth?: number; _nestedOf?: DataRow; _footer?: true; _filler?: true; _skeleton?: true };
 const NESTED = "::nested";
 /** The footer row: each column's json_config.aggregate over every matching row (the API's footer). */
 const FOOTER = "::footer";
 /** An empty row taking the space left in a grid that scrolls, so the footer sits just above the pagination. */
 const FILLER = "::filler";
+/** Placeholder rows shown until the first page of records arrives. */
+const SKELETON = "::skeleton";
+const SKELETON_ROWS = 6;
 const AGGREGATES = ["count", "sum", "avg", "min", "max"];
 const aggregateOf = (p: MetaParam) =>
   AGGREGATES.includes(p.json_config?.aggregate as string)
@@ -371,6 +374,10 @@ export function GridView({
   const [result, setResult] = useState<Page<DataRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // A page, search, sort or reload on its way. The rows only dim when it takes a moment,
+  // so a quick answer doesn't flicker.
+  const [fetching, setFetching] = useState(true);
+  const slow = useDebounced(fetching, 150) && fetching;
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   // A tree: the opened records, and the records under each, loaded when it opens.
@@ -413,6 +420,7 @@ export function GridView({
 
   useEffect(() => {
     let live = true;
+    setFetching(true);
     dataApi
       .list(meta.id, {
         page,
@@ -445,7 +453,8 @@ export function GridView({
               ? err.message
               : t("Records could not be loaded."),
           ),
-      );
+      )
+      .finally(() => live && setFetching(false));
     return () => {
       live = false;
     };
@@ -512,7 +521,9 @@ export function GridView({
   const hasFooter = rows.length > 0 && columns.some(aggregateOf);
   const filler = hasFooter && scrolls;
   const items = useMemo(
-    () => [
+    (): BodyItem[] => !result && !error
+      ? Array.from({ length: SKELETON_ROWS }, (_, i) => ({ _key: SKELETON + i, _skeleton: true as const }))
+      : [
       ...records.flatMap((r): BodyItem[] => {
         const item = { ...r, _key: String(r[key]) };
         return nested.length && expanded.has(item._key)
@@ -522,7 +533,7 @@ export function GridView({
       ...(filler ? [{ _key: FILLER, _filler: true as const }] : []),
       ...(hasFooter ? [{ _key: FOOTER, _footer: true as const }] : []),
     ],
-    [records, key, expanded, nested.length, hasFooter, filler],
+    [result, error, records, key, expanded, nested.length, hasFooter, filler],
   );
   const {
     ref: tableRef,
@@ -828,7 +839,12 @@ export function GridView({
 
           <div
             ref={tableRef}
-            className={fillHeight !== undefined ? "min-h-0 flex-1" : undefined}
+            aria-busy={fetching}
+            className={cx(
+              fillHeight !== undefined && "min-h-0 flex-1",
+              "[&_tbody]:transition-opacity [&_tbody]:duration-150",
+              slow && result && "[&_tbody]:opacity-50",
+            )}
             onContextMenu={(e) => {
               if (e.defaultPrevented || (e.target as HTMLElement).closest("input,textarea,[contenteditable=true]")) return;
               e.preventDefault();
@@ -855,7 +871,7 @@ export function GridView({
               }
               // The row holding nested grids takes no selection or row action; the grids inside work as usual.
               disabledKeys={items
-                .filter((r) => r._nestedOf || r._footer || r._filler)
+                .filter((r) => r._nestedOf || r._footer || r._filler || r._skeleton)
                 .map((r) => r._key)}
               disabledBehavior="selection"
               onRowAction={
@@ -864,6 +880,7 @@ export function GridView({
                       !String(id).endsWith(NESTED) &&
                       id !== FOOTER &&
                       id !== FILLER &&
+                      !String(id).startsWith(SKELETON) &&
                       run(
                         editAction,
                         records.find((r) => String(r[key]) === String(id)),
@@ -960,7 +977,19 @@ export function GridView({
                 )}
               >
                 {(row) =>
-                  row._filler ? (
+                  row._skeleton ? (
+                    <Table.Row id={row._key} className="hover:bg-transparent">
+                      {Array.from({ length: columnCount }, (_, i) => (
+                        <Table.Cell key={i}>
+                          {/* Widths vary by column and row so the placeholder reads as text, not a grid of bars. */}
+                          <div
+                            className="h-3 animate-pulse rounded bg-tertiary motion-reduce:animate-none"
+                            style={{ width: `${40 + ((i * 37 + Number(row._key.slice(SKELETON.length)) * 23) % 50)}%` }}
+                          />
+                        </Table.Cell>
+                      ))}
+                    </Table.Row>
+                  ) : row._filler ? (
                     <Table.Row id={FILLER} className="h-full hover:bg-transparent [&>td]:after:hidden">
                       {Array.from({ length: columnCount }, (_, i) => (
                         <Table.Cell key={i} className="p-0" />
@@ -1035,7 +1064,7 @@ export function GridView({
                   ) : (
                     <Table.Row
                       id={row._key}
-                      className="group cursor-pointer selected:bg-brand-primary_alt selected:hover:bg-brand-primary_alt"
+                      className="group cursor-pointer animate-in fade-in duration-200 motion-reduce:animate-none selected:bg-brand-primary_alt selected:hover:bg-brand-primary_alt"
                       onContextMenu={(e) => {
                         if ((e.target as HTMLElement).closest("input,textarea")) return;
                         e.preventDefault();
@@ -1174,6 +1203,8 @@ export function GridView({
               pageSize={perPage}
               onPageChange={(p) => setPage(Math.max(1, p))}
               onPageSizeChange={setPerPage}
+              onRefresh={() => setReload((n) => n + 1)}
+              refreshing={slow}
             />
           )}
         </TableCard.Root>

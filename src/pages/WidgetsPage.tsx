@@ -3,7 +3,7 @@ import { Copy01, Edit01, LayoutAlt01, Plus, Trash01 } from '@untitledui/icons';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../lib/api';
 import { pageApi, propValues, type Widget, type WidgetInput, type WidgetProp } from '../lib/pageApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Section } from '../components/form';
 import { Alert, IconAction } from '../components/ui';
@@ -19,7 +19,7 @@ import { PropsEditor } from './metas/PropsEditor';
 import { t } from '@/i18n';
 
 /** The renderers the frontend draws (backend: Widget::RENDERERS). */
-const RENDERERS = ['section', 'divider', 'spacer', 'heading', 'text', 'image', 'callout', 'button', 'links', 'stat', 'hero', 'list', 'meta', 'chart', 'iframe', 'composite', 'records', 'photo', 'table', 'schedule', 'carousel', 'gallery', 'accordion', 'collapse', 'tabs', 'quote', 'webform'];
+const RENDERERS = ['section', 'divider', 'spacer', 'heading', 'text', 'image', 'callout', 'button', 'links', 'stat', 'hero', 'list', 'meta', 'chart', 'iframe', 'composite', 'records', 'photo', 'table', 'schedule', 'carousel', 'gallery', 'accordion', 'collapse', 'tabs', 'quote', 'webform', 'social'];
 
 /** What each renderer is for, shown under the choice. */
 const RENDERER_HINTS: Record<string, string> = {
@@ -103,7 +103,7 @@ export default function WidgetsPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Widget library")}
         subtitle={t("What the page builder offers. Each widget placed on a page is a widget meta pointing at one of these.")}
@@ -188,7 +188,7 @@ export default function WidgetsPage() {
           onCancel={() => setDeleting(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '../lib/api';
 import { metaApi, type MetaOption } from '../lib/metaApi';
 import { SCHEDULE_KEYWORDS, scheduleApi, type Schedule, type ScheduleRun } from '../lib/scheduleApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -92,7 +92,7 @@ export default function SchedulesPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Schedules")}
         subtitle={t("Forms that run by themselves: each one is saved once for every row of its grid, whenever its schedule comes round.")}
@@ -241,7 +241,7 @@ export default function SchedulesPage() {
           onCancel={() => setDeleting(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

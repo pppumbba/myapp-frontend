@@ -114,3 +114,59 @@ html {
     margin-bottom: -1.5rem;
   }
 }
+
+/*
+ * A screen fades in when it opens. The animation runs whenever a top-level piece of the screen
+ * is mounted, so content replacing its loading skeleton fades in too, rather than popping.
+ */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.page-enter > * {
+  animation: page-enter 180ms ease-out;
+}
+
+/* A toast (components/Notices) rises in at the corner. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * Folding the sidebar (a view transition, see AppSidebar). Each side keeps its natural size,
+ * pinned to the top left, so nothing stretches: the sidebar grows or shrinks over it while
+ * the old and new pictures cross-fade. The names are set only while folding.
+ */
+.sidebar-folding .sidebar-fixed {
+  view-transition-name: sidebar;
+}
+.sidebar-folding .sidebar-main {
+  view-transition-name: main;
+}
+::view-transition-group(sidebar),
+::view-transition-group(main) {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+  overflow: clip;
+}
+::view-transition-old(sidebar),
+::view-transition-new(sidebar),
+::view-transition-old(main),
+::view-transition-new(main) {
+  width: auto;
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  animation-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter > * {
+    animation: none;
+  }
+}

@@ -1,4 +1,5 @@
 import { currentLocale, setLocale, t } from '../i18n';
+import { showError, toast } from './notices';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
 const TOKEN_KEY = 'auth_token';
@@ -57,11 +58,72 @@ export function forgetReads(): void {
   pending.clear();
 }
 
+/**
+ * Writes that change nothing worth announcing (signing in, previews, checks, marking read) or
+ * that say how they went on the screen already; every other write that works shows a toast.
+ */
+const QUIET = [
+  /^\/(login|logout|register|auth\/|user\/(locale|theme)|user\/session\/refresh|session-values\/test)/,
+  /^\/notifications\//,
+  /\/(preview|check)(\?|$)/,
+  /^\/excel-structure(\/[^/?]+(\/columns)?)?(\?|$)/,
+  /^\/metas\/\d+\/document-assets$/,
+];
+
+/** What the toast says for a write that worked. */
+const DONE: [RegExp, string][] = [
+  [/\/publish$/, 'Published'],
+  [/\/unpublish$/, 'Taken down'],
+  [/\/(send|run)$/, 'Done'],
+  [/\/(restore|rollback)$/, 'Restored'],
+  [/\/import$/, 'Imported'],
+  [/\/(copy|derive)$/, 'Copied'],
+  [/\/release$/, 'Released'],
+];
+
+/**
+ * How a failure is told: field errors (422 with errors) stay next to the fields and an ended
+ * session asks to sign in again. A failed write or an unexpected failure of a read (server error,
+ * no connection) opens the error dialog; other read errors are left to the screen.
+ */
+function tell(err: unknown, path: string, write: boolean): void {
+  if (!(err instanceof ApiError)) return;
+  if (err.status === 401) {
+    if (!/^\/(login|register|auth\/)/.test(path) && tokenStore.get()) {
+      showError(t('Your session has ended. Sign in again to carry on.'), { title: 'Signed out', session: true });
+    }
+    return;
+  }
+  if (err.status === 422 && err.errors && Object.keys(err.errors).length > 0) return;
+  if (write || err.status === 0 || err.status >= 500) {
+    showError(err.message, { title: write ? 'Not saved' : 'Something went wrong' });
+  }
+}
+
+export interface ApiOptions extends RequestInit {
+  /** false: no toast or error dialog; the screen tells the user itself. */
+  notify?: boolean;
+}
+
 /** Single place that adds the token and turns errors into ApiError; reads are shared and setup kept (see SETUP). */
-export function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if ((options.method ?? 'GET').toUpperCase() !== 'GET') {
+export function api<T>(path: string, { notify = true, ...options }: ApiOptions = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (method !== 'GET') {
     forgetReads();
-    return send<T>(path, options).finally(forgetReads);
+    return send<T>(path, options)
+      .then(
+        (data) => {
+          if (notify && !QUIET.some((re) => re.test(path))) {
+            toast(t(method === 'DELETE' ? 'Deleted' : (DONE.find(([re]) => re.test(path.split('?')[0]))?.[1] ?? 'Saved')));
+          }
+          return data;
+        },
+        (err) => {
+          if (notify) tell(err, path, true);
+          throw err;
+        },
+      )
+      .finally(forgetReads);
   }
   const key = `${tokenStore.get() ?? ''} ${currentLocale()} ${path}`;
   const known = kept.get(key) ?? pending.get(key);
@@ -70,6 +132,7 @@ export function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const at = round;
   const read = send<T>(path, options);
+  if (notify) read.catch((err) => tell(err, path, false));
   pending.set(key, read);
   const keep = SETUP.some((re) => re.test(path));
   read.then(
@@ -95,7 +158,11 @@ async function send<T>(path: string, options: RequestInit): Promise<T> {
   const token = tokenStore.get();
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers }).catch((err: unknown) => {
+    // Aborted on purpose: not a failure to tell anyone about.
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    throw new ApiError(0, t('The server could not be reached. Check your connection and try again.'));
+  });
   // The server says which language it picked (the user's, the browser's or the default).
   const language = res.headers.get('Content-Language');
   if (language && language !== currentLocale()) void setLocale(language);

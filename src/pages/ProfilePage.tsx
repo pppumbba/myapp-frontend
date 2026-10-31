@@ -6,7 +6,7 @@ import { initials } from '../lib/initials';
 import { languageApi, type Language } from '../lib/languageApi';
 import { clearRenderCache } from '../render/definitions';
 import { NativeSelect } from '@/components/base/select/select-native';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { Alert } from '../components/ui';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Button } from '@/components/base/buttons/button';
@@ -24,7 +24,7 @@ export default function ProfilePage() {
   const since = user?.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null;
 
   return (
-    <AppShell>
+    <>
       <PageHeader title={t("Profile")} subtitle={t("Your name, email and password.")} />
 
       <div className="mb-5 flex items-center gap-3">
@@ -44,7 +44,7 @@ export default function ProfilePage() {
         <LanguageCard />
         <PasswordCard />
       </div>
-    </AppShell>
+    </>
   );
 }
 

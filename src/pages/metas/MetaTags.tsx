@@ -10,9 +10,9 @@ import { Alert, IconAction } from '../../components/ui';
 import { Modal } from '../../components/Modal';
 import { t } from '@/i18n';
 
-/** A tag without its own color gets one from its name, so it looks the same everywhere. */
+/** A tag without its own color (or with one the badges don't know) gets one from its name, so it looks the same everywhere. */
 export function tagColor(tag: Pick<Tag, 'name' | 'color'>): TagColor {
-  if (tag.color) return tag.color;
+  if (tag.color && TAG_COLORS.includes(tag.color)) return tag.color;
   let h = 0;
   for (const ch of tag.name.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return TAG_COLORS[h % TAG_COLORS.length];

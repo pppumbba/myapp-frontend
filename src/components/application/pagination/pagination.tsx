@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronLeftDouble, ChevronRight, ChevronRightDouble } from "@untitledui/icons";
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronLeftDouble, ChevronRight, ChevronRightDouble, RefreshCw01 } from "@untitledui/icons";
+import type { ReactNode } from "react";
 import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import { Button } from "@/components/base/buttons/button";
 import { InputBase } from "@/components/base/input/input";
@@ -52,28 +53,31 @@ interface MobilePaginationProps {
     className?: string;
     /** The function to call when the page changes. */
     onPageChange?: (page: number) => void;
+    /** A refresh button shown before the page. */
+    refresh?: ReactNode;
 }
 
-const MobilePagination = ({ page = 1, total = 10, className, onPageChange }: MobilePaginationProps) => {
+const MobilePagination = ({ page = 1, total = 10, className, onPageChange, refresh }: MobilePaginationProps) => {
     return (
-        <nav aria-label={t("Pagination")} className={cx("flex items-center justify-between md:hidden", className)}>
-            <Button
-                aria-label={t("Go to previous page")}
-                iconLeading={ArrowLeft}
-                color="secondary"
-                size="sm"
-                onClick={() => onPageChange?.(Math.max(0, page - 1))}
-            />
-
-            <span className="text-sm text-fg-secondary">
+        <nav aria-label={t("Pagination")} className={cx("flex items-center gap-2 md:hidden", className)}>
+            <span className="mr-auto text-sm text-fg-secondary">
                 {t("Page {page} of {pages}", { page, pages: total })}
             </span>
-
+            <Button
+                aria-label={t("Go to previous page")}
+                iconLeading={ChevronLeft}
+                isDisabled={page === 1}
+                color="secondary"
+                size="xs"
+                onClick={() => onPageChange?.(Math.max(0, page - 1))}
+            />
+            {refresh}
             <Button
                 aria-label={t("Go to next page")}
-                iconLeading={ArrowRight}
+                iconLeading={ChevronRight}
+                isDisabled={page === total}
                 color="secondary"
-                size="sm"
+                size="xs"
                 onClick={() => onPageChange?.(Math.min(total, page + 1))}
             />
         </nav>
@@ -251,69 +255,90 @@ interface PaginationCardMinimalProps {
     total?: number;
     /** The number of items per page. */
     pageSize?: number;
-    /** The alignment of the pagination. */
-    align?: "left" | "center" | "right";
     /** The class name of the pagination component. */
     className?: string;
     /** The function to call when the page changes. */
     onPageChange?: (page: number) => void;
     /** The function to call when the page size changes. */
     onPageSizeChange?: (pageSize: number) => void;
+    /** Shows a refresh button on the left that calls this. */
+    onRefresh?: () => void;
+    /** Spins the refresh icon while a load is on its way. */
+    refreshing?: boolean;
 }
 
+const RefreshSpinning = ({ className }: { className?: string }) => <RefreshCw01 className={cx(className, "animate-spin motion-reduce:animate-none")} />;
+
+/**
+ * A compact pagination bar on the right: page, page size, then icon-only previous, refresh
+ * and next.
+ */
 export const PaginationCardMinimal = ({
     page = 1,
     total = 10,
     pageSize = 10,
-    align = "left",
     onPageChange,
     className,
     onPageSizeChange,
+    onRefresh,
+    refreshing,
 }: PaginationCardMinimalProps) => {
+    const refresh = onRefresh && (
+        <Button
+            aria-label={t("Refresh")}
+            iconLeading={refreshing ? RefreshSpinning : RefreshCw01}
+            color="secondary"
+            size="xs"
+            onClick={onRefresh}
+        />
+    );
     return (
-        <div className={cx("border-t border-secondary px-4 py-3 md:px-6 md:pt-3 md:pb-4", className)}>
-            <MobilePagination page={page} total={total} onPageChange={onPageChange} />
+        <div className={cx("border-t border-secondary px-4 py-2 md:px-6", className)}>
+            <MobilePagination page={page} total={total} onPageChange={onPageChange} refresh={refresh} />
 
-            <nav aria-label={t("Pagination")} className={cx("hidden items-center gap-3 md:flex", align === "center" && "justify-between")}>
-                <div className={cx(align === "center" && "flex flex-1 justify-start")}>
-                    <Button isDisabled={page === 1} color="secondary" size="sm" onClick={() => onPageChange?.(Math.max(0, page - 1))}>
-                        {t("Previous")}
-                    </Button>
-                </div>
-
-                <div
-                    className={cx(
-                        "flex items-center gap-3",
-                        align === "right" && "order-first mr-auto",
-                        align === "left" && "order-last ml-auto flex-row-reverse",
-                    )}
-                >
-                    <span className="text-sm font-medium text-fg-secondary">
+            <nav aria-label={t("Pagination")} className="hidden items-center gap-2 md:flex">
+                <div className="ml-auto flex items-center gap-2">
+                    <span className="text-sm text-fg-secondary">
                         {t("Page {page} of {pages}", { page, pages: total })}
                     </span>
-                    <Select
-                        aria-label={t("Page size")}
-                        value={pageSize}
-                        onChange={(value) => onPageSizeChange?.(value as number)}
-                        size="sm"
-                        items={[
-                            { label: t("{count} per page", { count: 10 }), id: 10 },
-                            { label: t("{count} per page", { count: 25 }), id: 25 },
-                            { label: t("{count} per page", { count: 50 }), id: 50 },
-                            { label: t("{count} per page", { count: 100 }), id: 100 },
-                        ]}
-                    >
-                        {(item) => (
-                            <Select.Item id={item.id} key={item.id}>
-                                {item.label?.split(" ")[0]}
-                            </Select.Item>
-                        )}
-                    </Select>
-                </div>
-                <div className={cx(align === "center" && "flex flex-1 justify-end")}>
-                    <Button isDisabled={page === total} color="secondary" size="sm" onClick={() => onPageChange?.(Math.min(total, page + 1))}>
-                        {t("Next")}
-                    </Button>
+                    {/* Only where the page size can change. */}
+                    {onPageSizeChange && (
+                        <Select
+                            aria-label={t("Page size")}
+                            value={pageSize}
+                            onChange={(value) => onPageSizeChange(value as number)}
+                            size="sm"
+                            items={[
+                                { label: t("{count} per page", { count: 10 }), id: 10 },
+                                { label: t("{count} per page", { count: 25 }), id: 25 },
+                                { label: t("{count} per page", { count: 50 }), id: 50 },
+                                { label: t("{count} per page", { count: 100 }), id: 100 },
+                            ]}
+                        >
+                            {(item) => (
+                                <Select.Item id={item.id} key={item.id}>
+                                    {item.label?.split(" ")[0]}
+                                </Select.Item>
+                            )}
+                        </Select>
+                    )}
+                    <Button
+                        aria-label={t("Go to previous page")}
+                        iconLeading={ChevronLeft}
+                        isDisabled={page === 1}
+                        color="secondary"
+                        size="xs"
+                        onClick={() => onPageChange?.(Math.max(0, page - 1))}
+                    />
+                    {refresh}
+                    <Button
+                        aria-label={t("Go to next page")}
+                        iconLeading={ChevronRight}
+                        isDisabled={page === total}
+                        color="secondary"
+                        size="xs"
+                        onClick={() => onPageChange?.(Math.min(total, page + 1))}
+                    />
                 </div>
             </nav>
         </div>

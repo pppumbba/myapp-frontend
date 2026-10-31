@@ -4,7 +4,7 @@ import { ArrowLeft, CheckCircle, Edit01, Plus, SearchLg, Trash01, X } from '@unt
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
 import { accessApi, type Ability, type MetaTreeData, type RoleLogEntry, type RoleMeta, type RoleStatus, type RoleWorkspace, type UserWithRoles } from '../lib/accessApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -64,7 +64,7 @@ export default function RoleWorkspacePage() {
   const statusCount = ws?.workflows.flatMap((w) => w.statuses).filter(statusHas).length ?? 0;
 
   return (
-    <AppShell>
+    <>
       <Link to="/admin" className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-tertiary hover:text-tertiary_hover">
         <ArrowLeft className="size-4 text-fg-quaternary" aria-hidden="true" />
         {t('Users & roles')}
@@ -130,7 +130,7 @@ export default function RoleWorkspacePage() {
           }}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

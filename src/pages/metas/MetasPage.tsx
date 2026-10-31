@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType, type Tag } from '../../lib/metaApi';
 import { useAuth } from '../../auth/AuthContext';
-import { AppShell, PageHeader } from '../../components/AppShell';
+import { PageHeader } from '../../components/AppShell';
 import { ClockRewind, Download01, Table, Grid01, Link03, List, Plus, SearchLg, Tag01, Upload01 } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -133,7 +133,7 @@ export default function MetasPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Metas")}
         subtitle={t("The grids, forms, calendars, Gantt charts and tab sets your apps link to. Open one to edit its columns or fields.")}
@@ -353,7 +353,7 @@ export default function MetasPage() {
           onCancel={() => setDeleting(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

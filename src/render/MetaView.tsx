@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import type { MetaParam } from '../lib/metaApi';
 import { Alert } from '../components/ui';
 import { Tab, TabList, TabPanel, Tabs } from '@/components/application/tabs/tabs';
@@ -84,6 +84,20 @@ export function MetaView({ metaId, depth = 0, preset: given, fill }: { metaId: n
       return <ThemeView def={def} />;
     case 'app':
       return <Alert>{t("An app can't be opened inside another screen. Open it on its own instead.")}</Alert>;
+    case 'screen': {
+      // A built-in page has its own address; put it in an app's menu to show it there.
+      const path = typeof def.meta.json_config?.path === 'string' ? def.meta.json_config.path : null;
+      return (
+        <div className="rounded-xl bg-primary px-6 py-10 text-center shadow-xs ring-1 ring-secondary">
+          <p className="text-sm text-tertiary">{t('A built-in screen of the system.')}</p>
+          {path && (
+            <Link to={path} className="mt-1 inline-block text-sm font-semibold text-brand-secondary hover:underline">
+              {t('Open {path}', { path })}
+            </Link>
+          )}
+        </div>
+      );
+    }
     default:
       return <Alert>{t('"{name}" has no type, so there is nothing to show.', { name: def.meta.name })}</Alert>;
   }

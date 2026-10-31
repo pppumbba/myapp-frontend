@@ -16,7 +16,7 @@ import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
 import { blankLine, DetailSection, detailPayload, lineAmount, startLines, type Line } from './DetailLines';
-import { autonumberFields, autonumberOf, filledFrom, isOneToOne, optionsOf, primaryKey, title, useDetailTree, useMetaDef, visibleParams } from './definitions';
+import { autonumberFields, autonumberOf, detailParams, filledFrom, isOneToOne, optionsOf, primaryKey, title, useDetailTree, useMetaDef, visibleParams } from './definitions';
 import { startValues, toPayload, type Values } from './formValues';
 import { lineChanges, runScript, scriptsOf, type ScriptEvent, type ScriptKind, type ScriptState } from './formScript';
 import { LookupField } from './LookupField';
@@ -31,6 +31,31 @@ import type { DetailNode } from './definitions';
 import { t } from '@/i18n';
 
 const wide = (f: MetaParam) => f.render_type === 'textarea' || f.data_type === 'text' || f.data_type === 'boolean' || f.data_type === 'document' || isFileParam(f);
+
+const pulse = 'animate-pulse motion-reduce:animate-none';
+
+/**
+ * Shown while a form loads: its own fields' shape once the definition is in (generic before
+ * that), so the modal doesn't jump when the form arrives.
+ */
+function FormSkeleton({ fields, details }: { fields: MetaParam[]; details: number }) {
+  const slots: (MetaParam | null)[] = fields.length ? fields.slice(0, 12) : [null, null, null, null];
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label={t('Loading')}>
+      <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+        {slots.map((f, i) => (
+          <div key={f?.field_path ?? i} className={f && wide(f) ? 'sm:col-span-2' : undefined}>
+            <div className={`${pulse} mb-2 h-3 rounded bg-tertiary`} style={{ width: `${30 + ((i * 17) % 35)}%` }} />
+            <div className={`${pulse} ${f && (f.render_type === 'textarea' || f.data_type === 'text') ? 'h-20' : 'h-10'} rounded-lg bg-secondary`} />
+          </div>
+        ))}
+      </div>
+      {Array.from({ length: details }, (_, i) => (
+        <div key={i} className={`${pulse} h-32 rounded-xl bg-secondary`} />
+      ))}
+    </div>
+  );
+}
 /** Never changed on a document's page: what the server or the lines work out, and parts that are not values. */
 const NOT_ON_PAGE = ['document', 'detail', 'subgrid', 'signature'];
 /** A typed-in number, not a lookup's id or a choice from a list. */
@@ -223,7 +248,7 @@ export function FormView({
   }, [def, fields, tree, currentId, fillKey, fresh]);
 
   if (defError || lineDefError || loadError) return <Alert>{defError ?? lineDefError ?? loadError}</Alert>;
-  if (!def || !tree || !values) return <div className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!def || !tree || !values) return <FormSkeleton fields={fields} details={def ? detailParams(def.params).length : 0} />;
 
   /** A field changed: take it (and what a lookup fills), then let the event script react. */
   const set = async (field: string, value: string | boolean, fill?: Record<string, string>) => {
@@ -350,7 +375,7 @@ export function FormView({
   const canAdd = config.save_and_add !== false && (embedded || !!currentId);
 
   const form = (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-5 animate-in fade-in duration-200 motion-reduce:animate-none">
       {error && <Alert>{error}</Alert>}
       {notes.length > 0 && (
         <div role="status" className="space-y-1 rounded-xl bg-secondary p-4 text-sm text-secondary ring-1 ring-secondary ring-inset">
@@ -441,28 +466,28 @@ export function FormView({
         ))}
       </div>
 
-      <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
+      <div className="modal-footer flex justify-end gap-2 border-t border-secondary pt-4">
         {currentId && def?.meta.is_log && (
-          <Button size="lg" color="tertiary" iconLeading={ClockRewind} className="mr-auto" onPress={() => setShowHistory(true)}>
+          <Button size="sm" color="tertiary" iconLeading={ClockRewind} className="mr-auto" onPress={() => setShowHistory(true)}>
             {t('History')}
           </Button>
         )}
         {onCancel && (
-          <Button size="lg" color="secondary" onPress={onCancel}>
+          <Button size="sm" color="secondary" onPress={onCancel}>
             {t('Cancel')}
           </Button>
         )}
         {canAdd && (
-          <Button size="lg" color="secondary" iconLeading={Plus} isDisabled={saving} onPress={() => submit('add')}>
+          <Button size="sm" color="secondary" iconLeading={Plus} isDisabled={saving} onPress={() => submit('add')}>
             {t('Save and add')}
           </Button>
         )}
         {printDef && (
-          <Button size="lg" color="secondary" iconLeading={Printer} isDisabled={saving} onPress={() => submit('print')}>
+          <Button size="sm" color="secondary" iconLeading={Printer} isDisabled={saving} onPress={() => submit('print')}>
             {t('Save and print')}
           </Button>
         )}
-        <Button size="lg" type="submit" isLoading={saving} showTextWhileLoading>
+        <Button size="sm" type="submit" isLoading={saving} showTextWhileLoading>
           {saving ? t('Saving…') : currentId ? t('Save changes') : t('Save')}
         </Button>
       </div>

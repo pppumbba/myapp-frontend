@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { ChevronLeftDouble, ChevronRightDouble, Circle, LogIn01 } from '@untitledui/icons';
 import { Button as AriaButton, Link as AriaLink } from 'react-aria-components';
 import { MobileNavigationHeader } from '@/components/application/app-navigation/base-components/mobile-header';
@@ -65,8 +66,16 @@ export function AppSidebar({
   const footerItems: NavItemType[] = user ? ownFooterItems : [...ownFooterItems, { label: t('Log in'), icon: LogIn01, href: '/login' }];
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = (next: boolean) => {
-    setCollapsed(next);
-    saveCollapsed(next);
+    const apply = () => {
+      setCollapsed(next);
+      saveCollapsed(next);
+    };
+    // Folding animates as a view transition (see index.css); browsers without one just switch.
+    const doc = document as Document & { startViewTransition?: (update: () => void) => { finished: Promise<void> } };
+    if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return apply();
+    const root = document.documentElement;
+    root.classList.add('sidebar-folding');
+    doc.startViewTransition(() => flushSync(apply)).finished.finally(() => root.classList.remove('sidebar-folding'));
   };
 
   const full = (withToggle: boolean) => (
@@ -160,12 +169,12 @@ export function AppSidebar({
       <MobileNavigationHeader key={activeUrl} logo={logo}>
         {full(false)}
       </MobileNavigationHeader>
-      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex">{collapsed ? rail : full(true)}</div>
+      <div className="sidebar-fixed hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex">{collapsed ? rail : full(true)}</div>
       {/* Takes the fixed sidebar's space in the layout. */}
-      <div className="hidden shrink-0 transition-[width] duration-150 lg:block" style={{ width }} />
+      <div className="hidden shrink-0 lg:block" style={{ width }} />
 
-      <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:py-6">
-        <div>{children}</div>
+      <main className="sidebar-main min-w-0 flex-1 px-4 py-5 sm:px-6 lg:py-6">
+        <div className="page-enter">{children}</div>
       </main>
     </div>
   );

@@ -20,6 +20,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import {
   siteApi,
+  SOCIAL_NETWORKS,
   type CheckLevel,
   type Site,
   type SiteDomain,
@@ -35,7 +36,8 @@ import {
 } from '../../lib/siteApi';
 import { themeApi, type ThemeMeta } from '../../lib/theme';
 import { SITE_LOOKS, siteLook } from './looks';
-import { AppShell, PageHeader } from '../../components/AppShell';
+import { SOCIAL_EXAMPLES, SOCIAL_NAMES } from './SiteSocial';
+import { PageHeader } from '../../components/AppShell';
 import { ConfirmDialog } from '../../components/Modal';
 import { Alert, IconAction } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -75,6 +77,7 @@ const toDraft = (p: SitePage): DraftPage => ({
   description: p.description,
   image: p.image,
   in_menu: p.in_menu,
+  in_footer: p.in_footer,
   status: p.status,
   path: p.path,
   page: p.page,
@@ -92,6 +95,7 @@ const toInput = (p: DraftPage): SitePageInput => ({
   description: p.description,
   image: p.image,
   in_menu: p.in_menu,
+  in_footer: p.in_footer,
   children: p.children.map(toInput),
 });
 
@@ -185,16 +189,16 @@ export default function SiteManagerPage() {
 
   if (!site || !settings) {
     return (
-      <AppShell>
+      <>
         {error ? <Alert>{error}</Alert> : <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />}
-      </AppShell>
+      </>
     );
   }
 
   const primary = site.domains.find((d) => d.is_primary)?.host ?? site.domains[0]?.host;
 
   return (
-    <AppShell>
+    <>
       <Link to="/sites" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-tertiary hover:text-secondary">
         <ArrowLeft className="size-4" aria-hidden="true" />
         {t('Websites')}
@@ -265,7 +269,7 @@ export default function SiteManagerPage() {
       )}
       {tab === 'forms' && <FormsTab siteId={id} />}
       {tab === 'visits' && <VisitsTab siteId={id} />}
-    </AppShell>
+    </>
   );
 }
 
@@ -318,9 +322,24 @@ function PagesTab({
       const parentAt = locate(next, at.parent.key)!;
       parentAt.list.splice(parentAt.index + 1, 0, page);
     });
+  /** Puts a page under another (last among its pages), or at the top level with null. */
+  const reparent = (key: string, parentKey: string | null) =>
+    edit(key, ({ list, index }, next) => {
+      const [page] = list.splice(index, 1);
+      if (!parentKey) {
+        next.push(page);
+        return;
+      }
+      const parentAt = locate(next, parentKey)!;
+      parentAt.list[parentAt.index].children.push(page);
+    });
+  // Sub pages go one level deep (the header shows one), so the parents are the top-level pages
+  // other than the home page; the page's own parent stays listed if it sits deeper.
+  const parentKey = current ? (locate(pages, current.key)?.parent?.key ?? null) : null;
+  const parents = rows.filter(({ page, depth }) => page.key !== current?.key && ((depth === 0 && page.slug !== '') || page.key === parentKey)).map(({ page }) => page);
   const add = () => {
     const key = `n${++newKey}`;
-    onChange([...clone(pages), { key, new_page: true, label: t('New page'), slug: `new-page-${newKey}`, in_menu: true, status: 'new', path: '', page: null, scheduled: [], published_at: null, children: [] }]);
+    onChange([...clone(pages), { key, new_page: true, label: t('New page'), slug: `new-page-${newKey}`, in_menu: true, in_footer: true, status: 'new', path: '', page: null, scheduled: [], published_at: null, children: [] }]);
     onSelect(key);
   };
 
@@ -336,7 +355,9 @@ function PagesTab({
                   <span className="flex items-center gap-1.5">
                     {page.slug === '' && depth === 0 && <Star01 className="size-4 shrink-0 text-fg-brand-primary" aria-label={t('Home page')} />}
                     <span className="truncate text-sm font-semibold text-primary">{page.label || t('Untitled')}</span>
-                    {!page.in_menu && <span className="text-xs text-tertiary">{t('(not in menu)')}</span>}
+                    {!page.in_menu && !page.in_footer && <span className="text-xs text-tertiary">{t('(not in menu)')}</span>}
+                    {page.in_menu && !page.in_footer && <span className="text-xs text-tertiary">{t('(header only)')}</span>}
+                    {!page.in_menu && page.in_footer && <span className="text-xs text-tertiary">{t('(footer only)')}</span>}
                   </span>
                   <span className="block truncate font-mono text-xs text-tertiary">{page.path || '—'}</span>
                 </button>
@@ -369,7 +390,17 @@ function PagesTab({
       </div>
 
       {current ? (
-        <PagePanel key={current.key} siteId={siteId} page={current} dirty={dirty} onChange={(fields) => update(current.key, fields)} onPublished={onPublished} />
+        <PagePanel
+          key={current.key}
+          siteId={siteId}
+          page={current}
+          dirty={dirty}
+          parents={parents}
+          parentKey={parentKey}
+          onParent={(key) => reparent(current.key, key)}
+          onChange={(fields) => update(current.key, fields)}
+          onPublished={onPublished}
+        />
       ) : (
         <p className="text-sm text-tertiary">{t('Pick a page to edit it.')}</p>
       )}
@@ -400,16 +431,32 @@ function PagePanel({
   siteId,
   page,
   dirty,
+  parents,
+  parentKey,
+  onParent,
   onChange,
   onPublished,
 }: {
   siteId: number;
   page: DraftPage;
   dirty: boolean;
+  /** The pages this one can go under. */
+  parents: DraftPage[];
+  parentKey: string | null;
+  onParent: (key: string | null) => void;
   onChange: (fields: Partial<DraftPage>) => void;
   onPublished: () => Promise<unknown>;
 }) {
   const saved = !!page.param_id;
+  const isHome = page.slug === '' && !parentKey;
+  const parent = parents.find((p) => p.key === parentKey);
+  const parentHint = isHome
+    ? t('The home page can’t go under another page.')
+    : page.children.length > 0
+      ? t('This page has pages under it, so it stays at the top. Move those out first.')
+      : parent
+        ? t('Its address becomes {path} when you save.', { path: `/${parent.slug}/${page.slug}` })
+        : t('Pick a page to show this one in its dropdown and under its address.');
   return (
     <div className="space-y-5">
       <section className="space-y-4 rounded-xl bg-primary p-5 shadow-xs ring-1 ring-secondary">
@@ -432,7 +479,18 @@ function PagePanel({
             hint={page.slug === '' ? t('Empty: this is the home page.') : t('Lower case, words joined by hyphens.')}
           />
         </div>
-        <Toggle label={t('Show in the menu')} size="sm" isSelected={page.in_menu} onChange={(on) => onChange({ in_menu: on })} />
+        <NativeSelect
+          label={t('Parent page')}
+          value={parentKey ?? ''}
+          disabled={isHome || page.children.length > 0}
+          onChange={(e) => onParent(e.target.value || null)}
+          options={[{ label: t('None (a top-level page)'), value: '' }, ...parents.map((p) => ({ label: p.label || p.path || t('Untitled'), value: p.key }))]}
+          hint={parentHint}
+        />
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <Toggle label={t('In the header')} size="sm" isSelected={page.in_menu} onChange={(on) => onChange({ in_menu: on })} />
+          <Toggle label={t('In the footer')} size="sm" isSelected={page.in_footer} onChange={(on) => onChange({ in_footer: on })} />
+        </div>
       </section>
 
       <section className="space-y-4 rounded-xl bg-primary p-5 shadow-xs ring-1 ring-secondary">
@@ -737,6 +795,22 @@ function SettingsTab({ name, settings, onChange }: { name: string; settings: Sit
         <Toggle label={t('Buttons in the theme’s brand colour instead of the look’s own')} size="sm" isSelected={settings.brand_accent} onChange={(on) => set({ brand_accent: on })} />
       )}
       <TextArea label={t('Footer')} rows={3} value={settings.footer ?? ''} onChange={(v) => set({ footer: v })} hint={t('Address, opening hours. Line breaks are kept.')} />
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-semibold text-primary">{t('Social pages')}</legend>
+        <p className="text-sm text-tertiary">{t('Shown as icons in the header and footer, and by the Social links widget. Leave the ones you don’t use empty.')}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {SOCIAL_NETWORKS.map((network) => (
+            <Input
+              key={network}
+              label={SOCIAL_NAMES[network]}
+              type="url"
+              value={settings.social?.[network] ?? ''}
+              onChange={(v) => set({ social: { ...settings.social, [network]: v } })}
+              placeholder={SOCIAL_EXAMPLES[network]}
+            />
+          ))}
+        </div>
+      </fieldset>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   Image03,
   MessageTextSquare01,
   Send01,
+  Share07,
   CheckCircle,
   CursorClick01,
   File04,
@@ -75,6 +76,7 @@ const icons: Record<string, FC<{ className?: string }>> = {
   tabs: Columns03,
   quote: MessageTextSquare01,
   send: Send01,
+  share: Share07,
 };
 export const WIDGET_ICONS = Object.keys(icons);
 export const widgetIcon = (name: string | null | undefined) => (name && icons[name]) || LayersThree01;
@@ -565,6 +567,15 @@ export function WidgetBlock({
             </figcaption>
           )}
         </figure>
+      );
+
+    case 'social':
+      // The links are the website's (its Settings), so pages outside a site have none to show.
+      return (
+        <div className="space-y-2">
+          {str(v.title) && <h3 className="text-lg font-semibold text-primary">{str(v.title)}</h3>}
+          <Placeholder icon={Share07} text={t('The website’s social pages (Instagram, Facebook…) show here. Set them on the website’s Settings tab.')} />
+        </div>
       );
 
     case 'webform':

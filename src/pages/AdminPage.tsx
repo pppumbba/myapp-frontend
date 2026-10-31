@@ -4,7 +4,7 @@ import { Edit01, Plus, SearchLg, Trash01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
 import { accessApi, type Role, type UserWithRoles } from '../lib/accessApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -38,7 +38,7 @@ export default function AdminPage() {
   }, []);
 
   return (
-    <AppShell>
+    <>
       <PageHeader title={t("Users & roles")} subtitle={t("Give people roles here. What a role may open, change or move is set on each meta in the builder.")} />
       {error && (
         <div className="mb-4">
@@ -52,7 +52,7 @@ export default function AdminPage() {
       <div className="mt-5 max-w-3xl">
         <LanguagesCard />
       </div>
-    </AppShell>
+    </>
   );
 }
 

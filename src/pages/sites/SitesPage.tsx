@@ -3,7 +3,7 @@ import { Globe01, Plus } from '@untitledui/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { siteApi, type SiteSummary } from '../../lib/siteApi';
-import { AppShell, PageHeader } from '../../components/AppShell';
+import { PageHeader } from '../../components/AppShell';
 import { Modal } from '../../components/Modal';
 import { Alert } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -22,7 +22,7 @@ export default function SitesPage() {
   }, []);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t('Websites')}
         subtitle={t('Public sites built from pages: their addresses, menu, domains, publishing and visits.')}
@@ -78,7 +78,7 @@ export default function SitesPage() {
         </ul>
       )}
       {creating && <NewSiteModal onClose={() => setCreating(false)} />}
-    </AppShell>
+    </>
   );
 }
 

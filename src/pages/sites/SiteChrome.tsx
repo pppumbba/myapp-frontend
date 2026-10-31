@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { NavItem, PublicSite } from '../../lib/siteApi';
+import { SocialLinks } from './SiteSocial';
 import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
 
@@ -32,24 +33,64 @@ function NavLink({ base, item, current, className }: { base: string; item: NavIt
   );
 }
 
-/** The menu as a list; sub pages in a nested list with subClass. */
-function Menu({ nav, base, current, linkClass, subClass }: Omit<ChromeProps, 'site'> & { linkClass: string; subClass: string }) {
+/**
+ * The menu as a list; sub pages in a nested list with subClass. With dropdowns, a page with
+ * sub pages gets an arrow button that opens them by tap or keyboard too (hover still does);
+ * a click elsewhere or Escape closes it.
+ */
+function Menu({ nav, base, current, linkClass, subClass, dropdowns = false }: Omit<ChromeProps, 'site'> & { linkClass: string; subClass: string; dropdowns?: boolean }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const ref = useRef<HTMLUListElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => setOpen(null), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(null);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [open]);
+
   return (
-    <ul>
-      {nav.map((item) => (
-        <li key={item.path}>
-          <NavLink base={base} item={item} current={current} className={linkClass} />
-          {item.children.length > 0 && (
-            <ul className={subClass}>
-              {item.children.map((child) => (
-                <li key={child.path}>
-                  <NavLink base={base} item={child} current={current} className={linkClass} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </li>
-      ))}
+    <ul ref={ref}>
+      {nav.map((item) => {
+        const hasSub = item.children.length > 0;
+        const isOpen = open === item.path;
+        const subId = `sub-${item.path.replace(/\W+/g, '-')}`;
+        return (
+          <li key={item.path} className={cx(hasSub && dropdowns && 'hm-has-sub')} data-open={hasSub && dropdowns ? isOpen : undefined}>
+            <NavLink base={base} item={item} current={current} className={linkClass} />
+            {hasSub && dropdowns && (
+              <button
+                type="button"
+                className="hm-sub-toggle"
+                aria-expanded={isOpen}
+                aria-controls={subId}
+                aria-label={t('Pages under {name}', { name: item.label })}
+                onClick={() => setOpen(isOpen ? null : item.path)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            )}
+            {hasSub && (
+              <ul id={dropdowns ? subId : undefined} className={subClass}>
+                {item.children.map((child) => (
+                  <li key={child.path}>
+                    <NavLink base={base} item={child} current={current} className={linkClass} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -77,6 +118,7 @@ export function SiteHeader(props: ChromeProps) {
   const drawer = (
     <nav id="site-menu" aria-label={t('Main')} className="hm-mast__drawer" data-open={open}>
       <Menu nav={nav} base={base} current={current} linkClass="hm-mast__link" subClass="hm-mast__sublist" />
+      <SocialLinks social={site.social} className="hm-social--drawer" />
     </nav>
   );
 
@@ -86,11 +128,12 @@ export function SiteHeader(props: ChromeProps) {
         <div className="container hm-mast__head">
           <Mark site={site} base={base} className="hm-mast__mark" />
           {site.tagline && <p className="hm-mast__tag">{site.tagline}</p>}
+          <SocialLinks social={site.social} className="hm-social--head" />
         </div>
         {nav.length > 0 && (
           <div className="hm-mast__bar">
             <nav aria-label={t('Main')} className="container hm-mast__nav">
-              <Menu nav={nav} base={base} current={current} linkClass="hm-mast__link" subClass="hm-mast__sub" />
+              <Menu nav={nav} base={base} current={current} linkClass="hm-mast__link" subClass="hm-mast__sub" dropdowns />
             </nav>
             <div className="hm-mast__toggle">{toggle('hm-mast__toggle-btn')}</div>
             {drawer}
@@ -113,13 +156,12 @@ export function SiteHeader(props: ChromeProps) {
         <div className="hm-bar__inner">
           <Mark site={site} base={base} className="hm-bar__mark" />
           {nav.length > 0 && (
-            <>
-              <nav aria-label={t('Main')} className="hm-bar__nav">
-                <Menu nav={nav} base={base} current={current} linkClass="hm-bar__link" subClass="hm-mast__sub" />
-              </nav>
-              <div className="hm-bar__toggle">{toggle('')}</div>
-            </>
+            <nav aria-label={t('Main')} className="hm-bar__nav">
+              <Menu nav={nav} base={base} current={current} linkClass="hm-bar__link" subClass="hm-mast__sub" dropdowns />
+            </nav>
           )}
+          <SocialLinks social={site.social} className={cx('hm-social--bar', nav.length === 0 && 'hm-social--alone')} />
+          {nav.length > 0 && <div className="hm-bar__toggle">{toggle('')}</div>}
         </div>
         {nav.length > 0 && drawer}
       </div>
@@ -127,12 +169,17 @@ export function SiteHeader(props: ChromeProps) {
   );
 }
 
+/** nav here is the footer's own list (footer_nav). */
 export function SiteFooter({ site, nav, base, current }: ChromeProps) {
   const year = new Date().getFullYear();
+  const social = <SocialLinks social={site.social} className="hm-social--foot" />;
   const legal = (
-    <p className="hm-close__legal">
-      © {year} {site.title}
-    </p>
+    <div className="hm-close__end">
+      <p className="hm-close__legal">
+        © {year} {site.title}
+      </p>
+      {social}
+    </div>
   );
   const links = nav.length > 0 && (
     <ul className="hm-close__links">
@@ -188,6 +235,7 @@ export function SiteFooter({ site, nav, base, current }: ChromeProps) {
           </p>
           {site.footer && <p className="hm-close__inline">{site.footer.split('\n').join(', ')}</p>}
           {links}
+          {social}
         </div>
       </footer>
     );

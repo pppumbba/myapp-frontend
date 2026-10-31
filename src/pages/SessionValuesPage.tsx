@@ -3,7 +3,7 @@ import { Edit01, Play, Plus, Trash01, UserSquare } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
 import { sessionApi, type SessionValue } from '../lib/sessionApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -61,7 +61,7 @@ export default function SessionValuesPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Session values")}
         subtitle={t("Values worked out for each user when they sign in, such as their employee or department. Queries use them as :name; default values and presets as {name}.")}
@@ -138,7 +138,7 @@ export default function SessionValuesPage() {
           onCancel={() => setDeleting(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

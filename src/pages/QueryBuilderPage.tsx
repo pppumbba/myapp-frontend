@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Database01, LinkExternal01, Plus } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
 import { metaApi, type Meta } from '../lib/metaApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { Modal } from '../components/Modal';
 import { Alert } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -35,7 +35,7 @@ export default function QueryBuilderPage() {
   }, []);
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={current ? current.name : t("Query builder")}
         subtitle={
@@ -118,7 +118,7 @@ export default function QueryBuilderPage() {
           }}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

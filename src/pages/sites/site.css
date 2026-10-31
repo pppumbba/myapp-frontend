@@ -78,7 +78,17 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-mast__sub { position: absolute; top: 100%; left: calc(var(--rule-bar) * -1); z-index: var(--z-dropdown); min-width: 14rem; display: none; flex-direction: column; border: var(--frame); background: var(--color-paper-3); }
 .hm-mast__sub .hm-mast__link { min-height: 44px; }
 .hm-mast__sub li + li { border-top: var(--rule-hair) solid var(--color-rule); }
-.hm-mast__nav li:hover > .hm-mast__sub, .hm-mast__nav li:focus-within > .hm-mast__sub { display: flex; }
+.hm-mast__nav li[data-open="true"] > .hm-mast__sub { display: flex; }
+@media (hover: hover) { .hm-mast__nav li:hover > .hm-mast__sub { display: flex; } }
+/* A page with sub pages: its link, then the arrow that opens them by tap or keyboard. */
+.hm-has-sub { display: flex; align-items: stretch; }
+.hm-has-sub > a { padding-right: var(--space-2xs); }
+.hm-sub-toggle { display: flex; align-items: center; justify-content: center; min-width: 32px; padding: 0 var(--space-2xs); border: 0; background: transparent; color: inherit; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out); }
+.hm-sub-toggle:hover { background: var(--color-paper-2); color: var(--color-ink); }
+.hm-sub-toggle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.hm-sub-toggle svg { width: 16px; height: 16px; transition: transform var(--dur-micro) var(--ease-out); }
+.hm-sub-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .hm-sub-toggle svg { transition: none; } }
 .hm-mast__toggle { display: none; }
 .hm-mast__drawer { display: none; }
 @media (max-width: 60rem) {
@@ -99,7 +109,9 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-bar__nav { margin-left: auto; }
 .hm-bar__nav > ul { display: flex; gap: var(--space-2xs); margin: 0; padding: 0; list-style: none; }
 .hm-bar__nav > ul > li { position: relative; }
-.hm-bar__nav li:hover > .hm-mast__sub, .hm-bar__nav li:focus-within > .hm-mast__sub { display: flex; }
+.hm-bar__nav li[data-open="true"] > .hm-mast__sub { display: flex; }
+@media (hover: hover) { .hm-bar__nav li:hover > .hm-mast__sub { display: flex; } }
+.hm-bar__nav .hm-sub-toggle { border-radius: var(--radius-control); }
 .hm-bar__nav .hm-mast__sub { left: 0; margin: 0; padding: 0; list-style: none; color: var(--color-ink); }
 .hm-bar__nav .hm-mast__sub .hm-bar__link { min-height: 44px; border-radius: 0; text-decoration: none; }
 .hm-bar__link { display: flex; align-items: center; min-height: 44px; padding-inline: var(--space-md); border-radius: var(--radius-control); font-weight: 500; text-decoration: none; white-space: nowrap; transition: background-color var(--dur-micro) var(--ease-out); }
@@ -126,6 +138,29 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-bar--slab .hm-bar__mark:hover, .hm-bar--slab .hm-bar__link:hover { color: var(--color-paper); background: var(--color-ink-2); }
 .hm-bar--slab .hm-bar__nav .hm-mast__sub .hm-bar__link:hover { color: var(--color-ink); background: var(--color-paper-2); }
 .hm-bar--slab :focus-visible { outline-color: var(--color-paper); }
+.hm-bar--slab :is(.hm-sub-toggle, .hm-social__link):hover { color: var(--color-paper); background: var(--color-ink-2); }
+
+/* Social pages: icons in the text colour, each a 44px target. */
+.hm-social { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3xs); margin: 0; padding: 0; list-style: none; }
+.hm-social__link { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-width: 44px; min-height: 44px; border-radius: var(--radius-control); color: inherit; text-decoration: none; transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
+.hm-social__link:hover { background: var(--color-paper-2); color: var(--color-accent); }
+.hm-social__link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.hm-social__icon { width: 20px; height: 20px; flex-shrink: 0; }
+.hm-social--labels { gap: var(--space-2xs) var(--space-xs); }
+.hm-social--labels .hm-social__link { padding-inline: var(--space-sm); font-weight: 500; }
+.hm-social--center { justify-content: center; }
+.hm-social--right { justify-content: flex-end; }
+.hm-social--bar { flex-wrap: nowrap; margin-left: var(--space-xs); }
+.hm-social--alone { margin-left: auto; }
+.hm-mast__drawer .hm-social { padding: var(--space-xs); border-top: var(--rule-hair) solid var(--color-rule); }
+.hm-mast__drawer .hm-social li + li { border-top: 0; }
+@media (max-width: 60rem) {
+  .hm-social--bar:not(.hm-social--alone) { display: none; }
+  .hm-mast:has(.hm-mast__bar) .hm-social--head { display: none; }
+}
+
+/* The pages under this one, after the page's own widgets. */
+.hm-subpages { margin-top: var(--section-gap-s); }
 
 /* Banner: one line of news over the bar, in the accent. */
 .hm-announce { margin: 0; padding-block: var(--space-xs); background: var(--color-accent); color: var(--color-accent-ink); font-size: var(--text-sm); font-weight: 600; text-align: center; }
@@ -438,7 +473,8 @@ button.hm-control__icon[data-disabled] { opacity: 0.35; cursor: not-allowed; }
 .hm-close__links { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-xs); align-self: end; }
 .hm-close__links a { font-weight: 500; }
 .hm-close__links a:hover { color: var(--color-accent); }
-.hm-close__legal { grid-column: 1 / -1; padding-top: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); color: var(--color-muted); font-size: var(--text-sm); }
+.hm-close__end { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs) var(--space-lg); padding-top: var(--space-md); border-top: var(--rule-hair) solid var(--color-rule); }
+.hm-close__legal { margin: 0; color: var(--color-muted); font-size: var(--text-sm); }
 @media (max-width: 60rem) { .hm-close .container { grid-template-columns: minmax(0, 1fr); } }
 .hm-close__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--space-lg) var(--gap-columns); }
 .hm-close__row .hm-close__links { flex-direction: row; flex-wrap: wrap; gap: var(--space-xs) var(--space-lg); }

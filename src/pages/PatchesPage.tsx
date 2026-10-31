@@ -3,7 +3,7 @@ import { ClockRewind, Download01, Edit01, Package, Plus, Rocket01, Trash01, Uplo
 import { ApiError } from '../lib/api';
 import { metaApi, type Meta } from '../lib/metaApi';
 import { patchApi, type Patch, type PatchInstall } from '../lib/patchApi';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -93,7 +93,7 @@ export default function PatchesPage() {
     }, t("The install could not be rolled back."));
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Patches")}
         subtitle={t("Ship metas from one installation to another, e.g. from test to live: release a patch here, install its file there, roll it back if needed.")}
@@ -228,7 +228,7 @@ export default function PatchesPage() {
           onCancel={() => setRollingBack(null)}
         />
       )}
-    </AppShell>
+    </>
   );
 }
 

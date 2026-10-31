@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../../lib/metaApi';
-import { AppShell } from '../../components/AppShell';
 import { ArrowLeft, Dataflow03, Edit01, PlayCircle, Trash01 } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -82,7 +81,7 @@ export default function MetaDetailPage() {
   const look = typeLook(meta?.type?.code);
 
   return (
-    <AppShell>
+    <>
       <Link to="/metas" className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-tertiary hover:text-tertiary_hover">
         <ArrowLeft className="size-5 text-fg-quaternary" />
         {t('All metas')}
@@ -249,7 +248,7 @@ export default function MetaDetailPage() {
           )}
         </>
       )}
-    </AppShell>
+    </>
   );
 }
 

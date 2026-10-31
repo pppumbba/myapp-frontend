@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { returnPath } from '../auth/routes';
 import { ApiError } from '../lib/api';
 import { Alert } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -25,7 +26,7 @@ export default function Login() {
     setParams({}, { replace: true });
     if (!code) return;
     loginWithGoogle(code)
-      .then(() => navigate('/', { replace: true }))
+      .then(() => navigate(returnPath(), { replace: true }))
       .catch((err) => {
         setError(err instanceof ApiError ? err.message : t('Something went wrong. Try again.'));
         setSubmitting(false);
@@ -38,7 +39,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/', { replace: true });
+      navigate(returnPath(), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("Something went wrong. Try again."));
     } finally {

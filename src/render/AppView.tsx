@@ -1,5 +1,5 @@
-import { useMemo, type FC } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo, type FC, type ReactNode } from 'react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BarChart01,
@@ -28,6 +28,7 @@ import { AppSidebar } from '../components/AppSidebar';
 import type { NavItemType } from '@/components/application/app-navigation/config';
 import { DrilldownHost } from './DrilldownHost';
 import { MetaView } from './MetaView';
+import { useScreens } from '../lib/screenApi';
 import { AppMetaContext } from './appContext';
 import { presetOf, title, useMetaDef, type MetaDef } from './definitions';
 import { useAuth } from '../auth/AuthContext';
@@ -89,14 +90,25 @@ function trail(items: MetaParam[], id: number): MetaParam[] | null {
  * An app meta: its params are the menu. Items with ref_meta_id open that screen; items
  * without one but with children are collapsible groups. The open screen is kept in ?screen=.
  * home is where its logo leads: the builder's start page, or on a portal the portal itself.
+ *
+ * Items that open a screen meta (a built-in page) link to the page's own address. Such a page
+ * shows inside the app as children, with activePath naming its screen (see ScreenApp).
  */
-export function AppView({ def, home = '/' }: { def: MetaDef; home?: string }) {
+export function AppView({ def, home = '/', children, activePath }: { def: MetaDef; home?: string; children?: ReactNode; activePath?: string }) {
   const { user, can } = useAuth();
   useAppTheme(def.meta.id);
   const [search] = useSearchParams();
+  const screenList = useScreens();
   const menu = useMemo(() => allowedMenu(def.params, (id) => can(id, 'view')), [def.params, can]);
   const all = screens(menu);
-  const current = all.find((p) => String(p.id) === search.get('screen')) ?? all[0];
+  const paths = useMemo(() => new Map((screenList ?? []).map((s) => [s.id, s.path])), [screenList]);
+  const pathOf = (p: MetaParam) => (p.ref_meta_id ? paths.get(p.ref_meta_id) : undefined);
+  // Inside a built-in page, the other items lead back to the app's own address.
+  const hrefOf = (p: MetaParam) => pathOf(p) ?? (children ? `/run/${def.meta.id}?screen=${p.id}` : screenUrl(p));
+  const current = children
+    ? all.find((p) => activePath !== undefined && pathOf(p) === activePath)
+    : (all.find((p) => String(p.id) === search.get('screen')) ?? all[0]);
+  const currentPath = current ? pathOf(current) : undefined;
   const mark = (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-solid text-sm font-semibold text-white" aria-hidden="true">
       {title(def.meta).charAt(0).toUpperCase()}
@@ -123,9 +135,16 @@ export function AppView({ def, home = '/' }: { def: MetaDef; home?: string }) {
           {mark}
         </Link>
       }
-      items={navItems(menu)}
-      activeUrl={current ? screenUrl(current) : undefined}    >
-      {current?.ref_meta_id ? (
+      items={navItems(menu, hrefOf)}
+      activeUrl={current ? hrefOf(current) : undefined}
+    >
+      {children ? (
+        children
+      ) : current?.ref_meta_id && !screenList ? (
+        <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+      ) : currentPath ? (
+        <Navigate to={currentPath} replace />
+      ) : current?.ref_meta_id ? (
         <>
           {/* Each screen draws its own title, so the page only says where you are. */}
           <nav aria-label={t("Breadcrumb")} className="mb-5">
@@ -165,7 +184,7 @@ const screenUrl = (p: MetaParam) => `?screen=${p.id}`;
  * The menu params as Untitled UI nav items. An item with children becomes a collapsible
  * group listing every screen beneath it (deeper levels are flattened into the group).
  */
-function navItems(items: MetaParam[]): NavItemType[] {
+function navItems(items: MetaParam[], hrefOf: (p: MetaParam) => string): NavItemType[] {
   return items
     .filter((p) => p.is_show)
     .flatMap((p): NavItemType[] => {
@@ -173,9 +192,9 @@ function navItems(items: MetaParam[]): NavItemType[] {
       const children = screens(p.children ?? []);
       if (children.length) {
         const inside = p.ref_meta_id ? [p, ...children] : children;
-        return [{ label: menuLabel(p), icon, items: inside.map((c) => ({ label: menuLabel(c), href: screenUrl(c) })) }];
+        return [{ label: menuLabel(p), icon, items: inside.map((c) => ({ label: menuLabel(c), href: hrefOf(c) })) }];
       }
-      return p.ref_meta_id ? [{ label: menuLabel(p), icon, href: screenUrl(p) }] : [];
+      return p.ref_meta_id ? [{ label: menuLabel(p), icon, href: hrefOf(p) }] : [];
     });
 }
 
@@ -188,6 +207,8 @@ export function RunMeta({ metaId, portal = false }: { metaId: number; portal?: b
   const { user } = useAuth();
 
   if (def?.meta.type?.code === 'app') return <AppView def={def} home={portal ? `/portal/${metaId}` : '/'} />;
+  // A built-in page lives at its own address.
+  if (def?.meta.type?.code === 'screen' && typeof def.meta.json_config?.path === 'string') return <Navigate to={def.meta.json_config.path} replace />;
 
   return (
     <div className="min-h-screen">

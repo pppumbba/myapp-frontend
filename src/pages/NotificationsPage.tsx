@@ -4,7 +4,7 @@ import { Bell01, CheckDone01, Trash01 } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
 import { accessApi, type AppNotification, type NotificationPage } from '../lib/accessApi';
 import { notificationsChanged } from '../lib/useUnread';
-import { AppShell, PageHeader } from '../components/AppShell';
+import { PageHeader } from '../components/AppShell';
 import { notificationLooks, notificationTime } from '../components/NotificationsMenu';
 import { Alert, IconAction } from '../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -57,7 +57,7 @@ export default function NotificationsPage() {
   const items = result?.data ?? [];
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t("Notifications")}
         subtitle={result ? (result.unread ? t('{count} unread', { count: result.unread }) : t("All caught up.")) : undefined}
@@ -125,6 +125,6 @@ export default function NotificationsPage() {
           </Button>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

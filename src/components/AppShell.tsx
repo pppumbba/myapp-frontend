@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { useLocation, useNavigationType } from 'react-router-dom';
 import { Clock, Dataflow03, Database01, Globe01, Grid01, HomeLine, LayersThree01, LayoutAlt01, Package, UserSquare, Users01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { AppSidebar } from './AppSidebar';
@@ -44,10 +44,18 @@ export function Logo() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
+  const navigationType = useNavigationType();
   const { isAdmin } = useAuth();
+  // A new screen starts at the top; Back and Forward leave the scroll where the browser puts it.
+  useEffect(() => {
+    if (navigationType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, navigationType]);
   const nav = (isAdmin ? [...everyone, ...admins] : everyone).map((item) => ({ ...item, label: t(item.label) }));
-  // /metas/12 still highlights Metas.
-  const activeUrl = nav.find((item) => item.href !== '/' && pathname.startsWith(item.href))?.href ?? pathname;
+  // /metas/12 still highlights Metas; the longest match wins, so /admin/roles/3 is Users & roles, not Home.
+  const activeUrl =
+    nav
+      .filter((item) => item.href !== '/' && pathname.startsWith(item.href))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? pathname;
 
   return (
     <AppSidebar label={t("Main")} logo={<Logo />} logoMark={<LogoMark />} items={nav} activeUrl={activeUrl}>

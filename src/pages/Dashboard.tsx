@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { metaApi, type Meta, type MetaOption, type MetaType } from '../lib/metaApi';
-import { AppShell } from '../components/AppShell';
 import { AppTile } from '../components/AppTile';
 import { Plus } from '@untitledui/icons';
 import { Button } from '@/components/base/buttons/button';
@@ -49,7 +48,7 @@ export default function Dashboard() {
   const recent = [...metas].reverse().slice(0, 4);
 
   return (
-    <AppShell>
+    <>
       <section className="relative mb-6 overflow-hidden rounded-xl bg-brand-section px-5 py-6 text-white sm:px-7 sm:py-7">
         <div className="absolute -top-24 -right-16 size-64 rounded-full bg-brand-500/40 blur-2xl" aria-hidden="true" />
         <div className="absolute -bottom-28 right-40 size-48 rounded-full bg-brand-400/25 blur-2xl" aria-hidden="true" />
@@ -160,6 +159,6 @@ export default function Dashboard() {
           }}
         />
       )}
-    </AppShell>
+    </>
   );
 }

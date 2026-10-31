@@ -160,7 +160,7 @@ export const dataApi = {
     downloadFile(`/metas/${metaId}/export${queryString({ ...q })}`, `${fileName}.xlsx`),
   /** Runs a stage query with these named parameters; a dry run changes nothing (backend: StageQueryController). */
   runStage: async (metaId: number, params: Record<string, string>, dryRun: boolean) => {
-    const result = await api<StageRun>(`/metas/${metaId}/run`, { method: 'POST', body: JSON.stringify({ params, dry_run: dryRun }) });
+    const result = await api<StageRun>(`/metas/${metaId}/run`, { method: 'POST', body: JSON.stringify({ params, dry_run: dryRun }), notify: !dryRun });
     return dryRun ? result : written(result);
   },
   /** An excel_import meta's empty workbook, with its headings. */
@@ -170,7 +170,7 @@ export const dataApi = {
     const body = new FormData();
     body.append('file', file);
     body.append('dry_run', dryRun ? '1' : '0');
-    const result = await api<ImportResult>(`/metas/${importMetaId}/import`, { method: 'POST', body });
+    const result = await api<ImportResult>(`/metas/${importMetaId}/import`, { method: 'POST', body, notify: !dryRun });
     return result.saved ? written(result) : result;
   },
 };

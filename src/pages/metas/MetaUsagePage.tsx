@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, SearchLg } from '@untitledui/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { metaApi, type MetaUse, type UsageMeta } from '../../lib/metaApi';
-import { AppShell, PageHeader } from '../../components/AppShell';
+import { PageHeader } from '../../components/AppShell';
 import { Alert } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
@@ -67,7 +67,7 @@ export default function MetaUsagePage() {
     });
 
   return (
-    <AppShell>
+    <>
       <PageHeader
         title={t('Where used')}
         subtitle={t('Each meta and the fields, buttons, settings, process steps, links and pages that use it. Check here before you change or delete one.')}
@@ -136,7 +136,7 @@ export default function MetaUsagePage() {
           </ul>
         </>
       )}
-    </AppShell>
+    </>
   );
 }
 
