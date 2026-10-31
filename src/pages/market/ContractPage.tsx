@@ -431,7 +431,7 @@ function PartiesCard({ contract: c }: { contract: Contract }) {
           const signature = c.signatures.find((s) => s.side === side);
           return (
             <div key={side}>
-              <p className="text-xs font-medium tracking-wide text-tertiary uppercase">{sideLabel(side)}</p>
+              <p className="text-xs font-medium text-tertiary">{sideLabel(side)}</p>
               <PartyLine party={c[side]} />
               <p className={cx('mt-0.5 text-sm', signature ? 'text-success-primary' : 'text-quaternary')}>
                 {signature

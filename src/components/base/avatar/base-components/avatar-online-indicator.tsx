@@ -31,7 +31,7 @@ export const AvatarOnlineIndicator = ({ size, status, className }: AvatarOnlineI
         }}
     >
         {/* Reflection */}
-        <svg viewBox="0 0 7.2 2.85" fill="none" className="mt-[10%] h-[20%] w-[60%]">
+        <svg aria-hidden="true" viewBox="0 0 7.2 2.85" fill="none" className="mt-[10%] h-[20%] w-[60%]">
             <path
                 d="M7.2 1.83107C7.2 2.84235 5.58823 2.19729 3.6 2.19729C1.61177 2.19729 0 2.84235 0 1.83107C0 0.8198 1.61177 0 3.6 0C5.58823 0 7.2 0.8198 7.2 1.83107Z"
                 fill="url(#reflection-gradient)"

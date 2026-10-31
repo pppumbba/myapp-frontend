@@ -494,15 +494,15 @@ export function QueryDesigner({ meta, tall = false }: { meta: Meta; tall?: boole
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Find a table')} aria-label={t('Find a table')} className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder" />
               </label>
               <div className="min-h-0 flex-1 overflow-auto py-1">
-                {inlineList.some((q) => q.key !== level) && <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary uppercase">{t('In this query')}</p>}
+                {inlineList.some((q) => q.key !== level) && <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary">{t('In this query')}</p>}
                 {inlineList.filter((q) => q.key !== level).map((q) => (
                   <SourceItem key={`i${q.key}`} label={q.label ?? q.key} kind="sub-query" payload={{ source: 'inline', name: q.key }} onAdd={() => addTable('inline', q.key, null)} />
                 ))}
-                {shownQueries.length > 0 && <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary uppercase">{t('Stored queries')}</p>}
+                {shownQueries.length > 0 && <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary">{t('Stored queries')}</p>}
                 {shownQueries.map((q) => (
                   <SourceItem key={`q${q.id}`} label={q.name} kind={q.type === 'query' || !q.type ? 'query' : q.type} payload={{ source: 'query', meta_id: q.id }} onAdd={() => addTable('query', null, q.id)} />
                 ))}
-                <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary uppercase">{t('Tables and views')}</p>
+                <p className="px-2.5 pt-2 pb-1 text-xs font-semibold text-tertiary">{t('Tables and views')}</p>
                 {shownTables.map((entry) => (
                   <SourceItem key={entry.name} label={entry.name} kind={entry.type} payload={{ source: 'table', name: entry.name }} onAdd={() => addTable('table', entry.name, null)} />
                 ))}
@@ -1156,7 +1156,7 @@ function ColumnsEditor({ columns, operands, onChange }: { columns: QueryColumn[]
                   </td>
                   <td className="px-1.5 py-1.5">
                     <select aria-label={t('Sort column {n}', { n: i + 1 })} className={field} value={c.sort ?? ''} onChange={(e) => set(i, { sort: (e.target.value || null) as QueryColumn['sort'] })}>
-                      <option value="">—</option>
+                      <option value="">{t('None')}</option>
                       <option value="asc">{t('Ascending')}</option>
                       <option value="desc">{t('Descending')}</option>
                     </select>

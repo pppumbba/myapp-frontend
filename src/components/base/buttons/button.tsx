@@ -199,7 +199,7 @@ export const Button: {
             {isReactComponent(IconLeading) && <IconLeading data-icon="leading" className={styles.common.icon} />}
 
             {loading && (
-                <svg
+                <svg aria-hidden="true"
                     fill="none"
                     data-icon="loading"
                     viewBox="0 0 20 20"

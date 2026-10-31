@@ -1,3 +1,8 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: restyle · scope: app
+ * paper: slate-50 shell, white panels · accent: indigo-600 (the brand, theme metas may repaint it) · display: Inter · body: Inter
+ * nav: kept (the sidebar shell) · signature: kept (the metas grid and record forms) · states: kept, as the screens have them
+ * axes: light/grotesk-sans/chromatic-indigo · posture: dense, flat, hairline-edged · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P3 H3 E4 S4 R3 V3 · weakest: R, the layouts are kept by request, so the restyle works through flat hairline surfaces, tighter radii and sentence-case labels */
 @import "./styles/globals.css";
 
 /*
@@ -46,12 +51,12 @@ html {
 }
 
 .dark-mode {
-  --chart-1: #3987e5;
-  --chart-2: #d95926;
-  --chart-3: #199e70;
-  --chart-4: #c98500;
-  --chart-5: #d55181;
-  --chart-6: #008300;
+  --chart-1: var(--chart-dark-1);
+  --chart-2: var(--chart-dark-2);
+  --chart-3: var(--chart-dark-3);
+  --chart-4: var(--chart-dark-4);
+  --chart-5: var(--chart-dark-5);
+  --chart-6: var(--chart-dark-6);
 }
 
 /* Printing one element: see render/print.ts. */
@@ -112,6 +117,50 @@ html {
   .modal-body .modal-footer {
     padding-bottom: 1.5rem;
     margin-bottom: -1.5rem;
+  }
+}
+
+/*
+ * A form split into .modal-scroll and .modal-footer (FormView): in a modal only the fields
+ * scroll, so the scrollbar ends above the buttons instead of running down beside them.
+ */
+.modal-body:has(> div > .modal-split) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-body:has(> div > .modal-split) > div {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding-inline: 0;
+}
+.modal-body .modal-split {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.modal-body .modal-split > .modal-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding-inline: 1rem;
+  /* Room for the last field's focus ring and hint. */
+  padding-bottom: 0.25rem;
+}
+.modal-body .modal-split > .modal-footer {
+  position: static;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding-inline: 1rem;
+  padding-bottom: 0;
+}
+@media (min-width: 40rem) {
+  .modal-body .modal-split > .modal-scroll,
+  .modal-body .modal-split > .modal-footer {
+    padding-inline: 1.5rem;
   }
 }
 

@@ -24,7 +24,8 @@ import {
   Zap,
 } from '@untitledui/icons';
 import type { MetaParam } from '../lib/metaApi';
-import { AppSidebar } from '../components/AppSidebar';
+import { AppSidebar, menuStyleOf } from '../components/AppSidebar';
+import { LogoMark } from '../components/AppShell';
 import type { NavItemType } from '@/components/application/app-navigation/config';
 import { DrilldownHost } from './DrilldownHost';
 import { MetaView } from './MetaView';
@@ -109,11 +110,8 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
     ? all.find((p) => activePath !== undefined && pathOf(p) === activePath)
     : (all.find((p) => String(p.id) === search.get('screen')) ?? all[0]);
   const currentPath = current ? pathOf(current) : undefined;
-  const mark = (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-solid text-sm font-semibold text-white" aria-hidden="true">
-      {title(def.meta).charAt(0).toUpperCase()}
-    </span>
-  );
+  // The Wand mark, in its own indigo whatever the app's theme.
+  const mark = <LogoMark size={32} />;
 
   // The app's logo is the way home.
   const homeLink = 'rounded-lg outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2';
@@ -121,6 +119,7 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
   return (
     <AppSidebar
       label={t('{name} menu', { name: title(def.meta) })}
+      menuStyle={menuStyleOf(def.meta.json_config?.menu_style)}
       logo={
         <Link to={home} aria-label={t("Home")} className={`flex items-center gap-2.5 ${homeLink}`}>
           {mark}

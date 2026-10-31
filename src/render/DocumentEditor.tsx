@@ -158,7 +158,7 @@ export function DocumentEditor({
             {updating && doc && <span className="absolute top-2 right-3 z-10 text-xs text-tertiary">{t('Updating…')}</span>}
             {ctx && page ? (
               <div
-                className="relative mx-auto flex flex-col bg-white text-[#101828] shadow-lg ring-1 ring-black/5"
+                className="relative mx-auto flex flex-col bg-white text-(--color-doc-ink) shadow-lg ring-1 ring-black/5"
                 style={{ width: pw * s, minHeight: ph * s, padding: `${page.margin.top * s}px ${page.margin.right * s}px ${page.margin.bottom * s}px ${page.margin.left * s}px`, fontFamily: FONT_CSS[page.font], fontSize: page.font_size * PT * s, lineHeight: 1.3 }}
               >
                 <PageBand band={doc!.layout.header} ctx={ctx} />
@@ -299,7 +299,7 @@ function PageElement({ el, ctx }: { el: DocElement; ctx: PageCtx }) {
   else if (el.type === 'field')
     content = (
       <>
-        {el.label && <span className="font-normal text-[#667085]">{el.label} </span>}
+        {el.label && <span className="font-normal text-(--color-doc-muted)">{el.label} </span>}
         {text(shown, el.id)}
       </>
     );
@@ -311,8 +311,8 @@ function PageElement({ el, ctx }: { el: DocElement; ctx: PageCtx }) {
       <div className="relative size-full">
         <span className="absolute top-[35%] left-0 w-[40%] whitespace-pre-wrap">{role}</span>
         {img && <img src={img} alt="" className="absolute top-0 left-[45%] h-[70%] w-[30%] object-contain" draggable={false} />}
-        <span className="absolute top-[62%] right-0 left-[42%] border-t border-[#344054]" />
-        <span className="absolute top-[66%] right-0 left-[42%] text-center text-[0.85em] text-[#475467]">{name}</span>
+        <span className="absolute top-[62%] right-0 left-[42%] border-t border-(--color-doc-rule)" />
+        <span className="absolute top-[66%] right-0 left-[42%] text-center text-[0.85em] text-(--color-doc-label)">{name}</span>
       </div>
     );
   }
@@ -333,9 +333,9 @@ function EditableSpot({ el, param: f, box, ctx }: { el: DocElement; param: MetaP
   const isPicked = !!ctx.picked && 'field' in ctx.picked && ctx.picked.field === f.field_path;
   const spot = cx(
     'absolute flex items-start overflow-hidden rounded-[2px] transition-colors',
-    error ? 'bg-[#fef3f2] outline-[1.5px] outline-[#d92d20] outline-solid' : isPicked || focused ? 'bg-[#f4ebff] outline-[1.5px] outline-[#7f56d9] outline-solid' : 'bg-[#f9f5ff] outline-1 outline-[#d6bbfb] outline-dashed hover:bg-[#f4ebff]',
+    error ? 'bg-(--color-doc-error-soft) outline-[1.5px] outline-(--color-doc-error) outline-solid' : isPicked || focused ? 'bg-(--color-doc-mark-soft) outline-[1.5px] outline-(--color-doc-mark) outline-solid' : 'bg-(--color-doc-field) outline-1 outline-(--color-doc-field-rule) outline-dashed hover:bg-(--color-doc-mark-soft)',
   );
-  const caption = el.label ? <span className="shrink-0 font-normal whitespace-pre text-[#667085]">{el.label} </span> : null;
+  const caption = el.label ? <span className="shrink-0 font-normal whitespace-pre text-(--color-doc-muted)">{el.label} </span> : null;
   const inputStyle: CSSProperties = { font: 'inherit', color: 'inherit', textAlign: box.textAlign, textDecoration: 'inherit' };
 
   if (typedIn(f)) {
@@ -350,7 +350,7 @@ function EditableSpot({ el, param: f, box, ctx }: { el: DocElement; param: MetaP
         ctx.setPicked({ field: f.field_path });
       },
       onBlur: () => setFocused(false),
-      className: 'min-w-0 flex-1 resize-none bg-transparent outline-none placeholder:text-[#b692f6]',
+      className: 'min-w-0 flex-1 resize-none bg-transparent outline-none placeholder:text-(--color-doc-mark-light)',
       style: inputStyle,
     };
     return (
@@ -371,7 +371,7 @@ function EditableSpot({ el, param: f, box, ctx }: { el: DocElement; param: MetaP
   return (
     <button type="button" className={cx(spot, 'text-left')} style={box} title={error ?? label} aria-label={`${label}: ${shown || 'empty'}`} onClick={() => ctx.setPicked({ field: f.field_path })}>
       {caption}
-      <span className={cx('min-w-0 flex-1 whitespace-pre-wrap', !shown && 'text-[#b692f6]')}>{shown || label}</span>
+      <span className={cx('min-w-0 flex-1 whitespace-pre-wrap', !shown && 'text-(--color-doc-mark-light)')}>{shown || label}</span>
     </button>
   );
 }
@@ -380,7 +380,7 @@ function PageTable({ section, ctx }: { section: Extract<Section, { kind: 'table'
   const { s } = ctx;
   const data = ctx.shown[section.id] as { rows: string[][]; totals: (string | null)[] | null } | undefined;
   const total = section.columns.reduce((a, c) => a + c.width, 0) || 1;
-  const cell = section.border ? 'border border-[#98a2b3]' : 'border-b border-[#d0d5dd]';
+  const cell = section.border ? 'border border-(--color-doc-border)' : 'border-b border-(--color-doc-guide)';
   const pad = { padding: `${1.2 * s}px ${1.5 * s}px` };
   const editable = ctx.hasLines(section.detail);
   const isPicked = !!ctx.picked && 'detail' in ctx.picked && ctx.picked.detail === section.detail;
@@ -436,7 +436,7 @@ function PageTable({ section, ctx }: { section: Extract<Section, { kind: 'table'
       aria-label={t('Change the lines')}
       title={t('Change the lines')}
       onClick={() => ctx.setPicked({ detail: section.detail })}
-      className={cx('block w-full rounded-[2px] text-left', isPicked ? 'outline-[1.5px] outline-[#7f56d9] outline-solid' : 'outline-1 outline-[#d6bbfb] outline-dashed hover:bg-[#f9f5ff]')}
+      className={cx('block w-full rounded-[2px] text-left', isPicked ? 'outline-[1.5px] outline-(--color-doc-mark) outline-solid' : 'outline-1 outline-(--color-doc-field-rule) outline-dashed hover:bg-(--color-doc-field)')}
     >
       {table}
     </button>

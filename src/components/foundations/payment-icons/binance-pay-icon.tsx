@@ -2,7 +2,7 @@ import type { SVGProps } from "react";
 
 const BinancePayIcon = (props: SVGProps<SVGSVGElement>) => {
     return (
-        <svg width="34" height="24" viewBox="0 0 34 24" fill="none" {...props}>
+        <svg aria-hidden="true" width="34" height="24" viewBox="0 0 34 24" fill="none" {...props}>
             <path d="M0 4C0 1.79086 1.79086 0 4 0H30C32.2091 0 34 1.79086 34 4V20C34 22.2091 32.2091 24 30 24H4C1.79086 24 0 22.2091 0 20V4Z" fill="#FCD535" />
             <path d="M5.9283 13.8692H5.9029L4.73638 12.7215L5.17973 12.2804L5.9156 13.0112L6.65122 12.2804L7.09457 12.7215L5.9283 13.8692Z" fill="#0B0B0B" />
             <path d="M4 12.0026V11.9521L4.44056 11.5504L4.86055 11.9866L4.44056 12.4043L4 12.0026Z" fill="#0B0B0B" />

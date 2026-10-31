@@ -112,7 +112,7 @@ export const Toggle = ({ label, hint, className, size = "sm", slim, ...ariaSwitc
             {...ariaSwitchProps}
             className={(state) =>
                 cx(
-                    "relative flex w-max items-start",
+                    "relative flex w-max max-w-full items-start",
                     state.isDisabled && "cursor-not-allowed",
                     styles[size].root,
                     typeof className === "function" ? className(state) : className,
@@ -132,7 +132,7 @@ export const Toggle = ({ label, hint, className, size = "sm", slim, ...ariaSwitc
                     />
 
                     {(label || hint) && (
-                        <div className={cx("flex flex-col", styles[size].textWrapper)}>
+                        <div className={cx("flex min-w-0 flex-col", styles[size].textWrapper)}>
                             {label && <p className={cx("text-secondary select-none", styles[size].label)}>{label}</p>}
                             {hint && (
                                 <span className={cx("text-tertiary", styles[size].hint)} onClick={(event) => event.stopPropagation()}>

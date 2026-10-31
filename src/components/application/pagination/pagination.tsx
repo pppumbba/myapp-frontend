@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronLeftDouble, ChevronRight, ChevronRightDouble, RefreshCw01 } from "@untitledui/icons";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import { Button } from "@/components/base/buttons/button";
 import { InputBase } from "@/components/base/input/input";
@@ -270,6 +270,46 @@ interface PaginationCardMinimalProps {
 const RefreshSpinning = ({ className }: { className?: string }) => <RefreshCw01 className={cx(className, "animate-spin motion-reduce:animate-none")} />;
 
 /**
+ * "Page [n] of N": type a page number and press Enter (or leave the box) to go there. The draft
+ * is kept while typing, so "12" doesn't stop at page 1 on the way; out-of-range numbers are
+ * pulled back to the first or last page, and anything else puts the current page back.
+ */
+const PageJump = ({ page, total, onPageChange }: { page: number; total: number; onPageChange?: (page: number) => void }) => {
+    const [draft, setDraft] = useState(String(page));
+    useEffect(() => setDraft(String(page)), [page]);
+
+    const go = () => {
+        const n = Number.parseInt(draft, 10);
+        if (Number.isNaN(n)) return setDraft(String(page));
+        const next = Math.min(Math.max(n, 1), total);
+        setDraft(String(next));
+        if (next !== page) onPageChange?.(next);
+    };
+
+    return (
+        <div className="flex items-center gap-2 text-sm whitespace-nowrap text-fg-secondary">
+            {t("Page")}
+            <InputBase
+                aria-label={t("Page number")}
+                value={draft}
+                inputMode="numeric"
+                onChange={(event) => setDraft(event.target.value.replace(/[^0-9]/g, ""))}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter") go();
+                    if (event.key === "Escape") setDraft(String(page));
+                }}
+                onBlur={go}
+                onFocus={(event) => event.target.select()}
+                size="sm"
+                wrapperClassName="w-auto min-w-11"
+                inputClassName="min-w-11 px-2 text-center tabular-nums field-sizing-content"
+            />
+            {t("of {pages}", { pages: total })}
+        </div>
+    );
+};
+
+/**
  * A compact pagination bar on the right: page, page size, then icon-only previous, refresh
  * and next.
  */
@@ -298,9 +338,7 @@ export const PaginationCardMinimal = ({
 
             <nav aria-label={t("Pagination")} className="hidden items-center gap-2 md:flex">
                 <div className="ml-auto flex items-center gap-2">
-                    <span className="text-sm text-fg-secondary">
-                        {t("Page {page} of {pages}", { page, pages: total })}
-                    </span>
+                    <PageJump page={page} total={total} onPageChange={onPageChange} />
                     {/* Only where the page size can change. */}
                     {onPageSizeChange && (
                         <Select

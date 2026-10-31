@@ -74,7 +74,7 @@ export const InputNumberBase = ({
             ref={groupRef}
             className={({ isFocusWithin, isDisabled, isInvalid }) =>
                 cx(
-                    "relative flex w-full flex-row items-stretch rounded-lg bg-primary shadow-xs outline-1 -outline-offset-1 outline-primary transition-all duration-100 ease-linear",
+                    "relative flex w-full flex-row items-stretch rounded-lg bg-primary shadow-xs outline-1 -outline-offset-1 outline-primary transition-[box-shadow,background-color,outline-color] duration-100 ease-linear",
 
                     isFocusWithin && !isDisabled && "outline-2 -outline-offset-2 outline-brand",
 

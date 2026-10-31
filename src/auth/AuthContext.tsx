@@ -14,6 +14,8 @@ export interface User {
   theme_meta_id?: number | null;
   /** How big the app is: sm, md or lg; null is md. */
   ui_size?: "sm" | "md" | "lg" | null;
+  /** Small choices; a missing key takes its default. form_saved_notice: "Saved" shows inside a form after saving (off by default; a toast says it anyway). */
+  preferences?: { form_saved_notice?: boolean; chat_sound?: boolean } | null;
   /** The language picked; null follows the browser. */
   locale?: string | null;
 }

@@ -109,7 +109,7 @@ export const InputGroup = ({ size = "md", prefix, leadingAddon, trailingAddon, l
                         // Used to apply styles based on the size of the input group within children
                         data-input-size={size}
                         className={cx(
-                            "group relative flex h-max w-full flex-row justify-center rounded-lg bg-primary transition-all duration-100 ease-linear",
+                            "group relative flex h-max w-full flex-row justify-center rounded-lg bg-primary transition-[box-shadow,background-color,border-color] duration-100 ease-linear",
 
                             // Only apply focus ring when child is select and input is focused
                             "has-[&>select]:shadow-xs has-[&>select]:ring-1 has-[&>select]:ring-border-primary has-[&>select]:ring-inset has-[&>select]:has-[input:focus]:ring-2 has-[&>select]:has-[input:focus]:ring-border-brand",

@@ -142,7 +142,7 @@ export function GanttView({ def, scope, initialFilters }: { def: MetaDef; scope?
         <div className="flex flex-col gap-4 border-b border-secondary px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-primary">
-              {short(from)} – {to.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              {t('{from} to {to}', { from: short(from), to: to.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) })}
             </h2>
             <p className="mt-0.5 truncate text-sm text-tertiary">
               {title(meta)}

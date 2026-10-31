@@ -1,0 +1,58 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: restyle · scope: app · the full stamp is on src/index.css
+ * axes: light/grotesk-sans/chromatic-indigo · posture: dense, flat, hairline-edged · contrast: pass · v2.0.0 */
+/*
+ * The Floor's base rules for the app, in the base layer so every utility still wins. Only what
+ * leaves the layouts alone: no element widths, sizes or margins (a restyle keeps the layout).
+ */
+@layer base {
+  html,
+  body {
+    overflow-x: clip;
+  }
+  html {
+    scrollbar-color: var(--color-border-primary) transparent;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    caret-color: var(--color-accent);
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 22%, transparent);
+    color: var(--color-ink);
+  }
+
+  /* A focus ring appears at once: no control fades its outline in. */
+  :focus-visible {
+    transition-duration: 0s;
+  }
+
+  /* Figures line up in columns. */
+  table,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A fieldset otherwise refuses to shrink below its widest child (a select with long options) and pushes a form sideways. */
+  fieldset {
+    min-width: 0;
+  }
+
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *:not(.keep-motion),
+    *:not(.keep-motion)::before,
+    *:not(.keep-motion)::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

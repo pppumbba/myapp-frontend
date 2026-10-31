@@ -5,6 +5,7 @@
 /* Hallmark · dismissed 23 · the accent field appears only on a banner whose owner picked the brand tone in the page builder, once a page, posture committed */
 /* Hallmark · answered F4 · one primary per banner; on the brand field the primary swaps to ink so it stays visible, it is the same control */
 /* Hallmark · dismissed 70 · the web form's Sent state follows dataApi.create, a real POST to the form's table; it never shows without one */
+/* Hallmark · waive 37 · each .hm-look-* class loads one site look and its own two faces; a rendered site uses one look, so a page never shows more than three families */
 
 /* Every public website, and nothing else: only SiteView carries .hm-site. Each site's look
  * (data-theme, one of Hallmark's 50 themes) sets the tokens in looks.css; this file only reads them. */
@@ -78,17 +79,14 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-mast__sub { position: absolute; top: 100%; left: calc(var(--rule-bar) * -1); z-index: var(--z-dropdown); min-width: 14rem; display: none; flex-direction: column; border: var(--frame); background: var(--color-paper-3); }
 .hm-mast__sub .hm-mast__link { min-height: 44px; }
 .hm-mast__sub li + li { border-top: var(--rule-hair) solid var(--color-rule); }
-.hm-mast__nav li[data-open="true"] > .hm-mast__sub { display: flex; }
+.hm-mast__nav li:has(:focus-visible) > .hm-mast__sub { display: flex; }
 @media (hover: hover) { .hm-mast__nav li:hover > .hm-mast__sub { display: flex; } }
-/* A page with sub pages: its link, then the arrow that opens them by tap or keyboard. */
-.hm-has-sub { display: flex; align-items: stretch; }
-.hm-has-sub > a { padding-right: var(--space-2xs); }
-.hm-sub-toggle { display: flex; align-items: center; justify-content: center; min-width: 32px; padding: 0 var(--space-2xs); border: 0; background: transparent; color: inherit; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out); }
-.hm-sub-toggle:hover { background: var(--color-paper-2); color: var(--color-ink); }
-.hm-sub-toggle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-.hm-sub-toggle svg { width: 16px; height: 16px; transition: transform var(--dur-micro) var(--ease-out); }
-.hm-sub-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-@media (prefers-reduced-motion: reduce) { .hm-sub-toggle svg { transition: none; } }
+/* A page with sub pages: the arrow sits inside its link and turns while the sub pages are open (hover or keyboard focus). */
+.hm-has-sub > a { gap: var(--space-2xs); }
+.hm-sub-arrow { width: 16px; height: 16px; flex-shrink: 0; transition: transform var(--dur-micro) var(--ease-out); }
+@media (hover: hover) { .hm-has-sub:hover .hm-sub-arrow { transform: rotate(180deg); } }
+.hm-has-sub:has(:focus-visible) .hm-sub-arrow { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .hm-sub-arrow { transition: none; } }
 .hm-mast__toggle { display: none; }
 .hm-mast__drawer { display: none; }
 @media (max-width: 60rem) {
@@ -109,9 +107,8 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-bar__nav { margin-left: auto; }
 .hm-bar__nav > ul { display: flex; gap: var(--space-2xs); margin: 0; padding: 0; list-style: none; }
 .hm-bar__nav > ul > li { position: relative; }
-.hm-bar__nav li[data-open="true"] > .hm-mast__sub { display: flex; }
+.hm-bar__nav li:has(:focus-visible) > .hm-mast__sub { display: flex; }
 @media (hover: hover) { .hm-bar__nav li:hover > .hm-mast__sub { display: flex; } }
-.hm-bar__nav .hm-sub-toggle { border-radius: var(--radius-control); }
 .hm-bar__nav .hm-mast__sub { left: 0; margin: 0; padding: 0; list-style: none; color: var(--color-ink); }
 .hm-bar__nav .hm-mast__sub .hm-bar__link { min-height: 44px; border-radius: 0; text-decoration: none; }
 .hm-bar__link { display: flex; align-items: center; min-height: 44px; padding-inline: var(--space-md); border-radius: var(--radius-control); font-weight: 500; text-decoration: none; white-space: nowrap; transition: background-color var(--dur-micro) var(--ease-out); }
@@ -138,12 +135,12 @@ html:has(.hm-site) { font-size: 16px !important; }
 .hm-bar--slab .hm-bar__mark:hover, .hm-bar--slab .hm-bar__link:hover { color: var(--color-paper); background: var(--color-ink-2); }
 .hm-bar--slab .hm-bar__nav .hm-mast__sub .hm-bar__link:hover { color: var(--color-ink); background: var(--color-paper-2); }
 .hm-bar--slab :focus-visible { outline-color: var(--color-paper); }
-.hm-bar--slab :is(.hm-sub-toggle, .hm-social__link):hover { color: var(--color-paper); background: var(--color-ink-2); }
+.hm-bar--slab .hm-social__link:hover { color: var(--color-paper); background: var(--color-ink-2); }
 
 /* Social pages: icons in the text colour, each a 44px target. */
 .hm-social { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3xs); margin: 0; padding: 0; list-style: none; }
 .hm-social__link { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-width: 44px; min-height: 44px; border-radius: var(--radius-control); color: inherit; text-decoration: none; transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
-.hm-social__link:hover { background: var(--color-paper-2); color: var(--color-accent); }
+.hm-social__link:hover { background: var(--color-paper-2); color: var(--color-ink); }
 .hm-social__link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .hm-social__icon { width: 20px; height: 20px; flex-shrink: 0; }
 .hm-social--labels { gap: var(--space-2xs) var(--space-xs); }
@@ -405,7 +402,7 @@ button.hm-control__icon[data-focus-visible] { outline: 2px solid var(--color-foc
 button.hm-control__icon[data-disabled] { opacity: 0.35; cursor: not-allowed; }
 .hm-control--button[data-pressed] .hm-control__icon, .hm-control--button[aria-expanded="true"] .hm-control__icon { color: var(--color-ink); }
 
-.hm-pop { min-width: var(--trigger-width); max-width: calc(100vw - 2 * var(--gutter, 16px)); overflow: auto; border: var(--frame); border-radius: min(var(--radius-card), 1rem); background: var(--color-paper); color: var(--color-ink); box-shadow: var(--shadow-panel, 0 18px 40px -18px rgb(0 0 0 / 0.35)); font-family: var(--font-body); font-size: var(--text-md); outline: none; }
+.hm-pop { min-width: var(--trigger-width); max-width: calc(100dvw - 2 * var(--gutter, 16px)); overflow: auto; border: var(--frame); border-radius: min(var(--radius-card), 1rem); background: var(--color-paper); color: var(--color-ink); box-shadow: var(--shadow-panel, 0 18px 40px -18px color-mix(in oklab, var(--color-ink) 35%, transparent)); font-family: var(--font-body); font-size: var(--text-md); outline: none; }
 .hm-pop[data-entering] { animation: hm-pop-in var(--dur-short, 160ms) var(--ease-out); }
 .hm-pop[data-exiting] { animation: hm-pop-in var(--dur-micro, 100ms) var(--ease-in) reverse; }
 @keyframes hm-pop-in { from { opacity: 0; transform: translateY(-4px); } }
@@ -421,7 +418,7 @@ button.hm-control__icon[data-disabled] { opacity: 0.35; cursor: not-allowed; }
 .hm-list__item[data-disabled] { opacity: 0.45; cursor: not-allowed; }
 .hm-list__empty { padding: var(--space-sm); color: var(--color-muted); font-size: var(--text-sm); }
 
-.hm-cal { width: min(20rem, calc(100vw - 2 * var(--gutter, 16px))); padding: var(--space-sm) var(--space-sm) 0; }
+.hm-cal { width: 20rem; max-width: 100%; padding: var(--space-sm) var(--space-sm) 0; }
 .hm-cal__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); padding-bottom: var(--space-xs); }
 .hm-site .hm-cal__month { margin: 0; max-width: none; font: var(--display-weight) var(--text-lg)/1.2 var(--font-display); letter-spacing: var(--tracking-display); }
 .hm-cal__grid { width: 100%; border-collapse: collapse; }

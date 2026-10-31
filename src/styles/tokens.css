@@ -1,0 +1,69 @@
+/*
+ * Hallmark's roles, mapped onto the Untitled UI tokens the app already has (theme.css), so a theme
+ * meta that repaints brand-* and neutral-* repaints these too. Nothing here is a second palette;
+ * the type scale and easings stay Tailwind's (theme.css) because a restyle keeps the layout.
+ */
+:root {
+  --color-paper: var(--color-bg-primary);
+  --color-paper-2: var(--color-bg-secondary);
+  --color-paper-3: var(--color-bg-tertiary);
+  --color-ink: var(--color-text-primary);
+  --color-ink-2: var(--color-text-secondary);
+  --color-muted: var(--color-text-tertiary);
+  --color-rule: var(--color-border-secondary);
+  --color-accent: var(--color-brand-600);
+  --color-accent-ink: var(--color-white);
+  --color-focus: var(--color-brand-500);
+
+  /* Motion is state: a control answers in a micro beat, a panel in a short one. */
+  --dur-micro: 120ms;
+  --dur-short: 200ms;
+
+  --rule-hair: 1px;
+
+  /* Dark mode's base pair (theme.css .dark-mode inverts alpha-white/alpha-black to these). */
+  --tone-night: rgb(12 14 18);
+  --tone-day: rgb(255 255 255);
+
+  /* Chart series in dark mode (index.css .dark-mode points --chart-1..6 at them). */
+  --chart-dark-1: #3987e5;
+  --chart-dark-2: #d95926;
+  --chart-dark-3: #199e70;
+  --chart-dark-4: #c98500;
+  --chart-dark-5: #d55181;
+  --chart-dark-6: #008300;
+
+  /*
+   * The printed page in the document designer and editor: it shows the PDF as it will print, on
+   * white paper whatever the app's theme, so these stay fixed instead of following the theme.
+   */
+  --color-doc-ink: #101828;
+  --color-doc-label: #475467;
+  --color-doc-muted: #667085;
+  --color-doc-rule: #344054;
+  --color-doc-mark: #7f56d9;
+  --color-doc-mark-ink: #6941c6;
+  --color-doc-mark-light: #b692f6;
+  --color-doc-mark-soft: #f4ebff;
+  --color-doc-error-soft: #fef3f2;
+  --color-doc-error: #d92d20;
+  --color-doc-border: #98a2b3;
+  --color-doc-guide: #d0d5dd;
+  --color-doc-guide-soft: #e4e7ec;
+  --color-doc-field: #f9f5ff;
+  --color-doc-field-rule: #d6bbfb;
+}
+
+/* The textarea's resize grip (components/base/textarea), drawn in gray-300 and, in dark mode, gray-700. */
+:root {
+  --resize-handle-bg: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 18 18' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 2L2 10' stroke='%23D5D7DA' stroke-linecap='round'/%3E%3Cpath d='M11 7L7 11' stroke='%23D5D7DA' stroke-linecap='round'/%3E%3C/svg%3E");
+  --resize-handle-bg-dark: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 18 18' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 2L2 10' stroke='%23373A41' stroke-linecap='round'/%3E%3Cpath d='M11 7L7 11' stroke='%23373A41' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* The Wand logo keeps its own indigo whatever theme a user or app picks (a logo is not themed); lighter on dark. */
+:root {
+  --color-logo: #4f39f6;
+}
+.dark-mode {
+  --color-logo: #7c6cff;
+}

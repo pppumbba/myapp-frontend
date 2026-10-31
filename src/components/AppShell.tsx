@@ -22,13 +22,13 @@ const admins = [
   { href: '/admin', label: 'Users & roles', icon: Users01 },
 ];
 
-export function LogoMark() {
+/** Three squares stepping down the diagonal, each smaller and fainter (src/assets/logo.svg). Always Wand indigo (--color-logo), never the theme's brand colour. */
+export function LogoMark({ size = 28, className = 'text-(--color-logo)' }: { size?: number; className?: string }) {
   return (
-    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" className="shrink-0">
-      <rect width="32" height="32" rx="8" fill="#4F46E5" />
-      <rect x="8" y="8" width="7" height="7" rx="2" fill="#fff" />
-      <rect x="17" y="8" width="7" height="7" rx="2" fill="#C7D2FE" />
-      <rect x="8" y="17" width="16" height="7" rx="2" fill="#A5B4FC" />
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={`shrink-0 ${className}`} fill="currentColor">
+      <rect width="14" height="14" rx="2" />
+      <rect x="15.5" y="15.5" width="9.5" height="9.5" rx="1.5" fillOpacity="0.55" />
+      <rect x="26.5" y="26.5" width="5.5" height="5.5" rx="1" fillOpacity="0.25" />
     </svg>
   );
 }
@@ -37,7 +37,7 @@ export function Logo() {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark />
-      <span className="text-md font-semibold text-primary">{t("Blue Sky")}</span>
+      <span className="text-md font-semibold text-primary">Wand</span>
     </span>
   );
 }

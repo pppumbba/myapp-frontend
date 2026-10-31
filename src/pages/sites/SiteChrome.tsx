@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { NavItem, PublicSite } from '../../lib/siteApi';
 import { SocialLinks } from './SiteSocial';
@@ -35,52 +35,27 @@ function NavLink({ base, item, current, className }: { base: string; item: NavIt
 
 /**
  * The menu as a list; sub pages in a nested list with subClass. With dropdowns, a page with
- * sub pages gets an arrow button that opens them by tap or keyboard too (hover still does);
- * a click elsewhere or Escape closes it.
+ * sub pages carries its arrow inside its own link: hovering opens the sub pages (CSS), a click
+ * still opens the page itself, and keyboard focus inside opens them too.
  */
 function Menu({ nav, base, current, linkClass, subClass, dropdowns = false }: Omit<ChromeProps, 'site'> & { linkClass: string; subClass: string; dropdowns?: boolean }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const ref = useRef<HTMLUListElement>(null);
-  const { pathname } = useLocation();
-  useEffect(() => setOpen(null), [pathname]);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(null);
-    };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [open]);
-
   return (
-    <ul ref={ref}>
+    <ul>
       {nav.map((item) => {
         const hasSub = item.children.length > 0;
-        const isOpen = open === item.path;
-        const subId = `sub-${item.path.replace(/\W+/g, '-')}`;
+        const isDropdown = hasSub && dropdowns;
         return (
-          <li key={item.path} className={cx(hasSub && dropdowns && 'hm-has-sub')} data-open={hasSub && dropdowns ? isOpen : undefined}>
-            <NavLink base={base} item={item} current={current} className={linkClass} />
-            {hasSub && dropdowns && (
-              <button
-                type="button"
-                className="hm-sub-toggle"
-                aria-expanded={isOpen}
-                aria-controls={subId}
-                aria-label={t('Pages under {name}', { name: item.label })}
-                onClick={() => setOpen(isOpen ? null : item.path)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <li key={item.path} className={cx(isDropdown && 'hm-has-sub')}>
+            <Link to={href(base, item.path)} aria-current={isCurrent(item, current) ? 'page' : undefined} className={linkClass}>
+              {item.label}
+              {isDropdown && (
+                <svg className="hm-sub-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
-              </button>
-            )}
+              )}
+            </Link>
             {hasSub && (
-              <ul id={dropdowns ? subId : undefined} className={subClass}>
+              <ul className={subClass}>
                 {item.children.map((child) => (
                   <li key={child.path}>
                     <NavLink base={base} item={child} current={current} className={linkClass} />

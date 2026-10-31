@@ -149,7 +149,7 @@ export function FileField({ param: f, value, error, required, onChange }: { para
                 <p className="mt-0.5 text-error-primary">{u.error}</p>
               ) : (
                 <div className="mt-1 h-1 overflow-hidden rounded-full bg-secondary">
-                  <div className="h-full bg-brand-solid transition-[width]" style={{ width: `${u.share * 100}%` }} />
+                  <div className="h-full origin-left bg-brand-solid transition-transform" style={{ transform: `scaleX(${u.share})` }} />
                 </div>
               )}
             </li>

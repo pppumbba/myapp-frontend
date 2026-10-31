@@ -83,12 +83,15 @@ function MoreButton({ meta, onMenu }: { meta: Meta; onMenu: NonNullable<CardProp
   );
 }
 
+/** Off-screen type drawings and rows are not drawn (content-visibility), so a list of hundreds stays quick; auto keeps each one's last drawn height. */
+const offscreen = '[content-visibility:auto]';
+
 /** Grid view: the type drawing on top, details and actions below. */
 export function MetaCard({ meta, onEdit, onDelete, onMenu }: CardProps) {
   const look = typeLook(meta.type?.code);
   return (
     <article onContextMenu={contextMenu(meta, onMenu)} className="group relative flex flex-col overflow-hidden rounded-xl bg-primary shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset hover:shadow-md">
-      <div className="relative px-5 pt-5 pb-3" style={{ background: look.tint }}>
+      <div className={`relative px-5 pt-5 pb-3 ${offscreen} [contain-intrinsic-size:auto_112px]`} style={{ background: look.tint }}>
         <TypePreview code={meta.type?.code} className="mx-auto h-20 w-full max-w-[180px]" />
       </div>
 
@@ -137,14 +140,14 @@ export function MetaCard({ meta, onEdit, onDelete, onMenu }: CardProps) {
 export function MetaRow({ meta, onEdit, onDelete, onMenu }: CardProps) {
   const look = typeLook(meta.type?.code);
   return (
-    <article onContextMenu={contextMenu(meta, onMenu)} className="group relative flex items-center gap-4 bg-primary px-4 py-3 transition duration-100 ease-linear hover:bg-primary_hover">
+    <article onContextMenu={contextMenu(meta, onMenu)} className={`group relative flex items-center gap-4 bg-primary px-4 py-3 transition duration-100 ease-linear hover:bg-primary_hover ${offscreen} [contain-intrinsic-size:auto_72px]`}>
       <div className="w-16 shrink-0 rounded-lg p-1.5" style={{ background: look.tint }}>
         <TypePreview code={meta.type?.code} className="w-full" />
       </div>
       <div className="min-w-0 flex-1">
         <Link
           to={`/metas/${meta.id}`}
-          className="block truncate text-md font-semibold text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-focus-ring"
+          className="block truncate text-md font-semibold text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-focus-ring focus-visible:after:-outline-offset-2"
         >
           {meta.name}
         </Link>

@@ -472,7 +472,7 @@ export function PageCanvas({
       <aside className="border-b border-secondary p-4 lg:overflow-y-auto lg:border-r lg:border-b-0" aria-label={t('Widget library')}>
         {palette.map(([category, widgets]) => (
           <div key={category} className="mb-5">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-quaternary uppercase">{category}</p>
+            <p className="mb-2 text-xs font-semibold text-quaternary">{category}</p>
             <ul className="grid grid-cols-2 gap-1.5 lg:grid-cols-1">
               {widgets.map((w) => {
                 const Icon = widgetIcon(w.icon);
@@ -496,7 +496,7 @@ export function PageCanvas({
         ))}
         {widgetMetas.length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-semibold tracking-wide text-quaternary uppercase">{t('Saved widgets')}</p>
+            <p className="mb-2 text-xs font-semibold text-quaternary">{t('Saved widgets')}</p>
             <ComboField aria-label={t('Place a saved widget')} size="sm" placeholder={t('Place an existing one…')} items={widgetMetas} value={existing} onChange={addExisting} />
           </div>
         )}

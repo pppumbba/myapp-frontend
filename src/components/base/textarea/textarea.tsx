@@ -1,15 +1,9 @@
 import type { ReactNode, Ref } from "react";
-import React from "react";
 import type { TextAreaProps as AriaTextAreaProps, TextFieldProps as AriaTextFieldProps } from "react-aria-components";
 import { TextArea as AriaTextArea, TextField as AriaTextField } from "react-aria-components";
 import { HintText } from "@/components/base/input/hint-text";
 import { Label } from "@/components/base/input/label";
 import { cx } from "@/utils/cx";
-
-// Creates a data URL for an SVG resize handle with a given color.
-const getResizeHandleBg = (color: string) => {
-    return `url(data:image/svg+xml;base64,${btoa(`<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2L2 10" stroke="${color}" stroke-linecap="round"/><path d="M11 7L7 11" stroke="${color}" stroke-linecap="round"/></svg>`)})`;
-};
 
 interface TextAreaBaseProps extends AriaTextAreaProps {
     /** Ref for the underlying textarea element. */
@@ -22,12 +16,6 @@ export const TextAreaBase = ({ className, size = "md", ...props }: TextAreaBaseP
     return (
         <AriaTextArea
             {...props}
-            style={
-                {
-                    "--resize-handle-bg": getResizeHandleBg("#D5D7DA"),
-                    "--resize-handle-bg-dark": getResizeHandleBg("#373A41"),
-                } as React.CSSProperties
-            }
             className={(state) =>
                 cx(
                     "w-full scroll-py-3 rounded-lg bg-primary text-primary shadow-xs ring-1 ring-primary transition duration-100 ease-linear ring-inset placeholder:text-placeholder autofill:rounded-lg autofill:text-primary focus:outline-hidden",

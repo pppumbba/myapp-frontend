@@ -55,23 +55,29 @@
     --radius-xs: 0.125rem;
     --radius-sm: 0.25rem;
     --radius-DEFAULT: 0.25rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
-    --radius-2xl: 1rem;
-    --radius-3xl: 1.5rem;
+    /* Tighter corners for a work tool: controls 6px, panels 8px (Hallmark restyle). */
+    --radius-md: 0.3125rem;
+    --radius-lg: 0.4rem;
+    --radius-xl: 0.55rem;
+    --radius-2xl: 0.75rem;
+    --radius-3xl: 1rem;
     --radius-full: 9999px;
 
     /* SHADOW */
-    --shadow-xs: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-sm: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
-    --shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0px 12px 16px -4px rgba(0, 0, 0, 0.08), 0px 4px 6px -2px rgba(0, 0, 0, 0.03), 0px 2px 2px -1px rgba(0, 0, 0, 0.04);
-    --shadow-xl: 0px 20px 24px -4px rgba(0, 0, 0, 0.08), 0px 8px 8px -4px rgba(0, 0, 0, 0.03), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.04);
-    --shadow-2xl: 0px 24px 48px -12px rgba(0, 0, 0, 0.18), 0px 4px 4px -2px rgba(0, 0, 0, 0.04);
-    --shadow-3xl: 0px 32px 64px -12px rgba(0, 0, 0, 0.14), 0px 5px 5px -2.5px rgba(0, 0, 0, 0.04);
+    /*
+     * Flat surfaces, edged by their hairline ring: resting cards and controls cast nothing, and
+     * only what floats (menus, popovers, dialogs) lifts, in a shadow tinted to the ink rather
+     * than black (Hallmark restyle).
+     */
+    --shadow-xs: 0px 0px 0px 0px rgb(10 13 18 / 0);
+    --shadow-sm: 0px 1px 2px rgb(10 13 18 / 0.05);
+    --shadow-md: 0px 4px 8px -2px rgb(10 13 18 / 0.08), 0px 1px 2px rgb(10 13 18 / 0.04);
+    --shadow-lg: 0px 10px 20px -6px rgb(10 13 18 / 0.14), 0px 2px 4px -1px rgb(10 13 18 / 0.05);
+    --shadow-xl: 0px 16px 32px -8px rgb(10 13 18 / 0.16), 0px 3px 6px -2px rgb(10 13 18 / 0.05);
+    --shadow-2xl: 0px 24px 48px -12px rgb(10 13 18 / 0.2), 0px 4px 8px -2px rgb(10 13 18 / 0.06);
+    --shadow-3xl: 0px 32px 64px -12px rgb(10 13 18 / 0.2), 0px 5px 10px -3px rgb(10 13 18 / 0.06);
 
-    --shadow-skeuomorphic: 0px 0px 0px 1px rgba(0, 0, 0, 0.18) inset, 0px -2px 0px 0px rgba(0, 0, 0, 0.05) inset;
+    --shadow-skeuomorphic: 0px 0px 0px 1px rgb(10 13 18 / 0.14) inset, 0px -1px 0px 0px rgb(10 13 18 / 0.05) inset;
     --shadow-xs-skeuomorphic: var(--shadow-skeuomorphic), var(--shadow-xs);
 
     --shadow-modern-mockup-inner-lg: 0px 0px 3.765px 1.255px rgba(10, 13, 18, 0.08) inset, 0px 0px 2.51px 1.255px rgba(10, 13, 18, 0.03) inset;
@@ -115,11 +121,11 @@
     --color-transparent: rgb(0 0 0 / 0);
 
     --color-white: rgb(255 255 255);
-    --color-black: rgb(0 0 0);
+    --color-black: rgb(10 13 18);
 
     /* These will be inverted in dark mode. */
     --color-alpha-white: rgb(255 255 255);
-    --color-alpha-black: rgb(0 0 0);
+    --color-alpha-black: rgb(10 13 18);
 
     --color-brand-50: var(--color-indigo-50);
     --color-brand-100: var(--color-indigo-100);
@@ -136,7 +142,7 @@
     /* LIGHT MODE VARIABLES */
 
     --color-alpha-white: rgb(255 255 255);
-    --color-alpha-black: rgb(0 0 0);
+    --color-alpha-black: rgb(10 13 18);
 
     /* UTILITY COLORS */
     --color-utility-blue-50: var(--color-blue-50);
@@ -498,8 +504,8 @@
     /* DARK MODE VARIABLES */
 
     .dark-mode {
-        --color-alpha-white: rgb(12 14 18);
-        --color-alpha-black: rgb(255 255 255);
+        --color-alpha-white: var(--tone-night);
+        --color-alpha-black: var(--tone-day);
 
         /* UTILITY COLORS */
 

@@ -222,314 +222,318 @@ export function MetaFormModal({
       onClose={onClose}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-8">
-        {error && <Alert>{error}</Alert>}
+      {/* Only .modal-scroll scrolls, so the scrollbar stops above the buttons (index.css). */}
+      <form onSubmit={onSubmit} className="modal-split space-y-8">
+        <div className="modal-scroll space-y-8">
+          {error && <Alert>{error}</Alert>}
 
-        <Section title={t('Type')}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {types.map((item) => {
-              const look = typeLook(item.code);
-              const selected = form.type_id === String(item.id);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => set('type_id', String(item.id))}
-                  className={`rounded-xl bg-primary p-2 text-left ring-inset transition duration-100 ease-linear ${
-                    selected ? 'ring-2' : 'ring-1 ring-secondary hover:ring-primary'
-                  }`}
-                  style={selected ? { boxShadow: `inset 0 0 0 2px ${look.ink}` } : undefined}
-                >
-                  <div className="rounded-lg p-2" style={{ background: look.tint }}>
-                    <TypePreview code={item.code} className="h-12 w-full" />
-                  </div>
-                  <span className="mt-2 block px-1 text-sm font-semibold text-primary">{item.name}</span>
-                </button>
-              );
-            })}
-          </div>
-          {types.length === 0 && (
-            <p className="text-sm text-tertiary">{t('No meta types found. Add rows to the meta_types table first.')}</p>
-          )}
-          {fe('type_id') && <p className="text-sm text-error-primary">{fe('type_id')}</p>}
-        </Section>
-
-        <Section title={t('Name')}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label={t('Name')}
-              isRequired
-              autoFocus
-              value={form.name}
-              onChange={onName}
-              placeholder={t('Customer list')}
-              isInvalid={!!fe('name')}
-              hint={fe('name')}
-            />
-            <Input
-              label={t('Code')}
-              isRequired
-              value={form.code}
-              onChange={(v) => {
-                setCodeTouched(true);
-                set('code', v);
-              }}
-              placeholder="customer_list"
-              isInvalid={!!fe('code')}
-              hint={fe('code') ?? t('Used in links and the API. Must be unique.')}
-            />
-            <Input
-              label={t('Display label')}
-              value={form.label_name}
-              onChange={(v) => set('label_name', v)}
-              isInvalid={!!fe('label_name')}
-              hint={fe('label_name') ?? t('Shown to people using the app. Leave blank to use the name.')}
-            />
-            <Input
-              label={t('Database table')}
-              value={form.table_name}
-              onChange={(v) => set('table_name', v)}
-              placeholder="customers"
-              isInvalid={!!fe('table_name')}
-              hint={fe('table_name') ?? t('The table this screen reads and writes.')}
-            />
-          </div>
-          <TextArea
-            label={t('Description')}
-            rows={3}
-            value={form.description}
-            onChange={(v) => set('description', v)}
-            isInvalid={!!fe('description')}
-            hint={fe('description')}
-          />
-          <TagPicker
-            tags={tags}
-            value={form.tag_ids}
-            onChange={(ids) => set('tag_ids', ids)}
-            onCreated={(tag) => setTags((all) => (all.some((item) => item.id === tag.id) ? all : [...all, tag].sort((a, b) => a.name.localeCompare(b.name))))}
-            hint={fe('tag_ids')}
-          />
-        </Section>
-
-        {types.find((item) => String(item.id) === form.type_id)?.code === 'stage_query' ? (
-          <Section title={t('Query')}>
-            <TextArea
-              label={t('SQL that changes data')}
-              rows={8}
-              value={form.query_string}
-              onChange={(v) => set('query_string', v)}
-              placeholder={"UPDATE proc_purchase_requests\nSET status = 'rejected'\nWHERE status = 'draft' AND needed_by < :before;\n\nINSERT INTO audit_notes (note, created_by) VALUES ('Closed drafts', :user_id)"}
-              textAreaClassName="font-mono text-sm"
-              isInvalid={!!fe('query_string')}
-              hint={
-                fe('query_string') ??
-                t('INSERT, UPDATE, DELETE or REPLACE; separate several with ;. They run together: if one fails, none is kept. :name parameters are its parameters (add one per name below the query), plus :user_id and :today.')
-              }
-            />
+          <Section title={t('Type')}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {types.map((item) => {
+                const look = typeLook(item.code);
+                const selected = form.type_id === String(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => set('type_id', String(item.id))}
+                    className={`rounded-xl bg-primary p-2 text-left ring-inset transition duration-100 ease-linear ${
+                      selected ? 'ring-2' : 'ring-1 ring-secondary hover:ring-primary'
+                    }`}
+                    style={selected ? { boxShadow: `inset 0 0 0 2px ${look.ink}` } : undefined}
+                  >
+                    <div className="rounded-lg p-2" style={{ background: look.tint }}>
+                      <TypePreview code={item.code} className="h-12 w-full" />
+                    </div>
+                    <span className="mt-2 block px-1 text-sm font-semibold text-primary">{item.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {types.length === 0 && (
+              <p className="text-sm text-tertiary">{t('No meta types found. Add rows to the meta_types table first.')}</p>
+            )}
+            {fe('type_id') && <p className="text-sm text-error-primary">{fe('type_id')}</p>}
           </Section>
-        ) : ['datagrid', 'get', 'calendar', 'gantt'].includes(types.find((item) => String(item.id) === form.type_id)?.code ?? '') && (
-          <Section title={t('Query')}>
-            <TextArea
-              label={t('SQL query')}
-              rows={6}
-              value={form.query_string}
-              onChange={(v) => set('query_string', v)}
-              placeholder={"SELECT o.id, o.po_number, s.name AS supplier_name\nFROM orders o JOIN suppliers s ON s.id = o.supplier_id\nWHERE (:status IS NULL OR o.status = :status)"}
-              textAreaClassName="font-mono text-sm"
-              isInvalid={!!fe('query_string')}
-              hint={
-                fe('query_string') ??
-                t('Optional. Reads records from this query instead of the table. :name parameters are filled from filters with the same field path (and :user_id, :today); an empty filter is null. Saving still goes through a form with a table.')
-              }
-            />
-          </Section>
-        )}
 
-        {(typeCode === 'form' || typeCode === 'datagrid') && (
-          <Section title={t('External service')}>
-            <p className="text-sm text-tertiary">
-              {t(typeCode === 'form'
-                ? 'Optional. With an address, this form reads and writes records through a REST service instead of the database table: GET for the list and one record (address/id), POST to add, PUT or PATCH to change, DELETE to remove. Params read and write fields by their field path, which may be a dot path such as'
-                : 'Optional. With an address, this grid reads and writes records through a REST service instead of the database table: GET for the list and one record (address/id), POST to add, PUT or PATCH to change, DELETE to remove. Params read and write fields by their field path, which may be a dot path such as')}{' '}
-              <code className="text-xs">address.city</code>.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+          <Section title={t('Name')}>
+            <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label={t('Address')}
-                value={form.service.service_url}
-                onChange={(v) => setService('service_url', v)}
-                placeholder="https://api.example.com/v1/suppliers"
-                inputClassName="font-mono text-sm"
-                isInvalid={!!se('service_url')}
-                hint={se('service_url') ?? t('The collection; one record is this address followed by /id.')}
+                label={t('Name')}
+                isRequired
+                autoFocus
+                value={form.name}
+                onChange={onName}
+                placeholder={t('Customer list')}
+                isInvalid={!!fe('name')}
+                hint={fe('name')}
               />
-              <NativeSelect
-                label={t('Changes with')}
-                value={form.service.service_update_method || 'PUT'}
-                onChange={(e) => setService('service_update_method', e.target.value === 'PUT' ? '' : e.target.value)}
-                options={[
-                  { label: 'PUT', value: 'PUT' },
-                  { label: t('PATCH'), value: 'PATCH' },
-                ]}
+              <Input
+                label={t('Code')}
+                isRequired
+                value={form.code}
+                onChange={(v) => {
+                  setCodeTouched(true);
+                  set('code', v);
+                }}
+                placeholder="customer_list"
+                isInvalid={!!fe('code')}
+                hint={fe('code') ?? t('Used in links and the API. Must be unique.')}
+              />
+              <Input
+                label={t('Display label')}
+                value={form.label_name}
+                onChange={(v) => set('label_name', v)}
+                isInvalid={!!fe('label_name')}
+                hint={fe('label_name') ?? t('Shown to people using the app. Leave blank to use the name.')}
+              />
+              <Input
+                label={t('Database table')}
+                value={form.table_name}
+                onChange={(v) => set('table_name', v)}
+                placeholder="customers"
+                isInvalid={!!fe('table_name')}
+                hint={fe('table_name') ?? t('The table this screen reads and writes.')}
               />
             </div>
-            {usesService && (
-              <>
-                <TextArea
-                  label={t('Headers')}
-                  rows={3}
-                  value={form.service.service_headers}
-                  onChange={(v) => setService('service_headers', v)}
-                  placeholder={"{ \"Authorization\": \"Bearer {env:SERVICE_SUPPLIER_TOKEN}\" }"}
-                  textAreaClassName="font-mono text-sm"
-                  isInvalid={!!se('service_headers')}
-                  hint={
-                    se('service_headers') ??
-                    t('A JSON object. Keep tokens in the server’s .env as SERVICE_… and write {env:SERVICE_…} here; only admins see these headers.')
-                  }
-                />
-                <TextArea
-                  label={t('List body')}
-                  rows={listsByPost ? 8 : 2}
-                  value={form.service.service_list_body}
-                  onChange={(v) => setService('service_list_body', v)}
-                  placeholder={"{ \"request\": { \"sessionId\": \"{env:SERVICE_ERP_SESSION}\", \"command\": \"…\", \"parameters\": { \"from\": \"{filter.from}\" } } }"}
-                  textAreaClassName="font-mono text-sm"
-                  isInvalid={!!se('service_list_body')}
-                  hint={
-                    se('service_list_body') ??
-                    t('For an endpoint that lists with a POST (e.g. runJson with a command): the JSON body to send. Then this list is read-only and a record opens from the list. Same placeholders as the list query; without {page}/{per_page}/{offset} all records come at once and are paged, searched and sorted here. Only admins see it.')
-                  }
-                />
-                {!listsByPost && (
-                  <TextArea
-                    label={t('List query')}
-                    rows={3}
-                    value={form.service.service_query}
-                    onChange={(v) => setService('service_query', v)}
-                    placeholder={"{ \"page\": \"{page}\", \"limit\": \"{per_page}\", \"q\": \"{search}\", \"status\": \"{filter.status}\" }"}
-                    textAreaClassName="font-mono text-sm"
-                    isInvalid={!!se('service_query')}
-                    hint={
-                      se('service_query') ??
-                      t('A JSON object of the list’s query string. Empty sends page, per_page, search, sort, dir and each filter by its name. Can use {page} {per_page} {offset} {search} {sort} {dir} {filter.name}, session values and {user_id}.')
-                    }
-                  />
-                )}
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Input
-                    label={t('Records at')}
-                    value={form.service.service_list_path}
-                    onChange={(v) => setService('service_list_path', v)}
-                    placeholder="data"
-                    inputClassName="font-mono text-sm"
-                    isInvalid={!!se('service_list_path')}
-                    hint={se('service_list_path') ?? t('Where the list sits in its answer; empty: the answer is the list.')}
-                  />
-                  <Input
-                    label={t('Total at')}
-                    value={form.service.service_total_path}
-                    onChange={(v) => setService('service_total_path', v)}
-                    placeholder="meta.total"
-                    inputClassName="font-mono text-sm"
-                    isInvalid={!!se('service_total_path')}
-                    hint={se('service_total_path') ?? t('Optional, for page counts.')}
-                  />
-                  <Input
-                    label={t('Record at')}
-                    value={form.service.service_record_path}
-                    onChange={(v) => setService('service_record_path', v)}
-                    placeholder="data"
-                    inputClassName="font-mono text-sm"
-                    isInvalid={!!se('service_record_path')}
-                    hint={se('service_record_path') ?? t('Where one record sits in its answer.')}
-                  />
-                </div>
-              </>
-            )}
+            <TextArea
+              label={t('Description')}
+              rows={3}
+              value={form.description}
+              onChange={(v) => set('description', v)}
+              isInvalid={!!fe('description')}
+              hint={fe('description')}
+            />
+            <TagPicker
+              tags={tags}
+              value={form.tag_ids}
+              onChange={(ids) => set('tag_ids', ids)}
+              onCreated={(tag) => setTags((all) => (all.some((item) => item.id === tag.id) ? all : [...all, tag].sort((a, b) => a.name.localeCompare(b.name))))}
+              hint={fe('tag_ids')}
+            />
           </Section>
-        )}
 
-        {typeCode === 'form' && (
-          <Section title={t('Scripts')}>
-            <ButtonGroup
-              size="sm"
-              selectedKeys={[script]}
-              onSelectionChange={(keys) => {
-                const [k] = [...keys];
-                if (k) setScript(k as ScriptColumn);
-              }}
-              disallowEmptySelection
-              className="w-auto flex-wrap"
-            >
-              {SCRIPTS.map((sc) => (
-                <ButtonGroupItem key={sc.column} id={sc.column}>
-                  {t(sc.label)}
-                  {form.scripts[sc.column].trim() && <span className="ml-1 size-1.5 rounded-full bg-brand-solid" aria-label={t('(has a script)')} />}
-                </ButtonGroupItem>
-              ))}
-            </ButtonGroup>
-            {SCRIPTS.filter((sc) => sc.column === script).map((sc) => (
-              <CodeEditor
-                key={sc.column}
-                label={`${t(sc.label)} (JavaScript)`}
-                value={form.scripts[sc.column]}
-                onChange={(v) => setForm((f) => ({ ...f, scripts: { ...f.scripts, [sc.column]: v } }))}
-                names={SCRIPT_NAMES}
-                placeholder={sc.placeholder}
-                isInvalid={!!fe(sc.column)}
+          {types.find((item) => String(item.id) === form.type_id)?.code === 'stage_query' ? (
+            <Section title={t('Query')}>
+              <TextArea
+                label={t('SQL that changes data')}
+                rows={8}
+                value={form.query_string}
+                onChange={(v) => set('query_string', v)}
+                placeholder={"UPDATE proc_purchase_requests\nSET status = 'rejected'\nWHERE status = 'draft' AND needed_by < :before;\n\nINSERT INTO audit_notes (note, created_by) VALUES ('Closed drafts', :user_id)"}
+                textAreaClassName="font-mono text-sm"
+                isInvalid={!!fe('query_string')}
                 hint={
-                  fe(sc.column) ?? (
-                    <>
-                      {t(sc.hint)} {t('Helpers:')} <code className="text-xs">{t('get(f) set(f, v) values sum(detail, fn|field) lines(detail) setLine(detail, i, f, v) header.get/set num(v) round(v, digits) today() hide(f) show(f) readonly(f) message(text) error(text) await fill(getId, params) session(path)')}</code>
-                    </>
-                  )
+                  fe('query_string') ??
+                  t('INSERT, UPDATE, DELETE or REPLACE; separate several with ;. They run together: if one fails, none is kept. :name parameters are its parameters (add one per name below the query), plus :user_id and :today.')
                 }
               />
-            ))}
-          </Section>
-        )}
-
-        <Section title={t('Links')}>
-          <NativeSelect
-            label={t('Refers to')}
-            value={form.ref_meta_id}
-            onChange={(e) => set('ref_meta_id', e.target.value)}
-            hint={fe('ref_meta_id') ?? t('Another meta this one is based on or opens. A grid can name its workflow, or another grid to reuse: its records, workflow, buttons and columns (leave table and query empty; its own fields change or hide columns by field path).')}
-            options={[
-              { label: t('Nothing'), value: '' },
-              ...options
-                .filter((o) => o.id !== meta?.id)
-                .map((o) => ({ label: `${o.name} (${o.type ?? 'no type'})`, value: String(o.id) })),
-            ]}
-          />
-          <Toggle label={t('Active')} hint={t('Inactive metas stay saved but are hidden from apps.')} isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
-          <Toggle
-            label={t('Public')}
-            hint={
-              form.is_public && meta
-                ? t('Anyone may open it at {url} and add records through it, without signing in. The screens, lines and lookups it shows must be public too. Nobody edits or deletes records this way, and a form never shows what others sent.', { url: `${window.location.origin}/portal/${meta.id}` })
-                : t('Anyone may open it and add records through it, without signing in, e.g. the screens of a portal.')
-            }
-            isSelected={form.is_public}
-            onChange={(v) => set('is_public', v)}
-          />
-          <Toggle
-            label={t('Open to everyone signed in')}
-            hint={t('Every signed-in user may open it, without a role. They may only view; what they may do inside is up to the screen, e.g. the market app.')}
-            isSelected={form.is_open}
-            onChange={(v) => set('is_open', v)}
-          />
-          {(typeCode === 'form' || typeCode === 'excel_import' || typeCode === 'matrix') && (
-            <Toggle
-              label={t('Keep a log of changes')}
-              hint={t('Every save through this {kind} is kept: who changed which fields from what to what, with its lines. Records show it under History.', { kind: t(typeCode === 'form' ? 'form' : typeCode === 'matrix' ? 'matrix' : 'import') })}
-              isSelected={form.is_log}
-              onChange={(v) => set('is_log', v)}
-            />
+            </Section>
+          ) : ['datagrid', 'get', 'calendar', 'gantt'].includes(types.find((item) => String(item.id) === form.type_id)?.code ?? '') && (
+            <Section title={t('Query')}>
+              <TextArea
+                label={t('SQL query')}
+                rows={6}
+                value={form.query_string}
+                onChange={(v) => set('query_string', v)}
+                placeholder={"SELECT o.id, o.po_number, s.name AS supplier_name\nFROM orders o JOIN suppliers s ON s.id = o.supplier_id\nWHERE (:status IS NULL OR o.status = :status)"}
+                textAreaClassName="font-mono text-sm"
+                isInvalid={!!fe('query_string')}
+                hint={
+                  fe('query_string') ??
+                  t('Optional. Reads records from this query instead of the table. :name parameters are filled from filters with the same field path (and :user_id, :today); an empty filter is null. Saving still goes through a form with a table.')
+                }
+              />
+            </Section>
           )}
-        </Section>
+
+          {(typeCode === 'form' || typeCode === 'datagrid') && (
+            <Section title={t('External service')}>
+              <p className="text-sm text-tertiary">
+                {t(typeCode === 'form'
+                  ? 'Optional. With an address, this form reads and writes records through a REST service instead of the database table: GET for the list and one record (address/id), POST to add, PUT or PATCH to change, DELETE to remove. Params read and write fields by their field path, which may be a dot path such as'
+                  : 'Optional. With an address, this grid reads and writes records through a REST service instead of the database table: GET for the list and one record (address/id), POST to add, PUT or PATCH to change, DELETE to remove. Params read and write fields by their field path, which may be a dot path such as')}{' '}
+                <code className="text-xs">address.city</code>.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+                <Input
+                  label={t('Address')}
+                  value={form.service.service_url}
+                  onChange={(v) => setService('service_url', v)}
+                  placeholder="https://api.example.com/v1/suppliers"
+                  inputClassName="font-mono text-sm"
+                  isInvalid={!!se('service_url')}
+                  hint={se('service_url') ?? t('The collection; one record is this address followed by /id.')}
+                />
+                <NativeSelect
+                  label={t('Changes with')}
+                  value={form.service.service_update_method || 'PUT'}
+                  onChange={(e) => setService('service_update_method', e.target.value === 'PUT' ? '' : e.target.value)}
+                  options={[
+                    { label: 'PUT', value: 'PUT' },
+                    { label: t('PATCH'), value: 'PATCH' },
+                  ]}
+                />
+              </div>
+              {usesService && (
+                <>
+                  <TextArea
+                    label={t('Headers')}
+                    rows={3}
+                    value={form.service.service_headers}
+                    onChange={(v) => setService('service_headers', v)}
+                    placeholder={"{ \"Authorization\": \"Bearer {env:SERVICE_SUPPLIER_TOKEN}\" }"}
+                    textAreaClassName="font-mono text-sm"
+                    isInvalid={!!se('service_headers')}
+                    hint={
+                      se('service_headers') ??
+                      t('A JSON object. Keep tokens in the server’s .env as SERVICE_… and write {env:SERVICE_…} here; only admins see these headers.')
+                    }
+                  />
+                  <TextArea
+                    label={t('List body')}
+                    rows={listsByPost ? 8 : 2}
+                    value={form.service.service_list_body}
+                    onChange={(v) => setService('service_list_body', v)}
+                    placeholder={"{ \"request\": { \"sessionId\": \"{env:SERVICE_ERP_SESSION}\", \"command\": \"…\", \"parameters\": { \"from\": \"{filter.from}\" } } }"}
+                    textAreaClassName="font-mono text-sm"
+                    isInvalid={!!se('service_list_body')}
+                    hint={
+                      se('service_list_body') ??
+                      t('For an endpoint that lists with a POST (e.g. runJson with a command): the JSON body to send. Then this list is read-only and a record opens from the list. Same placeholders as the list query; without {page}/{per_page}/{offset} all records come at once and are paged, searched and sorted here. Only admins see it.')
+                    }
+                  />
+                  {!listsByPost && (
+                    <TextArea
+                      label={t('List query')}
+                      rows={3}
+                      value={form.service.service_query}
+                      onChange={(v) => setService('service_query', v)}
+                      placeholder={"{ \"page\": \"{page}\", \"limit\": \"{per_page}\", \"q\": \"{search}\", \"status\": \"{filter.status}\" }"}
+                      textAreaClassName="font-mono text-sm"
+                      isInvalid={!!se('service_query')}
+                      hint={
+                        se('service_query') ??
+                        t('A JSON object of the list’s query string. Empty sends page, per_page, search, sort, dir and each filter by its name. Can use {page} {per_page} {offset} {search} {sort} {dir} {filter.name}, session values and {user_id}.')
+                      }
+                    />
+                  )}
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <Input
+                      label={t('Records at')}
+                      value={form.service.service_list_path}
+                      onChange={(v) => setService('service_list_path', v)}
+                      placeholder="data"
+                      inputClassName="font-mono text-sm"
+                      isInvalid={!!se('service_list_path')}
+                      hint={se('service_list_path') ?? t('Where the list sits in its answer; empty: the answer is the list.')}
+                    />
+                    <Input
+                      label={t('Total at')}
+                      value={form.service.service_total_path}
+                      onChange={(v) => setService('service_total_path', v)}
+                      placeholder="meta.total"
+                      inputClassName="font-mono text-sm"
+                      isInvalid={!!se('service_total_path')}
+                      hint={se('service_total_path') ?? t('Optional, for page counts.')}
+                    />
+                    <Input
+                      label={t('Record at')}
+                      value={form.service.service_record_path}
+                      onChange={(v) => setService('service_record_path', v)}
+                      placeholder="data"
+                      inputClassName="font-mono text-sm"
+                      isInvalid={!!se('service_record_path')}
+                      hint={se('service_record_path') ?? t('Where one record sits in its answer.')}
+                    />
+                  </div>
+                </>
+              )}
+            </Section>
+          )}
+
+          {typeCode === 'form' && (
+            <Section title={t('Scripts')}>
+              <ButtonGroup
+                size="sm"
+                selectedKeys={[script]}
+                onSelectionChange={(keys) => {
+                  const [k] = [...keys];
+                  if (k) setScript(k as ScriptColumn);
+                }}
+                disallowEmptySelection
+                className="w-auto flex-wrap"
+              >
+                {SCRIPTS.map((sc) => (
+                  <ButtonGroupItem key={sc.column} id={sc.column}>
+                    {t(sc.label)}
+                    {form.scripts[sc.column].trim() && <span className="ml-1 size-1.5 rounded-full bg-brand-solid" aria-label={t('(has a script)')} />}
+                  </ButtonGroupItem>
+                ))}
+              </ButtonGroup>
+              {SCRIPTS.filter((sc) => sc.column === script).map((sc) => (
+                <CodeEditor
+                  key={sc.column}
+                  label={`${t(sc.label)} (JavaScript)`}
+                  value={form.scripts[sc.column]}
+                  onChange={(v) => setForm((f) => ({ ...f, scripts: { ...f.scripts, [sc.column]: v } }))}
+                  names={SCRIPT_NAMES}
+                  placeholder={sc.placeholder}
+                  isInvalid={!!fe(sc.column)}
+                  hint={
+                    fe(sc.column) ?? (
+                      <>
+                        {t(sc.hint)} {t('Helpers:')} <code className="text-xs">{t('get(f) set(f, v) values sum(detail, fn|field) lines(detail) setLine(detail, i, f, v) header.get/set num(v) round(v, digits) today() hide(f) show(f) readonly(f) message(text) error(text) await fill(getId, params) session(path)')}</code>
+                      </>
+                    )
+                  }
+                />
+              ))}
+            </Section>
+          )}
+
+          <Section title={t('Links')}>
+            <NativeSelect
+              label={t('Refers to')}
+              value={form.ref_meta_id}
+              onChange={(e) => set('ref_meta_id', e.target.value)}
+              hint={fe('ref_meta_id') ?? t('Another meta this one is based on or opens. A grid can name its workflow, or another grid to reuse: its records, workflow, buttons and columns (leave table and query empty; its own fields change or hide columns by field path).')}
+              options={[
+                { label: t('Nothing'), value: '' },
+                ...options
+                  .filter((o) => o.id !== meta?.id)
+                  .map((o) => ({ label: `${o.name} (${o.type ?? 'no type'})`, value: String(o.id) })),
+              ]}
+            />
+            <Toggle label={t('Active')} hint={t('Inactive metas stay saved but are hidden from apps.')} isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
+            <Toggle
+              label={t('Public')}
+              hint={
+                form.is_public && meta
+                  ? t('Anyone may open it at {url} and add records through it, without signing in. The screens, lines and lookups it shows must be public too. Nobody edits or deletes records this way, and a form never shows what others sent.', { url: `${window.location.origin}/portal/${meta.id}` })
+                  : t('Anyone may open it and add records through it, without signing in, e.g. the screens of a portal.')
+              }
+              isSelected={form.is_public}
+              onChange={(v) => set('is_public', v)}
+            />
+            <Toggle
+              label={t('Open to everyone signed in')}
+              hint={t('Every signed-in user may open it, without a role. They may only view; what they may do inside is up to the screen, e.g. the market app.')}
+              isSelected={form.is_open}
+              onChange={(v) => set('is_open', v)}
+            />
+            {(typeCode === 'form' || typeCode === 'excel_import' || typeCode === 'matrix') && (
+              <Toggle
+                label={t('Keep a log of changes')}
+                hint={t('Every save through this {kind} is kept: who changed which fields from what to what, with its lines. Records show it under History.', { kind: t(typeCode === 'form' ? 'form' : typeCode === 'matrix' ? 'matrix' : 'import') })}
+                isSelected={form.is_log}
+                onChange={(v) => set('is_log', v)}
+              />
+            )}
+          </Section>
+
+        </div>
 
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-5">
           <Button size="lg" color="secondary" onPress={onClose}>

@@ -34,7 +34,7 @@ export const targetValue = (id: number | null | undefined, key?: string) => (key
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-4 border-b border-secondary px-4 py-4 last:border-b-0">
-      <p className="text-xs font-semibold tracking-wide text-quaternary uppercase">{title}</p>
+      <p className="text-xs font-semibold text-quaternary">{title}</p>
       {children}
     </div>
   );

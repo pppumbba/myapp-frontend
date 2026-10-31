@@ -920,7 +920,7 @@ export default function StudioPage() {
                     <p className="mt-2 mb-3 text-xs text-tertiary">{t('Drag onto the canvas, or click to add after the picked one.')}</p>
                     {groups.map(([group, items]) => (
                       <div key={group} className="mb-4">
-                        <p className="mb-1.5 text-xs font-semibold tracking-wide text-quaternary uppercase">{group}</p>
+                        <p className="mb-1.5 text-xs font-semibold text-quaternary">{group}</p>
                         <ul className="space-y-1">
                           {items.map((p) => (
                             <li key={p.id}>
@@ -949,7 +949,7 @@ export default function StudioPage() {
                     {!groups.length && search.trim() !== '' && <p className="mb-4 text-sm text-tertiary">{t('Nothing matches.')}</p>}
                     {lookups.map((l) => (
                       <div key={l.id} className="mb-4">
-                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-quaternary uppercase">
+                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-quaternary">
                           <l.icon className="size-3.5" />
                           {l.group}
                         </p>
@@ -1171,7 +1171,7 @@ function Explorer({
   return (
     <div className="space-y-5">
       <div>
-        <p className="mb-1.5 text-xs font-semibold tracking-wide text-quaternary uppercase">{t('App')}</p>
+        <p className="mb-1.5 text-xs font-semibold text-quaternary">{t('App')}</p>
         <button type="button" onClick={onApp} aria-pressed={!openKey} className={row(!openKey)}>
           <Menu01 className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">{doc.app.name}</span>
@@ -1196,7 +1196,7 @@ function Explorer({
         </ul>
       </div>
       <div>
-        <p className="mb-1.5 text-xs font-semibold tracking-wide text-quaternary uppercase">{t('On the canvas')}</p>
+        <p className="mb-1.5 text-xs font-semibold text-quaternary">{t('On the canvas')}</p>
         <Outline nodes={nodes} selected={selected} onSelect={onSelect} onMenu={onMenu} />
       </div>
     </div>

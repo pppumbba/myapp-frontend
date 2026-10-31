@@ -15,7 +15,7 @@ const pages: Record<string, string> = { profile: '/profile', home: '/', apps: '/
  * The signed-in user at the foot of every sidebar. Pressing it opens a menu: profile, the
  * builder's pages and log out. Collapsed, only the avatar shows.
  */
-export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
+export function UserMenu({ collapsed = false, below = false }: { collapsed?: boolean; /** In a top bar: opens downwards. */ below?: boolean }) {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -55,7 +55,7 @@ export function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
         )}
       </AriaButton>
 
-      <Dropdown.Popover placement={collapsed ? 'right bottom' : 'top'} offset={6}>
+      <Dropdown.Popover placement={below ? 'bottom end' : collapsed ? 'right bottom' : 'top'} offset={6}>
         <div className="flex items-center gap-2.5 border-b border-secondary px-3 py-2.5">
           {avatar}
           <div className="min-w-0">

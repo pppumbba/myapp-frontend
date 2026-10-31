@@ -68,7 +68,11 @@ const QUIET = [
   /\/(preview|check)(\?|$)/,
   /^\/excel-structure(\/[^/?]+(\/columns)?)?(\?|$)/,
   /^\/metas\/\d+\/document-assets$/,
+  /^\/chats(\/|\?|$)/,
 ];
+
+/** Writes that change nothing a screen is built from, so the kept setup reads stay (the messenger writes every few seconds). */
+const KEEPS_SETUP = /^\/chats(\/|\?|$)/;
 
 /** What the toast says for a write that worked. */
 const DONE: [RegExp, string][] = [
@@ -109,7 +113,8 @@ export interface ApiOptions extends RequestInit {
 export function api<T>(path: string, { notify = true, ...options }: ApiOptions = {}): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
   if (method !== 'GET') {
-    forgetReads();
+    const forget = KEEPS_SETUP.test(path) ? () => {} : forgetReads;
+    forget();
     return send<T>(path, options)
       .then(
         (data) => {
@@ -123,7 +128,7 @@ export function api<T>(path: string, { notify = true, ...options }: ApiOptions =
           throw err;
         },
       )
-      .finally(forgetReads);
+      .finally(forget);
   }
   const key = `${tokenStore.get() ?? ''} ${currentLocale()} ${path}`;
   const known = kept.get(key) ?? pending.get(key);

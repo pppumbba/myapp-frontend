@@ -28,7 +28,7 @@ export function notificationTime(at: string): string {
  * the notifications in a dropdown: newest first, opened to follow their link, with older
  * ones loaded on request. Collapsed, only the bell shows.
  */
-export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }) {
+export function NotificationsMenu({ collapsed = false, below = false }: { collapsed?: boolean; /** In a top bar: opens downwards. */ below?: boolean }) {
   const unread = useUnreadCount();
   const [isOpen, setOpen] = useState(false);
   const count = unread > 99 ? '99+' : unread;
@@ -36,12 +36,12 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
 
   const popover = (
     <Popover
-      placement={collapsed ? 'right bottom' : 'top start'}
+      placement={below ? 'bottom end' : collapsed ? 'right bottom' : 'top start'}
       offset={6}
       className={({ isEntering, isExiting }) =>
         cx(
           'w-96 max-w-[calc(100vw-2rem)] origin-(--trigger-anchor-point) overflow-hidden rounded-xl bg-primary shadow-lg ring-1 ring-secondary_alt outline-hidden will-change-transform',
-          isEntering && 'duration-150 ease-out animate-in fade-in placement-right:slide-in-from-left-0.5 placement-top:slide-in-from-bottom-0.5',
+          isEntering && 'duration-150 ease-out animate-in fade-in placement-right:slide-in-from-left-0.5 placement-top:slide-in-from-bottom-0.5 placement-bottom:slide-in-from-top-0.5',
           isExiting && 'duration-100 ease-in animate-out fade-out',
         )
       }
@@ -55,7 +55,7 @@ export function NotificationsMenu({ collapsed = false }: { collapsed?: boolean }
   if (collapsed) {
     return (
       <DialogTrigger isOpen={isOpen} onOpenChange={setOpen}>
-        <Tooltip title={t("Notifications")} placement="right">
+        <Tooltip title={t("Notifications")} placement={below ? 'bottom' : 'right'}>
           <TooltipTrigger
             aria-label={name}
             className={cx(

@@ -158,7 +158,7 @@ function FacetList({ label, choices, value, onPick }: { label: string; choices: 
 
   return (
     <div>
-      <p className="mb-1.5 text-xs font-semibold tracking-wide text-tertiary uppercase">{label}</p>
+      <p className="mb-1.5 text-xs font-semibold text-tertiary">{label}</p>
       {choices.length === 0 ? (
         <p className="text-sm text-quaternary">{t('Nothing to pick.')}</p>
       ) : (

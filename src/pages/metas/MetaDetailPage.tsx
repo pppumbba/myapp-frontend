@@ -12,7 +12,7 @@ import { MetaFormModal } from './MetaFormModal';
 import { ChartDesigner } from './ChartDesigner';
 import { DashboardDesigner } from './DashboardDesigner';
 import { MetaActionsPanel } from './MetaActionsPanel';
-import { ExcelImportDesigner, FormSettingsPanel, GridColumnsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
+import { AppSettingsPanel, ExcelImportDesigner, FormSettingsPanel, GridColumnsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
 import { MetaParamsPanel } from './MetaParamsPanel';
 import { ProcessFlowPanel } from './ProcessFlowPanel';
 import { VersionsPanel } from './VersionsPanel';
@@ -179,6 +179,7 @@ export default function MetaDetailPage() {
               <GridColumnsPanel key={`columns-${meta.id}`} meta={meta} />
             </>
           )}
+          {meta.type?.code === 'app' && <AppSettingsPanel key={`app-settings-${meta.id}`} meta={meta} />}
           {meta.type?.code === 'form' && <FormSettingsPanel key={`form-settings-${meta.id}`} meta={meta} options={options} />}
           {meta.type?.code === 'statement' && <StatementDesigner key={`statement-${meta.id}`} meta={meta} options={options} />}
           {meta.type?.code === 'report' && <ReportDesigner key={`report-${meta.id}`} meta={meta} />}

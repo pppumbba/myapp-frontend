@@ -16,6 +16,8 @@ import { DocumentDesigner } from './DocumentDesigner';
 import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
+import { MENU_STYLES, menuStyleOf, type MenuStyle } from '../../components/AppSidebar';
+import { cx } from '@/utils/cx';
 import { t, tLabels } from '@/i18n';
 
 /*
@@ -640,6 +642,79 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
         <Field title={t("Save and add")} hint={t("Shown in dialogs opened from a grid and when editing a record. A form on its own page already starts a new record after Save.")}>
           <Toggle label={t("Show Save and add")} isSelected={saveAndAdd} onChange={setSaveAndAdd} />
         </Field>
+      </div>
+    </Panel>
+  );
+}
+
+/** A small drawing of a menu style: the menu on the left, the screen on the right. */
+function MenuStyleSketch({ style }: { style: MenuStyle }) {
+  return (
+    <div aria-hidden="true" className={cx('flex h-16 overflow-hidden rounded-md ring-1 ring-secondary', style === 'inset' ? 'bg-tertiary' : 'bg-secondary', style === 'topbar' && 'flex-col')}>
+      <div
+        className={cx(
+          style === 'topbar' ? 'flex items-center gap-1.5 border-b border-secondary bg-primary px-1.5 py-1' : 'flex w-1/3 flex-col gap-1 p-1.5',
+          style === 'classic' && 'border-r border-secondary bg-primary',
+          style === 'floating' && 'm-1 rounded-md bg-primary shadow-sm ring-1 ring-secondary',
+          style === 'dark' && 'bg-gray-900',
+        )}
+      >
+        {[0, 1, 2].map((i) => (
+          <span key={i} className={cx('h-1 rounded-full', style === 'dark' ? 'bg-gray-600' : 'bg-quaternary', style === 'topbar' ? 'w-4' : i === 0 ? 'w-3/4' : 'w-1/2')} />
+        ))}
+      </div>
+      <div className={cx('flex-1 p-1.5', style === 'inset' && 'my-1 mr-1 rounded-md bg-secondary ring-1 ring-secondary')}>
+        <span className="block h-full rounded-sm bg-primary ring-1 ring-secondary" />
+      </div>
+    </div>
+  );
+}
+
+/** An app's menu style (json_config.menu_style), saved as soon as it is picked. */
+export function AppSettingsPanel({ meta }: { meta: Meta }) {
+  const [style, setStyle] = useState<MenuStyle>(menuStyleOf(meta.json_config?.menu_style));
+  const { busy, error, run } = useSaving();
+
+  const pick = (next: MenuStyle) => {
+    const before = style;
+    setStyle(next);
+    void run(async () => {
+      try {
+        await saveConfig(meta.id, { menu_style: next === 'classic' ? null : next });
+      } catch (err) {
+        setStyle(before);
+        throw err;
+      }
+    });
+  };
+
+  return (
+    <Panel title={t('App menu')} description={t('How the menu sits beside the screens while the app is open. Phones always get the top bar and its drawer.')}>
+      {error && <div className="mb-4"><Alert>{error}</Alert></div>}
+      <div role="radiogroup" aria-label={t('Menu style')} className="grid max-w-3xl grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+        {MENU_STYLES.map((m) => {
+          const on = style === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={busy}
+              onClick={() => !on && pick(m.id)}
+              className={cx(
+                'flex flex-col gap-2 rounded-lg p-2.5 text-left outline-focus-ring transition-shadow duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait',
+                on ? 'ring-2 ring-brand' : 'ring-1 ring-secondary hover:ring-primary',
+              )}
+            >
+              <MenuStyleSketch style={m.id} />
+              <span>
+                <span className="block text-sm font-semibold text-primary">{t(m.name)}</span>
+                <span className="block text-xs text-tertiary">{t(m.hint)}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </Panel>
   );

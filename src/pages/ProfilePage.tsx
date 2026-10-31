@@ -11,6 +11,7 @@ import { Alert } from '../components/ui';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
+import { Toggle } from '@/components/base/toggle/toggle';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { cx } from '@/utils/cx';
 import { useTheme } from '../components/ThemeProvider';
@@ -41,6 +42,7 @@ export default function ProfilePage() {
       <div className="max-w-3xl space-y-5">
         <DetailsCard />
         <AppearanceCard />
+        <FormsCard />
         <LanguageCard />
         <PasswordCard />
       </div>
@@ -324,6 +326,40 @@ function AppearanceCard() {
             </div>
           )}
         </div>
+      </div>
+    </Card>
+  );
+}
+
+/** How forms behave for this user (users.preferences), saved as soon as it is switched. */
+function FormsCard() {
+  const { user, updateUser } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function set(formSavedNotice: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      updateUser(await api<User>('/user/preferences', { method: 'PUT', body: JSON.stringify({ form_saved_notice: formSavedNotice }) }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("This could not be saved."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title={t("Forms")} description={t("What a form shows after it is saved.")}>
+      <div className="space-y-3">
+        {error && <Alert>{error}</Alert>}
+        <Toggle
+          label={t("Show a saved message in the form")}
+          hint={t("A green note stays at the top of the form after each save. A short notice in the corner appears either way.")}
+          isSelected={!!user?.preferences?.form_saved_notice}
+          isDisabled={busy}
+          onChange={(v) => void set(v)}
+        />
       </div>
     </Card>
   );

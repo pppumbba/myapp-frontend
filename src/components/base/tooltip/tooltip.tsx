@@ -81,7 +81,7 @@ export const Tooltip = ({
 
                         {arrow && (
                             <AriaOverlayArrow>
-                                <svg
+                                <svg aria-hidden="true"
                                     viewBox="0 0 100 100"
                                     className="size-2.5 fill-bg-primary-solid in-placement-left:-rotate-90 in-placement-right:rotate-90 in-placement-top:rotate-0 in-placement-bottom:rotate-180"
                                 >

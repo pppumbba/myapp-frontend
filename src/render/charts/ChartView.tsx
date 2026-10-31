@@ -220,7 +220,7 @@ function CartesianChart({ data, onSelect }: { data: ChartData; onSelect?: OnSele
   return (
     <Frame chartRef={ref} label={describe(data)} legend={<Legend series={data.series} />}>
       {width > 0 && height > 0 && (
-        <svg width={width} height={height} className="block overflow-visible" onPointerLeave={() => setHover(null)}>
+        <svg aria-hidden="true" width={width} height={height} className="block overflow-visible" onPointerLeave={() => setHover(null)}>
           {ticks.map((item) => (
             <g key={item}>
               <line x1={pad.left} x2={width - pad.right} y1={y(item)} y2={y(item)} stroke={item === 0 ? AXIS : GRID} strokeOpacity={item === 0 ? 0.5 : 1} strokeWidth={1} shapeRendering="crispEdges" />
@@ -320,7 +320,7 @@ function BarChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
   return (
     <Frame chartRef={ref} label={describe(data)} legend={<Legend series={data.series} />}>
       {width > 0 && height > 0 && (
-        <svg width={width} height={height} className="block overflow-visible" onPointerLeave={() => setHover(null)}>
+        <svg aria-hidden="true" width={width} height={height} className="block overflow-visible" onPointerLeave={() => setHover(null)}>
           <line x1={x(0)} x2={x(0)} y1={0} y2={height} stroke={AXIS} strokeOpacity={0.5} shapeRendering="crispEdges" />
           {data.rows.map((r, i) => {
             const top = i * band + (band - groupH) / 2;
@@ -411,7 +411,7 @@ function PieChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
     <Frame chartRef={ref} label={describe(data)}>
       {size > 0 && (
         <div className={cx('flex h-full gap-4', side ? 'items-center' : 'flex-col items-center')}>
-          <svg width={size} height={size} className="shrink-0" onPointerLeave={() => setHover(null)}>
+          <svg aria-hidden="true" width={size} height={size} className="shrink-0" onPointerLeave={() => setHover(null)}>
             {arcs.map((a, i) => (
               <path
                 key={i}

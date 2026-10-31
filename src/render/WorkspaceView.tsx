@@ -91,7 +91,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
       ) : (
         <>
           <header className="rounded-xl bg-primary p-5 shadow-xs ring-1 ring-secondary">
-            <p className="text-xs font-medium tracking-wide text-quaternary uppercase">{noun}</p>
+            <p className="text-xs font-medium text-quaternary">{noun}</p>
             <h2 className="mt-1 text-xl font-semibold text-primary">{titleField ? String(current[titleField] ?? '') : rowLabel(current)}</h2>
             {header.length > 0 && (
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">

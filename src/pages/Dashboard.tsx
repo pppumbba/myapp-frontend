@@ -50,8 +50,6 @@ export default function Dashboard() {
   return (
     <>
       <section className="relative mb-6 overflow-hidden rounded-xl bg-brand-section px-5 py-6 text-white sm:px-7 sm:py-7">
-        <div className="absolute -top-24 -right-16 size-64 rounded-full bg-brand-500/40 blur-2xl" aria-hidden="true" />
-        <div className="absolute -bottom-28 right-40 size-48 rounded-full bg-brand-400/25 blur-2xl" aria-hidden="true" />
         <div className="relative max-w-xl">
           <h1 className="text-display-xs font-semibold">
             {greeting()}

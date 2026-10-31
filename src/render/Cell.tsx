@@ -49,7 +49,7 @@ export function formatNumber(value: unknown, decimals = 2): string {
 
 /** Shows one value the way its param describes it. */
 export function Cell({ param, value, lookup }: { param: MetaParam; value: unknown; lookup?: Map<string, string> }) {
-  if (value === null || value === undefined || value === '') return <span className="text-quaternary">—</span>;
+  if (value === null || value === undefined || value === '') return null;
 
   if (lookup) return <>{lookup.get(String(value)) ?? `#${value}`}</>;
 

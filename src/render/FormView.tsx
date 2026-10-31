@@ -236,10 +236,7 @@ export function FormView({
     } else {
       Promise.all([dataApi.get(def.meta.id, currentId), filled]).then(([row, values]) => {
         if (!live) return;
-        return start(
-          startValues(fields, { ...row, ...values }),
-          Object.fromEntries(tree.map((n) => [n.detail.field_path, startLines(n, row[n.detail.field_path])])),
-        );
+        return start(startValues(fields, { ...row, ...values }), Object.fromEntries(tree.map((n) => [n.detail.field_path, startLines(n, row[n.detail.field_path])])));
       }, fail);
     }
     return () => {
@@ -375,95 +372,100 @@ export function FormView({
   const canAdd = config.save_and_add !== false && (embedded || !!currentId);
 
   const form = (
-    <form onSubmit={onSubmit} className="space-y-5 animate-in fade-in duration-200 motion-reduce:animate-none">
-      {error && <Alert>{error}</Alert>}
-      {notes.length > 0 && (
-        <div role="status" className="space-y-1 rounded-xl bg-secondary p-4 text-sm text-secondary ring-1 ring-secondary ring-inset">
-          {notes.map((n, i) => (
-            <p key={i}>{n}</p>
+    // In a modal only .modal-scroll scrolls, so the scrollbar stops above the buttons (index.css).
+    <form onSubmit={onSubmit} className="modal-split space-y-5 animate-in fade-in duration-200 motion-reduce:animate-none">
+      <div className="modal-scroll space-y-5">
+        {error && <Alert>{error}</Alert>}
+        {notes.length > 0 && (
+          <div role="status" className="space-y-1 rounded-xl bg-secondary p-4 text-sm text-secondary ring-1 ring-secondary ring-inset">
+            {notes.map((n, i) => (
+              <p key={i}>{n}</p>
+            ))}
+          </div>
+        )}
+        {saved && user?.preferences?.form_saved_notice && (
+          <div role="status" className="flex gap-3 rounded-xl bg-success-primary p-4 ring-1 ring-success-secondary ring-inset">
+            <CheckCircle className="size-5 shrink-0 text-fg-success-primary" aria-hidden="true" />
+            <div className="text-sm text-success-primary">
+              <p className="font-medium">{t('Saved. You can add another one.')}</p>
+              {alsoSaved.length > 0 && <p>{t('Also saved: {records}.', { records: alsoSaved.map((r) => (r.id ? `${r.process} #${r.id}` : r.process)).join(', ') })}</p>}
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+          {fields
+            .filter((f) => !hidden.has(f.field_path))
+            .map((f) => {
+              const auto = autonumberOf(f);
+              const next = recordId ? undefined : nextNumbers[f.field_path];
+              const readOnly = locked.has(f.field_path);
+              return (
+                <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
+                  {f.data_type === 'document' ? (
+                    <DocumentCard param={f} value={values[f.field_path]} onOpen={() => setEditing(f)} />
+                  ) : auto && !auto.editable ? (
+                    <Input
+                      label={f.label_name || f.param_name}
+                      value={recordId ? String(values[f.field_path] ?? '') : (next ?? '…')}
+                      isReadOnly
+                      isInvalid={!!fe(f.field_path)}
+                      hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
+                      wrapperClassName="bg-secondary shadow-none"
+                      inputClassName="tabular-nums"
+                    />
+                  ) : totals.has(f.field_path) ? (
+                    <Input
+                      label={f.label_name || f.param_name}
+                      value={formatNumber(totals.get(f.field_path))}
+                      isReadOnly
+                      hint={t('Worked out from the lines below.')}
+                      wrapperClassName="bg-secondary shadow-none"
+                      inputClassName="font-semibold tabular-nums"
+                    />
+                  ) : readOnly && isNumber(f) ? (
+                    // A number a script works out, shown like a total.
+                    <Input
+                      label={f.label_name || f.param_name}
+                      value={values[f.field_path] === '' ? '' : formatNumber(Number(values[f.field_path]))}
+                      isReadOnly
+                      isInvalid={!!fe(f.field_path)}
+                      hint={fe(f.field_path)}
+                      wrapperClassName="bg-secondary shadow-none"
+                      inputClassName="font-semibold tabular-nums"
+                    />
+                  ) : readOnly ? (
+                    <fieldset disabled className="contents">
+                      <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={() => {}} />
+                    </fieldset>
+                  ) : (
+                    <Field
+                      param={f}
+                      value={values[f.field_path]}
+                      error={fe(f.field_path)}
+                      hint={auto && next ? t('Leave blank for {next}.', { next }) : undefined}
+                      optional={!!auto && !recordId}
+                      onChange={(v, fill) => set(f.field_path, v, fill)}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          {shown.problems.map((p) => (
+            <div key={p} className="sm:col-span-2">
+              <Alert>{p}</Alert>
+            </div>
+          ))}
+          {shown.nodes.map((n) => (
+            <DetailSection
+              key={n.detail.field_path}
+              node={n}
+              lines={lines[n.detail.field_path] ?? []}
+              errors={fieldErrors}
+              onChange={(next) => setDetail(n.detail.field_path, next)}
+            />
           ))}
         </div>
-      )}
-      {saved && (
-        <div role="status" className="flex gap-3 rounded-xl bg-success-primary p-4 ring-1 ring-success-secondary ring-inset">
-          <CheckCircle className="size-5 shrink-0 text-fg-success-primary" aria-hidden="true" />
-          <div className="text-sm text-success-primary">
-            <p className="font-medium">{t('Saved. You can add another one.')}</p>
-            {alsoSaved.length > 0 && <p>{t('Also saved: {records}.', { records: alsoSaved.map((r) => (r.id ? `${r.process} #${r.id}` : r.process)).join(', ') })}</p>}
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
-        {fields.filter((f) => !hidden.has(f.field_path)).map((f) => {
-          const auto = autonumberOf(f);
-          const next = recordId ? undefined : nextNumbers[f.field_path];
-          const readOnly = locked.has(f.field_path);
-          return (
-          <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
-            {f.data_type === 'document' ? (
-              <DocumentCard param={f} value={values[f.field_path]} onOpen={() => setEditing(f)} />
-            ) : auto && !auto.editable ? (
-              <Input
-                label={f.label_name || f.param_name}
-                value={recordId ? String(values[f.field_path] ?? '') : (next ?? '…')}
-                isReadOnly
-                isInvalid={!!fe(f.field_path)}
-                hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
-                wrapperClassName="bg-secondary shadow-none"
-                inputClassName="tabular-nums"
-              />
-            ) : totals.has(f.field_path) ? (
-              <Input
-                label={f.label_name || f.param_name}
-                value={formatNumber(totals.get(f.field_path))}
-                isReadOnly
-                hint={t('Worked out from the lines below.')}
-                wrapperClassName="bg-secondary shadow-none"
-                inputClassName="font-semibold tabular-nums"
-              />
-            ) : readOnly && isNumber(f) ? (
-              // A number a script works out, shown like a total.
-              <Input
-                label={f.label_name || f.param_name}
-                value={values[f.field_path] === '' ? '' : formatNumber(Number(values[f.field_path]))}
-                isReadOnly
-                isInvalid={!!fe(f.field_path)}
-                hint={fe(f.field_path)}
-                wrapperClassName="bg-secondary shadow-none"
-                inputClassName="font-semibold tabular-nums"
-              />
-            ) : readOnly ? (
-              <fieldset disabled className="contents">
-                <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={() => {}} />
-              </fieldset>
-            ) : (
-              <Field
-                param={f}
-                value={values[f.field_path]}
-                error={fe(f.field_path)}
-                hint={auto && next ? t('Leave blank for {next}.', { next }) : undefined}
-                optional={!!auto && !recordId}
-                onChange={(v, fill) => set(f.field_path, v, fill)}
-              />
-            )}
-          </div>
-          );
-        })}
-        {shown.problems.map((p) => (
-          <div key={p} className="sm:col-span-2">
-            <Alert>{p}</Alert>
-          </div>
-        ))}
-        {shown.nodes.map((n) => (
-          <DetailSection
-            key={n.detail.field_path}
-            node={n}
-            lines={lines[n.detail.field_path] ?? []}
-            errors={fieldErrors}
-            onChange={(next) => setDetail(n.detail.field_path, next)}
-          />
-        ))}
       </div>
 
       <div className="modal-footer flex justify-end gap-2 border-t border-secondary pt-4">
@@ -491,9 +493,7 @@ export function FormView({
           {saving ? t('Saving…') : currentId ? t('Save changes') : t('Save')}
         </Button>
       </div>
-      {showHistory && currentId && def && (
-        <RecordHistory metaId={def.meta.id} recordId={currentId} params={def.params} tree={tree ?? []} onClose={() => setShowHistory(false)} />
-      )}
+      {showHistory && currentId && def && <RecordHistory metaId={def.meta.id} recordId={currentId} params={def.params} tree={tree ?? []} onClose={() => setShowHistory(false)} />}
       {editing && (
         <DocumentEditor
           formMetaId={def.meta.id}
@@ -509,9 +509,7 @@ export function FormView({
             return !NOT_ON_PAGE.includes(f.data_type) && !hidden.has(f.field_path) && !locked.has(f.field_path) && !totals.has(f.field_path) && !(auto && !auto.editable);
           }}
           onValue={(field, v) => set(field, v)}
-          renderField={(f) => (
-            <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={(v, fill) => set(f.field_path, v, fill)} />
-          )}
+          renderField={(f) => <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={(v, fill) => set(f.field_path, v, fill)} />}
           renderLines={(detail) => {
             const n = shown.nodes.find((x) => x.detail.field_path === detail);
             return n ? <DetailSection node={n} lines={lines[detail] ?? []} errors={fieldErrors} onChange={(next) => setDetail(detail, next)} /> : null;
@@ -540,7 +538,8 @@ export function FormView({
   if (embedded) return form;
 
   return (
-    <div className={`${details.some((d) => !isOneToOne(d)) ? 'max-w-6xl' : 'max-w-3xl'} rounded-xl bg-primary shadow-xs ring-1 ring-secondary`}>
+    // Opened from an app's menu, the form sits in the middle of the page.
+    <div className={`${details.some((d) => !isOneToOne(d)) ? 'max-w-6xl' : 'max-w-3xl'} ${appMetaId ? 'mx-auto' : ''} rounded-xl bg-primary shadow-xs ring-1 ring-secondary`}>
       <div className="border-b border-secondary px-4 py-4 sm:px-5">
         <h2 className="text-lg font-semibold text-primary">{title(def.meta)}</h2>
         {def.meta.description && <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>}
@@ -596,12 +595,7 @@ function Field({
     return <TextArea {...common} rows={3} value={String(value)} onChange={onChange} />;
   }
 
-  const type =
-    f.data_type === 'integer' || f.data_type === 'decimal'
-          ? 'number'
-          : f.render_type === 'email'
-            ? 'email'
-            : 'text';
+  const type = f.data_type === 'integer' || f.data_type === 'decimal' ? 'number' : f.render_type === 'email' ? 'email' : 'text';
 
   return <Input {...common} type={type} value={String(value)} onChange={onChange} />;
 }

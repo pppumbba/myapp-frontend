@@ -384,7 +384,7 @@ export function DocumentDesigner({ meta }: { meta: Meta }) {
         {/* Left: things to add, the record's fields, and the sections down the page. */}
         <aside className="space-y-5 border-b border-secondary p-3 lg:border-r lg:border-b-0">
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-tertiary uppercase">{t("Add")}</h3>
+            <h3 className="mb-1.5 text-xs font-semibold text-tertiary">{t("Add")}</h3>
             <div className="grid grid-cols-2 gap-1.5">
               {PALETTE.map((p) => (
                 <button
@@ -403,7 +403,7 @@ export function DocumentDesigner({ meta }: { meta: Meta }) {
             </div>
           </div>
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-tertiary uppercase">{t("Fields")}</h3>
+            <h3 className="mb-1.5 text-xs font-semibold text-tertiary">{t("Fields")}</h3>
             <ul className="max-h-56 space-y-0.5 overflow-y-auto">
               {fields.map((f) => (
                 <li key={f.path}>
@@ -422,7 +422,7 @@ export function DocumentDesigner({ meta }: { meta: Meta }) {
             </ul>
           </div>
           <div>
-            <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-tertiary uppercase">{t("Page")}</h3>
+            <h3 className="mb-1.5 text-xs font-semibold text-tertiary">{t("Page")}</h3>
             <ul className="space-y-0.5 text-xs">
               <OutlineItem icon={LayoutTop} label={t('Header · {height} mm', { height: layout.header.height })} active={selection?.band === 'header' && !selection.element} onClick={() => setSelection({ band: 'header' })} />
               {layout.sections.map((x, i) => (
@@ -448,7 +448,7 @@ export function DocumentDesigner({ meta }: { meta: Meta }) {
 
         {/* The page. */}
         <div className="overflow-auto bg-secondary p-4 sm:p-6" onPointerDown={(e) => e.target === e.currentTarget && setSelection(null)}>
-          <div className="mx-auto bg-white text-[#101828] shadow-lg ring-1 ring-black/5" style={paper} onPointerDown={(e) => e.target === e.currentTarget && setSelection(null)}>
+          <div className="mx-auto bg-white text-(--color-doc-ink) shadow-lg ring-1 ring-black/5" style={paper} onPointerDown={(e) => e.target === e.currentTarget && setSelection(null)}>
             <FreeBand ctx={context} bandKey="header" band={layout.header} label={t("Header · every page")} chrome />
             {layout.sections.map((x) =>
               x.kind === 'free' ? (
@@ -623,8 +623,8 @@ function FreeBand({ ctx, bandKey, band, label, chrome }: { ctx: Ctx; bandKey: Ba
         className={cx('relative', hidden ? 'h-2' : '', chrome && 'bg-gray-50/60')}
         style={{
           height: hidden ? undefined : band.height * s,
-          outline: active ? '1.5px solid #7f56d9' : over ? '1.5px dashed #7f56d9' : '1px dashed #d0d5dd',
-          backgroundImage: active || over ? `radial-gradient(circle, #d0d5dd 0.6px, transparent 0.6px)` : undefined,
+          outline: active ? '1.5px solid var(--color-doc-mark)' : over ? '1.5px dashed var(--color-doc-mark)' : '1px dashed var(--color-doc-guide)',
+          backgroundImage: active || over ? `radial-gradient(circle, var(--color-doc-guide) 0.6px, transparent 0.6px)` : undefined,
           backgroundSize: `${s * 5}px ${s * 5}px`,
         }}
       >
@@ -639,7 +639,7 @@ function FreeBand({ ctx, bandKey, band, label, chrome }: { ctx: Ctx; bandKey: Ba
         onPointerDown={resizeBand}
         className="absolute inset-x-0 -bottom-1 z-10 h-2 cursor-row-resize opacity-0 group-hover/band:opacity-100"
       >
-        <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-[#7f56d9]" />
+        <div className="mx-auto mt-0.5 h-1 w-10 rounded-full bg-(--color-doc-mark)" />
       </div>
     </div>
   );
@@ -677,7 +677,7 @@ function PlacedElement({ el, ctx, bandKey, selected }: { el: DocElement; ctx: Ct
     background: el.type === 'line' ? st.border_color : st.bg || undefined,
     border: el.type !== 'line' && st.border ? `${st.border * PT * s}px solid ${st.border_color}` : undefined,
     padding: st.padding * s,
-    outline: selected ? '1.5px solid #7f56d9' : undefined,
+    outline: selected ? '1.5px solid var(--color-doc-mark)' : undefined,
     outlineOffset: 1,
   };
   if (el.type === 'line' && el.h > el.w) {
@@ -688,7 +688,7 @@ function PlacedElement({ el, ctx, bandKey, selected }: { el: DocElement; ctx: Ct
   const placeholders = (text: string) =>
     text.split(/(\{[A-Za-z0-9_.]+(?:\|[a-z]+)?\})/).map((part, i) =>
       /^\{.+\}$/.test(part) ? (
-        <span key={i} className="rounded-sm bg-[#f4ebff] text-[#6941c6]">
+        <span key={i} className="rounded-sm bg-(--color-doc-mark-soft) text-(--color-doc-mark-ink)">
           {part}
         </span>
       ) : (
@@ -701,8 +701,8 @@ function PlacedElement({ el, ctx, bandKey, selected }: { el: DocElement; ctx: Ct
   else if (el.type === 'field')
     content = (
       <span className="whitespace-pre-wrap">
-        {el.label && <span className="font-normal text-[#667085]">{el.label} </span>}
-        <span className="text-[#6941c6]">[{el.field ? fieldLabel(el.field) : t("choose a field")}]</span>
+        {el.label && <span className="font-normal text-(--color-doc-muted)">{el.label} </span>}
+        <span className="text-(--color-doc-mark-ink)">[{el.field ? fieldLabel(el.field) : t("choose a field")}]</span>
       </span>
     );
   else if (el.type === 'page') content = el.text.replace('{page}', '1').replace('{pages}', '2');
@@ -717,8 +717,8 @@ function PlacedElement({ el, ctx, bandKey, selected }: { el: DocElement; ctx: Ct
       <div className="relative size-full">
         <span className="absolute top-[35%] left-0 w-[40%] whitespace-pre-wrap">{placeholders(el.label)}</span>
         {img && <img src={img} alt="" className="absolute top-0 left-[45%] h-[70%] w-[30%] object-contain" draggable={false} />}
-        <span className="absolute top-[62%] right-0 left-[42%] border-t border-[#344054]" />
-        <span className="absolute top-[66%] right-0 left-[42%] text-center text-[0.85em] text-[#475467]">{placeholders(el.text) || ' '}</span>
+        <span className="absolute top-[62%] right-0 left-[42%] border-t border-(--color-doc-rule)" />
+        <span className="absolute top-[66%] right-0 left-[42%] text-center text-[0.85em] text-(--color-doc-label)">{placeholders(el.text) || ' '}</span>
       </div>
     );
 
@@ -730,7 +730,7 @@ function PlacedElement({ el, ctx, bandKey, selected }: { el: DocElement; ctx: Ct
           role="separator"
           aria-label={t("Drag to resize")}
           onPointerDown={startResize}
-          className="absolute right-0 bottom-0 size-2.5 cursor-nwse-resize rounded-sm bg-[#7f56d9] ring-1 ring-white"
+          className="absolute right-0 bottom-0 size-2.5 cursor-nwse-resize rounded-sm bg-(--color-doc-mark) ring-1 ring-white"
         />
       )}
     </div>
@@ -741,13 +741,13 @@ function TablePreview({ section, ctx }: { section: Extract<Section, { kind: 'tab
   const { selection, setSelection, s, page } = ctx;
   const active = selection?.band === section.id && !selection.element;
   const total = section.columns.reduce((a, c) => a + c.width, 0) || 1;
-  const cell = section.border ? 'border border-[#98a2b3]' : 'border-b border-[#d0d5dd]';
+  const cell = section.border ? 'border border-(--color-doc-border)' : 'border-b border-(--color-doc-guide)';
   const pad = { padding: `${1.2 * s}px ${1.5 * s}px` };
   return (
     <div
       onPointerDown={() => setSelection({ band: section.id })}
       className="cursor-pointer"
-      style={{ outline: active ? '1.5px solid #7f56d9' : '1px dashed transparent', fontSize: section.font_size ? section.font_size * PT * s : undefined }}
+      style={{ outline: active ? '1.5px solid var(--color-doc-mark)' : '1px dashed transparent', fontSize: section.font_size ? section.font_size * PT * s : undefined }}
     >
       <table className="w-full border-collapse">
         <thead>
@@ -773,7 +773,7 @@ function TablePreview({ section, ctx }: { section: Extract<Section, { kind: 'tab
                 </td>
               )}
               {section.columns.map((c) => (
-                <td key={c.id} className={cx(cell, 'text-[#6941c6]')} style={{ ...pad, textAlign: c.align }}>
+                <td key={c.id} className={cx(cell, 'text-(--color-doc-mark-ink)')} style={{ ...pad, textAlign: c.align }}>
                   [{c.field}]
                 </td>
               ))}
@@ -804,13 +804,13 @@ function TextPreview({ section, ctx }: { section: Extract<Section, { kind: 'text
     <div
       onPointerDown={() => setSelection({ band: section.id })}
       className="cursor-pointer"
-      style={{ marginTop: section.space_before * s, textAlign: section.align, fontSize: section.font_size ? section.font_size * PT * s : undefined, outline: active ? '1.5px solid #7f56d9' : '1px dashed #e4e7ec' }}
+      style={{ marginTop: section.space_before * s, textAlign: section.align, fontSize: section.font_size ? section.font_size * PT * s : undefined, outline: active ? '1.5px solid var(--color-doc-mark)' : '1px dashed var(--color-doc-guide-soft)' }}
     >
       {section.text.split(/\n\s*\n/).map((p, i) => (
         <p key={i} className="whitespace-pre-wrap" style={{ marginBottom: 1.5 * s }}>
           {p.split(/(\{[A-Za-z0-9_.]+(?:\|[a-z]+)?\})/).map((part, j) =>
             /^\{.+\}$/.test(part) ? (
-              <span key={j} className="rounded-sm bg-[#f4ebff] text-[#6941c6]">
+              <span key={j} className="rounded-sm bg-(--color-doc-mark-soft) text-(--color-doc-mark-ink)">
                 {part}
               </span>
             ) : (
@@ -1160,7 +1160,7 @@ function Group({ title, actions, children }: { title: string; actions?: ReactNod
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold tracking-wide text-tertiary uppercase">{title}</h3>
+        <h3 className="text-xs font-semibold text-tertiary">{title}</h3>
         {actions && <div className="flex gap-0.5">{actions}</div>}
       </div>
       {children}
