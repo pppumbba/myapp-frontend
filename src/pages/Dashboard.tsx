@@ -76,7 +76,7 @@ export default function Dashboard() {
               {t("See all apps")}
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {apps.slice(0, 6).map((a, i) => (
               <AppTile key={a.id} app={a} index={i} />
             ))}

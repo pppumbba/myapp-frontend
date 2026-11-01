@@ -81,13 +81,13 @@ export default function AppsPage() {
       )}
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("Loading apps")}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("Loading apps")}>
           {Array.from({ length: 3 }, (_, i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
           ))}
         </div>
       ) : visible.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((a) => (
             <AppTile key={a.id} app={a} index={apps.indexOf(a)} showEdit={isAdmin} />
           ))}

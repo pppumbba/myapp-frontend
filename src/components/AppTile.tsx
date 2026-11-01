@@ -23,8 +23,8 @@ export function AppTile({ app, index, showEdit = false }: { app: Meta; index: nu
         {name.charAt(0).toUpperCase()}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-primary">{name}</p>
-        <p className="truncate text-xs text-tertiary">{app.description || (items === 1 ? t('1 menu item') : t('{count} menu items', { count: items }))}</p>
+        <p className="text-sm font-semibold break-words text-primary sm:truncate">{name}</p>
+        <p className="line-clamp-2 text-xs text-tertiary sm:line-clamp-1">{app.description || (items === 1 ? t('1 menu item') : t('{count} menu items', { count: items }))}</p>
       </div>
       {showEdit && <IconAction icon={Edit01} label={t('Edit {name} in the builder', { name })} onPress={() => navigate(`/metas/${app.id}`)} />}
       <Button color="secondary" size="sm" iconTrailing={ArrowRight} onPress={() => navigate(`/run/${app.id}`)}>
