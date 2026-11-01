@@ -5,7 +5,6 @@ import { metaApi, type Meta, type MetaOption, type MetaType } from '../lib/metaA
 import { AppTile } from '../components/AppTile';
 import { Plus } from '@untitledui/icons';
 import { Button } from '@/components/base/buttons/button';
-import { TypePreview, typeLook } from '../components/TypePreview';
 import { MetaCard } from './metas/MetaCard';
 import { MetaFormModal } from './metas/MetaFormModal';
 import { t } from '@/i18n';
@@ -58,7 +57,7 @@ export default function Dashboard() {
           <p className="mt-1.5 text-md text-brand-200">
             {loaded && metas.length > 0
               ? t('You have {apps} apps and {metas} metas in total.', { apps: apps.length, metas: metas.length })
-              : t("Pick a building block below to start your first app.")}
+              : t("You have no apps yet.")}
           </p>
         </div>
       </section>
@@ -82,40 +81,6 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
-      )}
-
-      {isAdmin && (
-      <section className="mb-7" aria-labelledby="start-heading">
-        <h2 id="start-heading" className="text-md font-semibold text-primary">
-          {t("Create something new")}
-        </h2>
-        <p className="mb-3 text-sm text-tertiary">{t("Each one becomes a screen you can link from an app’s menu.")}</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          {(types.length ? types : []).map((item) => {
-            const look = typeLook(item.code);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setCreatingType(item.id)}
-                className="rounded-xl bg-primary p-2.5 text-left shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset outline-focus-ring hover:shadow-md hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2"
-              >
-                <div className="rounded-lg p-2" style={{ background: look.tint }}>
-                  <TypePreview code={item.code} className="h-11 w-full" />
-                </div>
-                <span className="mt-2 block px-0.5 text-sm font-semibold text-primary">{item.name}</span>
-                {item.description && <span className="mt-0.5 block px-0.5 text-xs text-tertiary line-clamp-2">{item.description}</span>}
-              </button>
-            );
-          })}
-        </div>
-        {loaded && types.length === 0 && (
-          <p className="rounded-xl bg-primary px-5 py-4 text-sm text-tertiary ring-1 ring-secondary ring-inset">
-            {t("No meta types yet. Add app, datagrid, form, calendar and tabs to the meta_types table, then reload.")}
-          </p>
-        )}
-      </section>
-
       )}
 
       {isAdmin && recent.length > 0 && (
