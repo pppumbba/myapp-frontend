@@ -16,7 +16,13 @@ export interface Tag {
   metas_count?: number;
 }
 
-export const TAG_COLORS = ['gray', 'brand', 'blue', 'indigo', 'purple', 'pink', 'orange', 'warning', 'success', 'error'] as const;
+/** How a grid can show its records as widgets (json_config.view), and where a column sits on one. */
+export const RECORD_LOOKS = ['cards', 'inline', 'tiles'] as const;
+export type RecordLook = (typeof RECORD_LOOKS)[number];
+export const RECORD_SLOTS = ['image', 'title', 'subtitle', 'badge', 'body', 'footer'] as const;
+export type RecordSlot = (typeof RECORD_SLOTS)[number];
+
+export const TAG_COLORS =['gray', 'brand', 'blue', 'indigo', 'purple', 'pink', 'orange', 'warning', 'success', 'error'] as const;
 export type TagColor = (typeof TAG_COLORS)[number];
 
 export interface MetaRef {
@@ -101,6 +107,8 @@ export interface MetaParam {
   is_label: boolean;
   /** Holds the id of the record's parent in the same table: a grid shows its records as a tree. */
   is_parent?: boolean;
+  /** Where this field sits when the grid shows its records as widgets. */
+  widget_position?: RecordSlot | null;
   /** A lookup: the looked-up record's field it shows (empty: that meta's is_label field, else name). */
   display_field: string | null;
   /** A lookup: the looked-up record's field it stores (empty: id). */

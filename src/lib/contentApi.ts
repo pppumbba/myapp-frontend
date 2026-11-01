@@ -73,5 +73,13 @@ export const contentApi = {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
+  /** A picture for an <img>, which can't send the token itself. The caller revokes the address. */
+  pictureUrl: async (id: number) => {
+    const token = tokenStore.get();
+    const res = await fetch(`${BASE_URL}/contents/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, t('The file could not be opened.'));
+    return URL.createObjectURL(await res.blob());
+  },
+
   download: (file: FileInfo) => downloadFile(`/contents/${file.id}?download=1`, file.file_name),
 };

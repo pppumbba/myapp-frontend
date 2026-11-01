@@ -37,7 +37,7 @@ export function Logo() {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark />
-      <span className="text-md font-semibold text-primary">Wand</span>
+      <span className="text-md font-semibold text-primary">Wand Studio</span>
     </span>
   );
 }

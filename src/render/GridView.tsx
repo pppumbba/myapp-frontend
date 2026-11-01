@@ -33,7 +33,7 @@ import { useAuth } from "../auth/AuthContext";
 import type { Ability } from "../lib/accessApi";
 import { ApiError } from "../lib/api";
 import { dataApi, type DataRow, type Page } from "../lib/dataApi";
-import type { MetaAction, MetaParam } from "../lib/metaApi";
+import { RECORD_LOOKS, type MetaAction, type MetaParam } from "../lib/metaApi";
 import { Alert, IconAction } from "../components/ui";
 import { useFillHeight } from "./useFillHeight";
 import { ContextMenu, pointOf, type MenuEntry, type MenuPoint } from "../components/ContextMenu";
@@ -48,6 +48,7 @@ import { Input } from "@/components/base/input/input";
 import { ColumnValue, formatNumber } from "./Cell";
 import { cx } from "@/utils/cx";
 import { FormView } from "./FormView";
+import { GridCards } from "./GridCards";
 import { GridFilters, type Filters } from "./GridFilters";
 import { GridSidebar } from "./GridSidebar";
 import { ImportView } from "./ImportView";
@@ -233,6 +234,8 @@ const abilityOf: Record<MetaAction["action"], Ability> = {
  * A nested subgrid (json_config.display "nested") opens instead under each row's expand arrow.
  * The grid's json_config.row_numbers adds a # column, and frozen_columns keeps that many
  * columns (with # and the arrow) in view when the table scrolls sideways.
+ * json_config.view "cards", "inline" or "tiles" shows the records as those widgets instead
+ * (GridCards), except for tree grids and grids with nested subgrids, which need the table's rows.
  *
  * fixed: filter values set from outside, e.g. a subgrid's parameters from the parent row.
  * scope: exact values every row has and every new record gets, e.g. a workspace's tender_id;
@@ -290,6 +293,7 @@ export function GridView({
   const nested = useMemo(() => subgrids.filter(isNestedSubgrid), [subgrids]);
   // The field holding each record's parent (is_parent): the records show as a tree.
   const parentParam = useMemo(() => params.find((p) => p.is_parent), [params]);
+  const cards = !parentParam && !nested.length ? RECORD_LOOKS.find((look) => look === meta.json_config?.view) : undefined;
   const rowNumbers = meta.json_config?.row_numbers === true;
   // The arrow and # columns come first and freeze with the frozen data columns.
   const lead = (nested.length ? 1 : 0) + (rowNumbers ? 1 : 0);
@@ -678,10 +682,102 @@ export function GridView({
     ];
   }
 
+  // The column that names a record (is_label), else the first: which may be a card's picture.
+  const nameColumn = columns.find((c) => c.is_label) ?? columns[0];
   const rowName = (row?: DataRow) =>
-    row && columns[0] && !columns[0].is_select
-      ? String(row[columns[0].field_path] ?? "")
+    row && nameColumn && !nameColumn.is_select
+      ? String(row[nameColumn.field_path] ?? "")
       : "";
+
+  const emptyState = (
+    <div className="px-6 py-10 text-center">
+      {missing.length ? (
+        <>
+          <p className="text-sm font-semibold text-primary">
+            {t("Fill in the required filters")}
+          </p>
+          <p className="mt-1 text-sm text-tertiary">{t('{fields} needed before records show.', { fields: missing.join(', ') })}</p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold text-primary">
+            {result
+              ? search || activeFilters
+                ? t("No matches")
+                : t("Nothing here yet")
+              : t("Loading…")}
+          </p>
+          {result && (
+            <p className="mt-1 text-sm text-tertiary">
+              {search || activeFilters
+                ? t("Try other filters.")
+                : t("Records will show up here.")}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  /** A column's value in a row: its workflow status, a link when it drills down, or plain. */
+  const cellValue = (c: MetaParam, row: DataRow) =>
+    workflow && c.field_path === "status_id" ? (
+      <StatusBadge status={statuses.get(Number(row.status_id))} />
+    ) : drill && drilldownOf(c.json_config) ? (
+      <AriaButton
+        onPress={() => {
+          const d = drilldownOf(c.json_config)!;
+          drill({
+            metaId: d.meta_id,
+            params: drillParams(d, row),
+            drawer: d.open_in === "drawer",
+            label: rowName(row) || title(meta),
+          });
+        }}
+        className="rounded text-left font-medium text-brand-secondary underline-offset-2 outline-focus-ring hover:underline focus-visible:outline-2"
+      >
+        <ColumnValue param={c} value={row[c.field_path]} />
+      </AriaButton>
+    ) : (
+      <ColumnValue param={c} value={row[c.field_path]} />
+    );
+
+  /** A row's own buttons. */
+  const rowButtons = (row: DataRow) => (
+    <div className="flex justify-end gap-0.5">
+      {rowDrill && (
+        <IconAction
+          icon={ArrowUpRight}
+          label={rowDrill.label || t("Open")}
+          onPress={() =>
+            drill!({
+              metaId: rowDrill.meta_id,
+              params: drillParams(rowDrill, row),
+              drawer: rowDrill.open_in === "drawer",
+              label: rowName(row) || title(meta),
+            })
+          }
+        />
+      )}
+      {rowActions.map((a) => (
+        <IconAction
+          key={a.id}
+          icon={iconOf(a)}
+          danger={a.action === "delete"}
+          label={a.label}
+          onPress={() => run(a, row)}
+        />
+      ))}
+    </div>
+  );
+
+  /** A column's footer value: only the value, no label, whatever the total is. */
+  const footerValue = (c: MetaParam) => {
+    const agg = aggregateOf(c);
+    const value = result?.footer?.[c.field_path];
+    if (!agg || value == null) return null;
+    return agg === "count" ? formatNumber(Number(value)) : <ColumnValue param={c} value={value} />;
+  };
 
   return (
     <>
@@ -851,6 +947,49 @@ export function GridView({
               setMenu({ at: pointOf(e) });
             }}
           >
+            {cards ? (
+            <GridCards
+              look={cards}
+              label={title(meta)}
+              columns={columns}
+              records={records}
+              rowKey={key}
+              loading={!result && !error}
+              dimmed={slow && !!result}
+              selected={selected}
+              onSelect={setSelected}
+              onOpen={editAction ? (row) => run(editAction, row) : undefined}
+              onMenu={(e, row) => {
+                if ((e.target as HTMLElement).closest("input,textarea")) return;
+                e.preventDefault();
+                setSelected(String(row[key]));
+                setMenu({
+                  at: pointOf(e),
+                  row,
+                  field: (e.target as HTMLElement).closest<HTMLElement>("[data-field]")?.dataset.field,
+                });
+              }}
+              labelOf={(c) => (c === statusColumn ? t("Status") : c.label_name || c.param_name)}
+              renderValue={cellValue}
+              renderActions={(row) => (rowActions.length || rowDrill ? rowButtons(row) : null)}
+              empty={emptyState}
+              footer={
+                hasFooter ? (
+                  <dl className="flex flex-wrap gap-x-6 gap-y-1 border-t border-secondary bg-secondary px-4 py-2 text-sm">
+                    {columns.filter(aggregateOf).map((c) => (
+                      <div key={c.field_path} className="flex gap-2">
+                        <dt className="text-tertiary">{c.label_name || c.param_name}</dt>
+                        <dd className="font-semibold text-primary tabular-nums">{footerValue(c)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : undefined
+              }
+              sort={sort}
+              onSort={setSort}
+              style={scrollStyle}
+            />
+            ) : (
             <Table
               aria-label={title(meta)}
               scrollStyle={scrollStyle}
@@ -946,35 +1085,7 @@ export function GridView({
                   viewWidth,
                   result?.footer,
                 ]}
-                renderEmptyState={() => (
-                  <div className="px-6 py-10 text-center">
-                    {missing.length ? (
-                      <>
-                        <p className="text-sm font-semibold text-primary">
-                          {t("Fill in the required filters")}
-                        </p>
-                        <p className="mt-1 text-sm text-tertiary">{t('{fields} needed before records show.', { fields: missing.join(', ') })}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-semibold text-primary">
-                          {result
-                            ? search || activeFilters
-                              ? t("No matches")
-                              : t("Nothing here yet")
-                            : t("Loading…")}
-                        </p>
-                        {result && (
-                          <p className="mt-1 text-sm text-tertiary">
-                            {search || activeFilters
-                              ? t("Try other filters.")
-                              : t("Records will show up here.")}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+                renderEmptyState={() => emptyState}
               >
                 {(row) =>
                   row._skeleton ? (
@@ -1005,28 +1116,19 @@ export function GridView({
                             className={footerCell(i)}
                           />
                         )),
-                        ...columns.map((c, i) => {
-                          const agg = aggregateOf(c);
-                          const value = result?.footer?.[c.field_path];
-                          return (
-                            <Table.Cell
-                              key={c.field_path}
-                              style={freeze(lead + i, true).style}
-                              className={cx(
-                                footerCell(lead + i),
-                                "whitespace-nowrap",
-                                isNumber(c) ? "text-right tabular-nums" : "",
-                              )}
-                            >
-                              {/* Only the value: no label, whatever the total is. */}
-                              {!agg || value == null ? null : agg === "count" ? (
-                                formatNumber(Number(value))
-                              ) : (
-                                <ColumnValue param={c} value={value} />
-                              )}
-                            </Table.Cell>
-                          );
-                        }),
+                        ...columns.map((c, i) => (
+                          <Table.Cell
+                            key={c.field_path}
+                            style={freeze(lead + i, true).style}
+                            className={cx(
+                              footerCell(lead + i),
+                              "whitespace-nowrap",
+                              isNumber(c) ? "text-right tabular-nums" : "",
+                            )}
+                          >
+                            {footerValue(c)}
+                          </Table.Cell>
+                        )),
                         ...(rowActions.length || rowDrill
                           ? [
                               <Table.Cell
@@ -1126,64 +1228,13 @@ export function GridView({
                                 onToggle={() => toggleNode(row._key)}
                               />
                             )}
-                            {workflow && c.field_path === "status_id" ? (
-                              <StatusBadge
-                                status={statuses.get(Number(row.status_id))}
-                              />
-                            ) : drill && drilldownOf(c.json_config) ? (
-                              <AriaButton
-                                onPress={() => {
-                                  const d = drilldownOf(c.json_config)!;
-                                  drill({
-                                    metaId: d.meta_id,
-                                    params: drillParams(d, row),
-                                    drawer: d.open_in === "drawer",
-                                    label: rowName(row) || title(meta),
-                                  });
-                                }}
-                                className="rounded text-left font-medium text-brand-secondary underline-offset-2 outline-focus-ring hover:underline focus-visible:outline-2"
-                              >
-                                <ColumnValue
-                                  param={c}
-                                  value={row[c.field_path]}
-                                />
-                              </AriaButton>
-                            ) : (
-                              <ColumnValue
-                                param={c}
-                                value={row[c.field_path]}
-                              />
-                            )}
+                            {cellValue(c, row)}
                           </Table.Cell>
                         )),
                         ...(rowActions.length || rowDrill
                           ? [
                               <Table.Cell key="_actions" className="w-px">
-                                <div className="flex justify-end gap-0.5">
-                                  {rowDrill && (
-                                    <IconAction
-                                      icon={ArrowUpRight}
-                                      label={rowDrill.label || t("Open")}
-                                      onPress={() =>
-                                        drill!({
-                                          metaId: rowDrill.meta_id,
-                                          params: drillParams(rowDrill, row),
-                                          drawer: rowDrill.open_in === "drawer",
-                                          label: rowName(row) || title(meta),
-                                        })
-                                      }
-                                    />
-                                  )}
-                                  {rowActions.map((a) => (
-                                    <IconAction
-                                      key={a.id}
-                                      icon={iconOf(a)}
-                                      danger={a.action === "delete"}
-                                      label={a.label}
-                                      onPress={() => run(a, row)}
-                                    />
-                                  ))}
-                                </div>
+                                {rowButtons(row)}
                               </Table.Cell>,
                             ]
                           : []),
@@ -1193,6 +1244,7 @@ export function GridView({
                 }
               </Table.Body>
             </Table>
+            )}
           </div>
 
           {/* Always shown, even on one page, so it doesn't jump away when a filter narrows the rows. */}
@@ -1209,6 +1261,7 @@ export function GridView({
           )}
         </TableCard.Root>
       </div>
+
 
       {menu && (
         <ContextMenu

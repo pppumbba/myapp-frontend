@@ -26,7 +26,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
             <div className="mt-8">{children}</div>
           </div>
         </main>
-        <p className="text-xs text-quaternary">© {new Date().getFullYear()} Wand</p>
+        <p className="text-xs text-quaternary">© {new Date().getFullYear()} Wand Studio</p>
       </div>
 
       <aside className="relative m-3 hidden overflow-hidden rounded-2xl bg-brand-section lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16" aria-hidden="true">

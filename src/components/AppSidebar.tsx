@@ -41,7 +41,7 @@ type Item = NavItemType | NavItemDividerType;
 export type MenuStyle = 'classic' | 'floating' | 'inset' | 'dark' | 'topbar';
 
 export const MENU_STYLES: { id: MenuStyle; name: string; hint: string }[] = [
-  { id: 'classic', name: 'Classic', hint: 'Fixed to the left edge, with a line beside it.' },
+  { id: 'classic', name: 'Classic', hint: 'Fixed to the page edge, with a line beside it.' },
   { id: 'floating', name: 'Floating', hint: 'A rounded panel lifted off the page edge.' },
   { id: 'inset', name: 'Inset', hint: 'The menu sits on the frame; the screen is a rounded panel inside it.' },
   { id: 'dark', name: 'Dark', hint: 'A dark menu beside the screen, whatever the light or dark mode.' },
@@ -49,6 +49,11 @@ export const MENU_STYLES: { id: MenuStyle; name: string; hint: string }[] = [
 ];
 
 export const menuStyleOf = (value: unknown): MenuStyle => (MENU_STYLES.some((m) => m.id === value) ? (value as MenuStyle) : 'classic');
+
+/** Which side of the screen an app's side menu is on (an app meta's json_config.menu_side). The top bar has no side. */
+export type MenuSide = 'left' | 'right';
+
+export const menuSideOf = (value: unknown): MenuSide => (value === 'right' ? 'right' : 'left');
 
 /** Per side style: the menu panel, the fixed column holding it, the space it takes, and the main area. The top bar is drawn by TopBar. */
 const LOOKS: Record<Exclude<MenuStyle, 'topbar'>, { aside: string; column: string; gap: number; frame: string; main: string }> = {
@@ -65,9 +70,17 @@ const LOOKS: Record<Exclude<MenuStyle, 'topbar'>, { aside: string; column: strin
   dark: { aside: 'dark-mode border-secondary bg-primary scheme-dark md:border-r', column: '', gap: 0, frame: '', main: '' },
 };
 
+/** What a style adds with the menu on the right: the line moves to the menu's other edge, and the inset screen's margin with it. */
+const ON_RIGHT: Record<Exclude<MenuStyle, 'topbar'>, { aside: string; main: string }> = {
+  classic: { aside: 'lg:border-r-0 lg:border-l', main: '' },
+  floating: { aside: '', main: '' },
+  inset: { aside: '', main: 'lg:mr-0 lg:ml-2' },
+  dark: { aside: 'lg:border-r-0 lg:border-l', main: '' },
+};
+
 /**
  * The Untitled UI sidebar used by the builder and by running apps, with the notifications
- * bell and the signed-in user at the foot (a guest, e.g. on a portal, gets Log in instead). On large screens it's fixed on the left and can fold into an icon rail (the
+ * bell and the signed-in user at the foot (a guest, e.g. on a portal, gets Log in instead). On large screens it's fixed to the left (or menuSide right) and can fold into an icon rail (the
  * choice is remembered); below that it becomes a top bar whose menu button opens it as a
  * drawer.
  */
@@ -79,6 +92,7 @@ export function AppSidebar({
   footerItems: ownFooterItems = [],
   label,
   menuStyle = 'classic',
+  menuSide = 'left',
   children,
 }: {
   logo: ReactNode;
@@ -91,12 +105,20 @@ export function AppSidebar({
   /** Accessible name of the navigation. */
   label: string;
   menuStyle?: MenuStyle;
+  menuSide?: MenuSide;
   children: ReactNode;
 }) {
   const { user } = useAuth();
   const footerItems: NavItemType[] = user ? ownFooterItems : [...ownFooterItems, { label: t('Log in'), icon: LogIn01, href: '/login' }];
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const look = LOOKS[menuStyle === 'topbar' ? 'classic' : menuStyle];
+  const sideStyle = menuStyle === 'topbar' ? 'classic' : menuStyle;
+  const onRight = menuSide === 'right' && menuStyle !== 'topbar';
+  const look = onRight
+    ? { ...LOOKS[sideStyle], aside: cx(LOOKS[sideStyle].aside, ON_RIGHT[sideStyle].aside), main: cx(LOOKS[sideStyle].main, ON_RIGHT[sideStyle].main) }
+    : LOOKS[sideStyle];
+  // The arrows point the way the menu folds: towards its own edge.
+  const FoldIcon = onRight ? ChevronRightDouble : ChevronLeftDouble;
+  const UnfoldIcon = onRight ? ChevronLeftDouble : ChevronRightDouble;
   const toggle = (next: boolean) => {
     const apply = () => {
       setCollapsed(next);
@@ -118,7 +140,7 @@ export function AppSidebar({
         {withToggle && (
           <Tooltip title={t("Collapse menu")} placement="right">
             <TooltipTrigger aria-label={t("Collapse menu")} onPress={() => toggle(true)} className={railButton}>
-              <ChevronLeftDouble className="size-4" />
+              <FoldIcon className="size-4" />
             </TooltipTrigger>
           </Tooltip>
         )}
@@ -158,7 +180,7 @@ export function AppSidebar({
       <div className="shrink-0">{logoMark}</div>
       <Tooltip title={t("Expand menu")} placement="right">
         <TooltipTrigger aria-label={t("Expand menu")} onPress={() => toggle(false)} className={cx(railButton, 'mt-3 shrink-0')}>
-          <ChevronRightDouble className="size-4" />
+          <UnfoldIcon className="size-4" />
         </TooltipTrigger>
       </Tooltip>
 
@@ -213,19 +235,19 @@ export function AppSidebar({
   }
 
   return (
-    <div className={cx('min-h-screen lg:flex', look.frame)} style={{ '--width': `${WIDTH}px`, '--rail': `${RAIL_WIDTH}px` } as React.CSSProperties}>
+    <div className={cx('min-h-screen lg:flex', onRight && 'lg:flex-row-reverse', look.frame)} style={{ '--width': `${WIDTH}px`, '--rail': `${RAIL_WIDTH}px` } as React.CSSProperties}>
       {/* Keyed on the page so the drawer closes once a link is followed. */}
       <MobileNavigationHeader key={activeUrl} logo={logo}>
         {full(false)}
       </MobileNavigationHeader>
-      <div className={cx('sidebar-fixed hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex', look.column)}>{collapsed ? rail : full(true)}</div>
+      <div className={cx('sidebar-fixed hidden lg:fixed lg:inset-y-0 lg:z-30 lg:flex', onRight ? 'lg:right-0' : 'lg:left-0', look.column)}>{collapsed ? rail : full(true)}</div>
       {/* Takes the fixed sidebar's space in the layout. */}
       <div className="hidden shrink-0 lg:block" style={{ width }} />
 
       <main className={cx('sidebar-main min-w-0 flex-1 px-4 py-5 sm:px-6 lg:py-6', look.main)}>
         <div className="page-enter">{children}</div>
       </main>
-      <Messenger />
+      <Messenger menuRight={onRight ? width : 0} />
     </div>
   );
 }

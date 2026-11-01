@@ -24,7 +24,7 @@ import {
   Zap,
 } from '@untitledui/icons';
 import type { MetaParam } from '../lib/metaApi';
-import { AppSidebar, menuStyleOf } from '../components/AppSidebar';
+import { AppSidebar, menuSideOf, menuStyleOf } from '../components/AppSidebar';
 import { LogoMark } from '../components/AppShell';
 import type { NavItemType } from '@/components/application/app-navigation/config';
 import { DrilldownHost } from './DrilldownHost';
@@ -120,6 +120,7 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
     <AppSidebar
       label={t('{name} menu', { name: title(def.meta) })}
       menuStyle={menuStyleOf(def.meta.json_config?.menu_style)}
+      menuSide={menuSideOf(def.meta.json_config?.menu_side)}
       logo={
         <Link to={home} aria-label={t("Home")} className={`flex items-center gap-2.5 ${homeLink}`}>
           {mark}

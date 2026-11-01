@@ -53,20 +53,20 @@ function typingLine(names: string[]) {
  * is remembered. Direct chats and groups, people and message search, typing and seen marks, and a
  * chime for news. It polls; see useMessenger.
  */
-export function Messenger() {
+export function Messenger({ menuRight }: { menuRight?: number }) {
   const { user, updateUser } = useAuth();
   if (!user) return null;
-  return <MessengerFor user={user} updateUser={updateUser} />;
+  return <MessengerFor user={user} updateUser={updateUser} menuRight={menuRight} />;
 }
 
-function MessengerFor({ user, updateUser }: { user: User; updateUser: (u: User) => void }) {
+function MessengerFor({ user, updateUser, menuRight }: { user: User; updateUser: (u: User) => void; menuRight?: number }) {
   const [isOpen, setOpen] = useState(false);
   const [view, setView] = useState<View>({ kind: 'list' });
   const sound = user.preferences?.chat_sound !== false;
   const m = useMessenger({ userId: user.id, visible: isOpen && view.kind === 'chat', sound });
   const launcher = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const { spot, view: screen, dragging, startDrag, wasDragged } = useChatPosition();
+  const { spot, view: screen, dragging, startDrag, wasDragged } = useChatPosition(menuRight);
 
   const current = m.open ? m.chats?.find((c) => c.id === m.open?.chatId) : undefined;
 

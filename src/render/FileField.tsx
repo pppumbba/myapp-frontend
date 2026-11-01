@@ -8,6 +8,8 @@ import { t } from '@/i18n';
 
 const PICTURES = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
+export const isPicture = (file: FileInfo) => PICTURES.includes((file.file_extension ?? '').toLowerCase());
+
 /** A file field's value as the form keeps it: its files as JSON (form values are strings). */
 export function filesOf(value: unknown): FileInfo[] {
   if (Array.isArray(value)) return value as FileInfo[];

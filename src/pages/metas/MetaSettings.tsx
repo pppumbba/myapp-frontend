@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus, Trash01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
-import { metaApi, type Meta, type MetaOption, type MetaParam } from '../../lib/metaApi';
+import { metaApi, RECORD_LOOKS, RECORD_SLOTS, type Meta, type MetaOption, type MetaParam, type RecordSlot } from '../../lib/metaApi';
 import { ComboField } from '../../components/ComboField';
 import { Alert, IconAction } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
+import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { Toggle } from '@/components/base/toggle/toggle';
@@ -16,7 +17,7 @@ import { DocumentDesigner } from './DocumentDesigner';
 import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
-import { MENU_STYLES, menuStyleOf, type MenuStyle } from '../../components/AppSidebar';
+import { MENU_STYLES, menuSideOf, menuStyleOf, type MenuSide, type MenuStyle } from '../../components/AppSidebar';
 import { cx } from '@/utils/cx';
 import { t, tLabels } from '@/i18n';
 
@@ -553,18 +554,61 @@ export function GridFilterLayoutPanel({ meta }: { meta: Meta }) {
   );
 }
 
+const SLOT_LABELS: Record<RecordSlot, string> = { image: 'Image', title: 'Title', subtitle: 'Subtitle', badge: 'Badge', body: 'Details', footer: 'Footer' };
+
+/** Where each of the grid's own columns sits on a record's widget (widget_position); saved as it's chosen. */
+function RecordSlotsEditor({ meta, params }: { meta: Meta; params: MetaParam[] | null }) {
+  const [chosen, setChosen] = useState<Record<number, RecordSlot | null>>({});
+  const { busy, error, run } = useSaving();
+  const columns = visibleParams(params ?? []).filter((p) => p.main_meta_id === meta.id);
+  if (!columns.length) return null;
+
+  const place = (param: MetaParam, slot: RecordSlot | null) =>
+    run(async () => {
+      await metaApi.updateParam(param.id, { widget_position: slot });
+      setChosen((current) => ({ ...current, [param.id]: slot }));
+      clearRenderCache();
+    });
+
+  return (
+    <fieldset className="mb-5 max-w-xl">
+      <legend className="text-sm font-medium text-secondary">{t("Place on the widget")}</legend>
+      <p className="mt-0.5 text-sm text-tertiary">{t("Automatic: the first column is the title, the others are details. An image column takes an uploaded picture or a web address.")}</p>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      <ul className="mt-3 divide-y divide-secondary rounded-lg ring-1 ring-secondary">
+        {columns.map((p) => (
+          <li key={p.id} className="flex items-center gap-3 px-3 py-2">
+            <span className="min-w-0 flex-1 truncate text-sm text-primary">{p.label_name || p.param_name}</span>
+            <NativeSelect
+              aria-label={t("Place of {field}", { field: p.label_name || p.param_name })}
+              size="sm"
+              className="w-40"
+              disabled={busy}
+              value={(p.id in chosen ? chosen[p.id] : p.widget_position) ?? ''}
+              onChange={(e) => void place(p, (e.target.value || null) as RecordSlot | null)}
+              options={[{ value: '', label: t("Automatic") }, ...RECORD_SLOTS.map((slot) => ({ value: slot, label: t(SLOT_LABELS[slot]) }))]}
+            />
+          </li>
+        ))}
+      </ul>
+    </fieldset>
+  );
+}
+
 /**
  * How a grid's table looks: a # column (json_config.row_numbers), how many leading columns
  * stay in view when it scrolls sideways (json_config.frozen_columns), and a fixed size in px
- * (json_config.height, width) that its rows scroll inside, both ways.
+ * (json_config.height, width) that its rows scroll inside, both ways. json_config.view shows
+ * the records as widgets instead of table rows, each column at its widget_position.
  */
 export function GridColumnsPanel({ meta }: { meta: Meta }) {
   const config = meta.json_config ?? {};
+  const [view, setView] = useState<string>(RECORD_LOOKS.find((look) => look === config.view) ?? 'table');
   const [rowNumbers, setRowNumbers] = useState(config.row_numbers === true);
   const [frozen, setFrozen] = useState(config.frozen_columns ? String(config.frozen_columns) : '0');
   const [height, setHeight] = useState(config.height ? String(config.height) : '');
   const [width, setWidth] = useState(config.width ? String(config.width) : '');
-  const state = JSON.stringify([rowNumbers, frozen, height, width]);
+  const state = JSON.stringify([view, rowNumbers, frozen, height, width]);
   const [saved, setSaved] = useState(state);
   const { busy, error, run } = useSaving();
   const dirty = state !== saved;
@@ -579,7 +623,7 @@ export function GridColumnsPanel({ meta }: { meta: Meta }) {
       description={`${t("Row numbers, frozen columns and the grid's size.")} ${nested ? t('Each row also has an arrow that opens its nested subgrid; it freezes with the columns.') : t('To open a subgrid inside each row, give it {code}.', { code: '{ "display": "nested" }' })}`}
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
-          await saveConfig(meta.id, { row_numbers: rowNumbers, frozen_columns: Number(frozen) || null, height: px(height), width: px(width) });
+          await saveConfig(meta.id, { view: view === 'table' ? null : view, row_numbers: rowNumbers, frozen_columns: Number(frozen) || null, height: px(height), width: px(width) });
           setSaved(state);
         })}>
           {dirty ? t("Save") : t("Saved")}
@@ -587,6 +631,16 @@ export function GridColumnsPanel({ meta }: { meta: Meta }) {
       }
     >
       {error && <div className="mb-4"><Alert>{error}</Alert></div>}
+      <div className="mb-5 max-w-xl">
+        <NativeSelect
+          label={t("Show records as")}
+          hint={t("Cards, inline cards and tiles show each record as a widget. Row numbers and frozen columns are for the table. Tree grids and grids with nested subgrids stay tables.")}
+          value={view}
+          onChange={(e) => setView(e.target.value)}
+          options={[{ value: 'table', label: t("Table") }, { value: 'cards', label: t("Cards") }, { value: 'inline', label: t("Inline cards") }, { value: 'tiles', label: t("Tiles") }]}
+        />
+      </div>
+      {view !== 'table' && <RecordSlotsEditor meta={meta} params={params} />}
       <div className="flex max-w-3xl flex-col gap-5 sm:flex-row sm:items-end">
         <Toggle label={t("Row numbers")} hint={t("A # column counting the rows, across pages.")} isSelected={rowNumbers} onChange={setRowNumbers} />
         <div className="sm:w-64">
@@ -648,13 +702,15 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
 }
 
 /** A small drawing of a menu style: the menu on the left, the screen on the right. */
-function MenuStyleSketch({ style }: { style: MenuStyle }) {
+function MenuStyleSketch({ style, side }: { style: MenuStyle; side: MenuSide }) {
+  const onRight = side === 'right' && style !== 'topbar';
   return (
-    <div aria-hidden="true" className={cx('flex h-16 overflow-hidden rounded-md ring-1 ring-secondary', style === 'inset' ? 'bg-tertiary' : 'bg-secondary', style === 'topbar' && 'flex-col')}>
+    <div aria-hidden="true" className={cx('flex h-16 overflow-hidden rounded-md ring-1 ring-secondary', style === 'inset' ? 'bg-tertiary' : 'bg-secondary', style === 'topbar' && 'flex-col', onRight && 'flex-row-reverse')}>
       <div
         className={cx(
           style === 'topbar' ? 'flex items-center gap-1.5 border-b border-secondary bg-primary px-1.5 py-1' : 'flex w-1/3 flex-col gap-1 p-1.5',
-          style === 'classic' && 'border-r border-secondary bg-primary',
+          style === 'classic' && (onRight ? 'border-l' : 'border-r'),
+          style === 'classic' && 'border-secondary bg-primary',
           style === 'floating' && 'm-1 rounded-md bg-primary shadow-sm ring-1 ring-secondary',
           style === 'dark' && 'bg-gray-900',
         )}
@@ -663,17 +719,31 @@ function MenuStyleSketch({ style }: { style: MenuStyle }) {
           <span key={i} className={cx('h-1 rounded-full', style === 'dark' ? 'bg-gray-600' : 'bg-quaternary', style === 'topbar' ? 'w-4' : i === 0 ? 'w-3/4' : 'w-1/2')} />
         ))}
       </div>
-      <div className={cx('flex-1 p-1.5', style === 'inset' && 'my-1 mr-1 rounded-md bg-secondary ring-1 ring-secondary')}>
+      <div className={cx('flex-1 p-1.5', style === 'inset' && 'my-1 rounded-md bg-secondary ring-1 ring-secondary', style === 'inset' && (onRight ? 'ml-1' : 'mr-1'))}>
         <span className="block h-full rounded-sm bg-primary ring-1 ring-secondary" />
       </div>
     </div>
   );
 }
 
-/** An app's menu style (json_config.menu_style), saved as soon as it is picked. */
+/** An app's menu style and side (json_config.menu_style, menu_side), saved as soon as they are picked. */
 export function AppSettingsPanel({ meta }: { meta: Meta }) {
   const [style, setStyle] = useState<MenuStyle>(menuStyleOf(meta.json_config?.menu_style));
+  const [side, setSide] = useState<MenuSide>(menuSideOf(meta.json_config?.menu_side));
   const { busy, error, run } = useSaving();
+
+  const pickSide = (next: MenuSide) => {
+    const before = side;
+    setSide(next);
+    void run(async () => {
+      try {
+        await saveConfig(meta.id, { menu_side: next === 'right' ? 'right' : null });
+      } catch (err) {
+        setSide(before);
+        throw err;
+      }
+    });
+  };
 
   const pick = (next: MenuStyle) => {
     const before = style;
@@ -707,7 +777,7 @@ export function AppSettingsPanel({ meta }: { meta: Meta }) {
                 on ? 'ring-2 ring-brand' : 'ring-1 ring-secondary hover:ring-primary',
               )}
             >
-              <MenuStyleSketch style={m.id} />
+              <MenuStyleSketch style={m.id} side={side} />
               <span>
                 <span className="block text-sm font-semibold text-primary">{t(m.name)}</span>
                 <span className="block text-xs text-tertiary">{t(m.hint)}</span>
@@ -716,6 +786,15 @@ export function AppSettingsPanel({ meta }: { meta: Meta }) {
           );
         })}
       </div>
+      {style !== 'topbar' && (
+        <div className="mt-4">
+          <p className="mb-1.5 text-sm font-medium text-secondary">{t('Menu side')}</p>
+          <ButtonGroup size="sm" aria-label={t('Menu side')} selectionMode="single" disallowEmptySelection isDisabled={busy} selectedKeys={[side]} onSelectionChange={(keys) => pickSide([...keys][0] === 'right' ? 'right' : 'left')}>
+            <ButtonGroupItem id="left">{t('Left')}</ButtonGroupItem>
+            <ButtonGroupItem id="right">{t('Right')}</ButtonGroupItem>
+          </ButtonGroup>
+        </div>
+      )}
     </Panel>
   );
 }

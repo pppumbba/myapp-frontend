@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { ClockRewind, Download01, Edit01, Package, Plus, Rocket01, Trash01, Upload01 } from '@untitledui/icons';
+import { Check, ClockRewind, Download01, Edit01, Package, Plus, Rocket01, Trash01, Upload01 } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
-import { metaApi, type Meta } from '../lib/metaApi';
+import { metaApi, type Meta, type Tag } from '../lib/metaApi';
 import { patchApi, type Patch, type PatchInstall } from '../lib/patchApi';
 import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
@@ -13,7 +13,9 @@ import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { ImportMetasModal, MetaPicker } from './metas/MetaTransferModals';
+import { tagColor } from './metas/MetaTags';
 import { t } from '@/i18n';
+import { cx } from '@/utils/cx';
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -307,6 +309,19 @@ function InstallRow({ install: i, busy, onDownload, onRollback }: { install: Pat
   );
 }
 
+/** The tags in use on these metas, each with its metas' ids, by name. */
+function tagGroups(metas: Meta[]): { tag: Tag; ids: number[] }[] {
+  const groups = new Map<number, { tag: Tag; ids: number[] }>();
+  for (const meta of metas) {
+    for (const tag of meta.tags ?? []) {
+      const group = groups.get(tag.id) ?? { tag, ids: [] };
+      group.ids.push(meta.id);
+      groups.set(tag.id, group);
+    }
+  }
+  return [...groups.values()].sort((a, b) => a.tag.name.localeCompare(b.tag.name));
+}
+
 /** A patch's name and metas; a draft can change until it is released. */
 function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; metas: Meta[]; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState(patch?.code ?? `patch_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`);
@@ -318,6 +333,12 @@ function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; m
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [added, setAdded] = useState<string | null>(null);
+  const groups = tagGroups(metas);
+
+  function toggleTag(ids: number[], isPicked: boolean) {
+    setAdded(null);
+    setPicked(isPicked ? picked.filter((id) => !ids.includes(id)) : [...new Set([...picked, ...ids])]);
+  }
 
   async function addChanged() {
     setError(null);
@@ -365,6 +386,24 @@ function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; m
           </Button>
         </div>
         {added && <p role="status" className="text-sm text-success-primary">{added}</p>}
+        {groups.length > 0 && (
+          <div role="group" aria-label={t("Add the metas with a tag")} className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm text-tertiary">{t("With tag:")}</span>
+            {groups.map(({ tag, ids }) => {
+              const isPicked = ids.every((id) => picked.includes(id));
+              return (
+                <button key={tag.id} type="button" aria-pressed={isPicked} onClick={() => toggleTag(ids, isPicked)} className={cx('rounded-full outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2', isPicked && 'ring-2 ring-brand')}>
+                  <Badge type="pill-color" size="sm" color={tagColor(tag)}>
+                    <span className="flex items-center gap-1">
+                      {isPicked && <Check className="size-3" aria-hidden="true" />}
+                      {tag.name} ({ids.length})
+                    </span>
+                  </Badge>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <MetaPicker metas={metas} picked={picked} onChange={setPicked} autoFocus={false} />
         <Checkbox isSelected={withUsed} onChange={setWithUsed} label={t("Also the metas they use")} hint={t("Lookups, the forms their buttons open, process steps, linked metas… and the ones those use. Leave it off when the other app already has them: they are found there by code.")} />
         <div className="flex justify-end gap-2 border-t border-secondary pt-4">

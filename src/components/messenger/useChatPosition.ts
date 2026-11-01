@@ -13,6 +13,8 @@ const EDGE = 8;
 /** A press that moves less than this is a click, not a drag. */
 const SLOP = 4;
 const START: Spot = { x: 16, y: 16 };
+/** Tailwind's lg: from here the side menu is fixed beside the page. */
+const LARGE = 1024;
 
 function read(): Spot {
   try {
@@ -32,17 +34,19 @@ function save(spot: Spot) {
   }
 }
 
-const clamp = (spot: Spot, w: number, h: number): Spot => ({
-  x: Math.round(Math.min(Math.max(spot.x, EDGE), w - BUTTON - EDGE)),
+/** Inside the window; on large screens also clear of a menu taking `menuRight` px on the right. */
+const clamp = (spot: Spot, w: number, h: number, menuRight: number): Spot => ({
+  x: Math.round(Math.min(Math.max(spot.x, EDGE + (w >= LARGE ? menuRight : 0)), w - BUTTON - EDGE)),
   y: Math.round(Math.min(Math.max(spot.y, EDGE), h - BUTTON - EDGE)),
 });
 
 /**
  * The chat button's place, dragged with the pointer (the button itself or the panel's header) and
  * remembered in this browser. Kept inside the window when it shrinks. wasDragged() tells a click
- * that ended a drag apart from a real click.
+ * that ended a drag apart from a real click. menuRight: the width of a menu fixed on the right,
+ * which the button stays clear of so it doesn't cover the menu's foot.
  */
-export function useChatPosition() {
+export function useChatPosition(menuRight = 0) {
   const [view, setView] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [stored, setStored] = useState(read);
   const [dragging, setDragging] = useState(false);
@@ -54,7 +58,7 @@ export function useChatPosition() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const spot = clamp(stored, view.w, view.h);
+  const spot = clamp(stored, view.w, view.h, menuRight);
 
   const startDrag = useCallback(
     (e: ReactPointerEvent) => {
@@ -74,7 +78,7 @@ export function useChatPosition() {
           document.documentElement.style.userSelect = 'none';
           window.getSelection()?.removeAllRanges();
         }
-        last = clamp({ x: from.x - dx, y: from.y - dy }, window.innerWidth, window.innerHeight);
+        last = clamp({ x: from.x - dx, y: from.y - dy }, window.innerWidth, window.innerHeight, menuRight);
         setStored(last);
       };
       const end = () => {
@@ -94,7 +98,7 @@ export function useChatPosition() {
       window.addEventListener('pointerup', end);
       window.addEventListener('pointercancel', end);
     },
-    [spot],
+    [spot, menuRight],
   );
 
   return { spot, view, dragging, startDrag, wasDragged: () => dragged.current };
