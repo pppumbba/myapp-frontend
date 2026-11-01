@@ -20,6 +20,8 @@ const KEEP_VISIBLE = 80;
  *
  * Drag it by the header, resize it from the right/bottom edges or the corner. The header stays
  * fixed and only the body scrolls; a footer marked `modal-footer` sticks to the bottom.
+ * With `fill`, phones get it at full height from the top, so its edges stay put as the content
+ * changes and the on-screen keyboard covers none of it.
  */
 export function Modal({
   title,
@@ -27,12 +29,14 @@ export function Modal({
   onClose,
   children,
   size = 'md',
+  fill = false,
 }: {
   title: string;
   description?: string;
   onClose: () => void;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  fill?: boolean;
 }) {
   const width = { sm: 'sm:max-w-100', md: 'sm:max-w-2xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' }[size];
   const boxRef = useRef<HTMLDivElement>(null);
@@ -85,10 +89,10 @@ export function Modal({
   };
 
   return (
-    <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()}>
+    <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()} className={fill ? 'max-sm:items-start' : undefined}>
       <UModal
         ref={boxRef}
-        className={cx('relative flex flex-col max-sm:overflow-hidden', width, active && 'select-none')}
+        className={cx('relative flex flex-col max-sm:overflow-hidden', width, fill && 'max-sm:h-full', active && 'select-none')}
         style={{
           translate: `${offset.x}px ${offset.y}px`,
           ...(box && { width: box.w, height: box.h, maxWidth: 'none' }),

@@ -169,86 +169,91 @@ function LookupDialog({ refId, value, valueField, onPick, onClose }: { refId: nu
   const name = def ? title(def.meta) : 'records';
 
   return (
-    <Modal title={t('Choose from {name}', { name })} onClose={onClose} size="xl">
-      <Input aria-label={t('Search {name}', { name })} icon={SearchLg} placeholder={t('Search')} value={query} onChange={setQuery} autoFocus />
+    <Modal title={t('Choose from {name}', { name })} onClose={onClose} size="xl" fill>
+      {/* Only the rows scroll: the search, the column names and the paging stay in place (index.css). */}
+      <div className="modal-split gap-4">
+        <div className="shrink-0 px-4 sm:px-6">
+          <Input aria-label={t('Search {name}', { name })} icon={SearchLg} placeholder={t('Search')} value={query} onChange={setQuery} autoFocus />
+        </div>
 
-      <div className="mt-4">
-        {defError || error ? (
-          <Alert>{defError ?? error}</Alert>
-        ) : !def || !result ? (
-          <div className="h-60 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
-        ) : (
-          <div className="overflow-x-auto rounded-xl ring-1 ring-secondary">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary text-left text-xs font-medium text-tertiary">
-                <tr>
-                  {columns.map((c) => (
-                    <th key={c.field_path} scope="col" className="px-4 py-2.5 font-medium">
-                      {c.label_name || c.param_name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-secondary">
-                {result.data.map((row) => {
-                  const picked = String(row[valueField]) === value;
-                  return (
-                    <tr
-                      key={String(row.id)}
-                      onClick={() => onPick(row)}
-                      className={cx('cursor-pointer transition duration-100 ease-linear', picked ? 'bg-brand-primary_alt' : 'hover:bg-primary_hover')}
-                    >
-                      {columns.map((c, i) => (
-                        <td key={c.field_path} className="px-4 py-3 text-tertiary">
-                          {i === 0 ? (
-                            // The first cell is the row's button, for the keyboard.
-                            <button
-                              type="button"
-                              aria-pressed={picked}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onPick(row);
-                              }}
-                              className="rounded text-left font-medium text-primary outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2"
-                            >
-                              <ColumnValue param={c} value={row[c.field_path]} />
-                            </button>
-                          ) : (
-                            <ColumnValue param={c} value={row[c.field_path]} />
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-                {!result.data.length && (
+        <div className="modal-scroll flex flex-col pt-px">
+          {defError || error ? (
+            <Alert>{defError ?? error}</Alert>
+          ) : !def || !result ? (
+            <div className="h-60 shrink-0 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
+          ) : (
+            <div className="min-h-0 overflow-auto rounded-xl ring-1 ring-secondary">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-secondary text-left text-xs font-medium text-tertiary">
                   <tr>
-                    <td colSpan={columns.length || 1} className="px-4 py-10 text-center text-tertiary">
-                      {search ? t('Nothing matches “{search}”.', { search }) : t('There are no records yet.')}
-                    </td>
+                    {columns.map((c) => (
+                      <th key={c.field_path} scope="col" className="px-4 py-2.5 font-medium">
+                        {c.label_name || c.param_name}
+                      </th>
+                    ))}
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-secondary">
+                  {result.data.map((row) => {
+                    const picked = String(row[valueField]) === value;
+                    return (
+                      <tr
+                        key={String(row.id)}
+                        onClick={() => onPick(row)}
+                        className={cx('cursor-pointer transition duration-100 ease-linear', picked ? 'bg-brand-primary_alt' : 'hover:bg-primary_hover')}
+                      >
+                        {columns.map((c, i) => (
+                          <td key={c.field_path} className="px-4 py-3 text-tertiary">
+                            {i === 0 ? (
+                              // The first cell is the row's button, for the keyboard.
+                              <button
+                                type="button"
+                                aria-pressed={picked}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPick(row);
+                                }}
+                                className="rounded text-left font-medium text-primary outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2"
+                              >
+                                <ColumnValue param={c} value={row[c.field_path]} />
+                              </button>
+                            ) : (
+                              <ColumnValue param={c} value={row[c.field_path]} />
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                  {!result.data.length && (
+                    <tr>
+                      <td colSpan={columns.length || 1} className="px-4 py-10 text-center text-tertiary">
+                        {search ? t('Nothing matches “{search}”.', { search }) : t('There are no records yet.')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {result && result.last_page > 1 && (
+          <div className="modal-footer flex items-center justify-between gap-3 border-t border-secondary pt-4">
+            <p className="text-sm text-tertiary">
+              {t('Page {page} of {pages}', { page: result.current_page, pages: result.last_page })}
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" color="secondary" iconLeading={ChevronLeft} isDisabled={page <= 1} onPress={() => setPage(page - 1)}>
+                {t('Previous')}
+              </Button>
+              <Button size="sm" color="secondary" iconTrailing={ChevronRight} isDisabled={page >= result.last_page} onPress={() => setPage(page + 1)}>
+                {t('Next')}
+              </Button>
+            </div>
           </div>
         )}
       </div>
-
-      {result && result.last_page > 1 && (
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <p className="text-sm text-tertiary">
-            {t('Page {page} of {pages}', { page: result.current_page, pages: result.last_page })}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" color="secondary" iconLeading={ChevronLeft} isDisabled={page <= 1} onPress={() => setPage(page - 1)}>
-              {t('Previous')}
-            </Button>
-            <Button size="sm" color="secondary" iconTrailing={ChevronRight} isDisabled={page >= result.last_page} onPress={() => setPage(page + 1)}>
-              {t('Next')}
-            </Button>
-          </div>
-        </div>
-      )}
     </Modal>
   );
 }
