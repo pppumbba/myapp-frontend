@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download01, SearchLg, Upload01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
-import { metaApi, type ImportExisting, type ImportResult, type Meta } from '../../lib/metaApi';
+import { metaApi, type ImportExisting, type ImportResult, type Meta, type SchemaChanges } from '../../lib/metaApi';
 import { Modal } from '../../components/Modal';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
@@ -107,6 +107,36 @@ const ACTIONS: Record<ImportResult['metas'][number]['action'], { label: string; 
  * Imports a metas file. It first shows what would happen (a dry run), for the choice made
  * about metas whose code is already here, then imports on confirm.
  */
+/** What a patch adds to the database, as a short list; nothing when it adds nothing. */
+export function SchemaSummary({ schema }: { schema: SchemaChanges }) {
+  const rows = Object.entries(schema.rows);
+  const lines = [
+    [t("New tables"), schema.tables],
+    [t("New columns"), schema.columns],
+    [t("New indexes and links"), schema.keys],
+    [t("New triggers"), schema.triggers],
+    [t("Replaced triggers"), schema.replaced_triggers],
+    [t("New roles"), schema.roles],
+    [t("Rows added"), rows.map(([table, n]) => `${table} (${n})`)],
+    [t("Rows left out, the table already has records"), schema.rows_kept],
+  ] as const;
+  const shown = lines.filter(([, items]) => items.length > 0);
+  if (!shown.length) return null;
+  return (
+    <div className="rounded-lg p-3 text-sm ring-1 ring-secondary">
+      <p className="font-medium text-secondary">{t("Database")}</p>
+      <dl className="mt-1 space-y-1">
+        {shown.map(([label, items]) => (
+          <div key={label}>
+            <dt className="text-tertiary">{label}: {items.length}</dt>
+            <dd className="break-words text-xs text-secondary">{items.join(', ')}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export function ImportMetasModal({
   onClose,
   onDone,
@@ -227,6 +257,7 @@ export function ImportMetasModal({
                 </li>
               ))}
             </ul>
+            {shown.schema && <SchemaSummary schema={shown.schema} />}
             {shown.warnings.length > 0 && (
               <div className="rounded-lg bg-warning-primary p-3 text-sm text-warning-primary">
                 <p className="font-medium">{t("Notes")}</p>

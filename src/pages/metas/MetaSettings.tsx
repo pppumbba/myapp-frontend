@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus, Trash01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
-import { metaApi, RECORD_LOOKS, RECORD_SLOTS, type Meta, type MetaOption, type MetaParam, type RecordSlot } from '../../lib/metaApi';
+import { GRID_VIEWS, GRID_VIEW_LABELS, gridViewOf, metaApi, RECORD_SLOTS, type GridViewName, type Meta, type MetaOption, type MetaParam, type RecordSlot } from '../../lib/metaApi';
 import { ComboField } from '../../components/ComboField';
 import { Alert, IconAction } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
+import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { Toggle } from '@/components/base/toggle/toggle';
@@ -599,16 +600,19 @@ function RecordSlotsEditor({ meta, params }: { meta: Meta; params: MetaParam[] |
  * How a grid's table looks: a # column (json_config.row_numbers), how many leading columns
  * stay in view when it scrolls sideways (json_config.frozen_columns), and a fixed size in px
  * (json_config.height, width) that its rows scroll inside, both ways. json_config.view shows
- * the records as widgets instead of table rows, each column at its widget_position.
+ * the records as widgets instead of table rows, each column at its widget_position, and
+ * json_config.view_buttons are the other views people can switch to from the toolbar.
  */
 export function GridColumnsPanel({ meta }: { meta: Meta }) {
   const config = meta.json_config ?? {};
-  const [view, setView] = useState<string>(RECORD_LOOKS.find((look) => look === config.view) ?? 'table');
+  const [view, setView] = useState<GridViewName>(gridViewOf(config));
+  const [ticked, setTicked] = useState<unknown[]>(Array.isArray(config.view_buttons) ? config.view_buttons : []);
+  const otherViews = GRID_VIEWS.filter((v) => v !== view && ticked.includes(v));
   const [rowNumbers, setRowNumbers] = useState(config.row_numbers === true);
   const [frozen, setFrozen] = useState(config.frozen_columns ? String(config.frozen_columns) : '0');
   const [height, setHeight] = useState(config.height ? String(config.height) : '');
   const [width, setWidth] = useState(config.width ? String(config.width) : '');
-  const state = JSON.stringify([view, rowNumbers, frozen, height, width]);
+  const state = JSON.stringify([view, otherViews, rowNumbers, frozen, height, width]);
   const [saved, setSaved] = useState(state);
   const { busy, error, run } = useSaving();
   const dirty = state !== saved;
@@ -623,7 +627,7 @@ export function GridColumnsPanel({ meta }: { meta: Meta }) {
       description={`${t("Row numbers, frozen columns and the grid's size.")} ${nested ? t('Each row also has an arrow that opens its nested subgrid; it freezes with the columns.') : t('To open a subgrid inside each row, give it {code}.', { code: '{ "display": "nested" }' })}`}
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
-          await saveConfig(meta.id, { view: view === 'table' ? null : view, row_numbers: rowNumbers, frozen_columns: Number(frozen) || null, height: px(height), width: px(width) });
+          await saveConfig(meta.id, { view: view === 'table' ? null : view, view_buttons: otherViews.length ? otherViews : null, row_numbers: rowNumbers, frozen_columns: Number(frozen) || null, height: px(height), width: px(width) });
           setSaved(state);
         })}>
           {dirty ? t("Save") : t("Saved")}
@@ -636,11 +640,26 @@ export function GridColumnsPanel({ meta }: { meta: Meta }) {
           label={t("Show records as")}
           hint={t("Cards, inline cards and tiles show each record as a widget. Row numbers and frozen columns are for the table. Tree grids and grids with nested subgrids stay tables.")}
           value={view}
-          onChange={(e) => setView(e.target.value)}
-          options={[{ value: 'table', label: t("Table") }, { value: 'cards', label: t("Cards") }, { value: 'inline', label: t("Inline cards") }, { value: 'tiles', label: t("Tiles") }]}
+          onChange={(e) => setView(e.target.value as GridViewName)}
+          options={GRID_VIEWS.map((v) => ({ value: v, label: t(GRID_VIEW_LABELS[v]) }))}
         />
       </div>
-      {view !== 'table' && <RecordSlotsEditor meta={meta} params={params} />}
+      <fieldset className="mb-5 max-w-xl">
+        <legend className="text-sm font-medium text-secondary">{t("View buttons")}</legend>
+        <p className="mt-0.5 text-sm text-tertiary">{t("Tick other views to put buttons above the grid that switch between them. Each person's pick is remembered in their browser.")}</p>
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+          {GRID_VIEWS.map((v) => (
+            <Checkbox
+              key={v}
+              label={t(GRID_VIEW_LABELS[v])}
+              isDisabled={v === view}
+              isSelected={v === view || ticked.includes(v)}
+              onChange={(on) => setTicked((current) => (on ? [...current, v] : current.filter((x) => x !== v)))}
+            />
+          ))}
+        </div>
+      </fieldset>
+      {(view !== 'table' || otherViews.length > 0) && <RecordSlotsEditor meta={meta} params={params} />}
       <div className="flex max-w-3xl flex-col gap-5 sm:flex-row sm:items-end">
         <Toggle label={t("Row numbers")} hint={t("A # column counting the rows, across pages.")} isSelected={rowNumbers} onChange={setRowNumbers} />
         <div className="sm:w-64">

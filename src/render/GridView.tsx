@@ -21,8 +21,12 @@ import {
   File06,
   FilterLines,
   GitBranch01,
+  Grid01,
+  LayoutGrid01,
+  List,
   Plus,
   SearchLg,
+  Table as TableIcon,
   Trash01,
   Upload01,
   Zap,
@@ -33,7 +37,7 @@ import { useAuth } from "../auth/AuthContext";
 import type { Ability } from "../lib/accessApi";
 import { ApiError } from "../lib/api";
 import { dataApi, type DataRow, type Page } from "../lib/dataApi";
-import { RECORD_LOOKS, type MetaAction, type MetaParam } from "../lib/metaApi";
+import { GRID_VIEWS, GRID_VIEW_LABELS, gridViewButtons, gridViewOf, type GridViewName, type MetaAction, type MetaParam } from "../lib/metaApi";
 import { Alert, IconAction } from "../components/ui";
 import { useFillHeight } from "./useFillHeight";
 import { ContextMenu, pointOf, type MenuEntry, type MenuPoint } from "../components/ContextMenu";
@@ -41,7 +45,9 @@ import { ConfirmDialog, Modal } from "../components/Modal";
 import { Table, TableCard } from "@/components/application/table/table";
 import { PaginationCardMinimal } from "@/components/application/pagination/pagination";
 import { Badge } from "@/components/base/badges/badges";
+import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import { Button } from "@/components/base/buttons/button";
+import { Tooltip } from "@/components/base/tooltip/tooltip";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { useDebounced } from "@/hooks/use-debounced";
 import { Input } from "@/components/base/input/input";
@@ -211,6 +217,26 @@ function useFrozenOffsets(count: number, deps: unknown[]) {
   return { ref, lefts, viewWidth };
 }
 
+const VIEW_ICONS: Record<GridViewName, FC<{ className?: string }>> = { table: TableIcon, cards: Grid01, inline: List, tiles: LayoutGrid01 };
+const viewKey = (metaId: number) => `grid_view_${metaId}`;
+
+/** The view this person last picked on this grid, in this browser. */
+function readGridView(metaId: number): GridViewName | undefined {
+  try {
+    return GRID_VIEWS.find((v) => v === localStorage.getItem(viewKey(metaId)));
+  } catch {
+    return undefined;
+  }
+}
+
+function saveGridView(metaId: number, view: GridViewName) {
+  try {
+    localStorage.setItem(viewKey(metaId), view);
+  } catch {
+    // Storage can be blocked; the buttons still work for this visit.
+  }
+}
+
 /** What a toolbar button is doing right now. */
 type Running = { action: MetaAction; row?: DataRow };
 
@@ -236,6 +262,7 @@ const abilityOf: Record<MetaAction["action"], Ability> = {
  * columns (with # and the arrow) in view when the table scrolls sideways.
  * json_config.view "cards", "inline" or "tiles" shows the records as those widgets instead
  * (GridCards), except for tree grids and grids with nested subgrids, which need the table's rows.
+ * json_config.view_buttons adds toolbar buttons to switch view; each person's pick is remembered.
  *
  * fixed: filter values set from outside, e.g. a subgrid's parameters from the parent row.
  * scope: exact values every row has and every new record gets, e.g. a workspace's tender_id;
@@ -293,7 +320,11 @@ export function GridView({
   const nested = useMemo(() => subgrids.filter(isNestedSubgrid), [subgrids]);
   // The field holding each record's parent (is_parent): the records show as a tree.
   const parentParam = useMemo(() => params.find((p) => p.is_parent), [params]);
-  const cards = !parentParam && !nested.length ? RECORD_LOOKS.find((look) => look === meta.json_config?.view) : undefined;
+  const tableOnly = !!parentParam || nested.length > 0;
+  const viewButtons = tableOnly ? [] : gridViewButtons(meta.json_config);
+  const [pickedView, setPickedView] = useState(() => readGridView(meta.id));
+  const view = tableOnly ? "table" : pickedView && viewButtons.includes(pickedView) ? pickedView : gridViewOf(meta.json_config);
+  const cards = view === "table" ? undefined : view;
   const rowNumbers = meta.json_config?.row_numbers === true;
   // The arrow and # columns come first and freeze with the frozen data columns.
   const lead = (nested.length ? 1 : 0) + (rowNumbers ? 1 : 0);
@@ -543,7 +574,7 @@ export function GridView({
     ref: tableRef,
     lefts,
     viewWidth,
-  } = useFrozenOffsets(frozen, [columns, items, nested.length, rowNumbers]);
+  } = useFrozenOffsets(frozen, [columns, items, nested.length, rowNumbers, view]);
 
   // The table compares cell props on every render, so each style object is made once per layout.
   const frozenStyles = useMemo(
@@ -841,6 +872,27 @@ export function GridView({
                   />
                 )}
                 <div className="flex flex-wrap gap-2">
+                  {viewButtons.length > 0 && (
+                    <ButtonGroup
+                      size="sm"
+                      aria-label={t("View")}
+                      selectionMode="single"
+                      disallowEmptySelection
+                      selectedKeys={[view]}
+                      onSelectionChange={(keys) => {
+                        const next = viewButtons.find((v) => keys.has(v));
+                        if (!next) return;
+                        setPickedView(next);
+                        saveGridView(meta.id, next);
+                      }}
+                    >
+                      {viewButtons.map((v) => (
+                        <Tooltip key={v} title={t(GRID_VIEW_LABELS[v])}>
+                          <ButtonGroupItem id={v} aria-label={t(GRID_VIEW_LABELS[v])} iconLeading={VIEW_ICONS[v]} />
+                        </Tooltip>
+                      ))}
+                    </ButtonGroup>
+                  )}
                   {filterParams.length > 0 && !sidebar && (dropdown ? (
                     <DialogTrigger isOpen={showFilters} onOpenChange={setShowFilters}>
                       <Button size="sm" color="secondary" iconLeading={FilterLines}>

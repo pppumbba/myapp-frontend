@@ -8,6 +8,8 @@ export interface Patch {
   name: string;
   description: string | null;
   with_used: boolean;
+  /** The tables whose rows its file carries. */
+  data_tables: string[] | null;
   status: 'draft' | 'released';
   hash: string | null;
   released_at: string | null;
@@ -17,7 +19,15 @@ export interface Patch {
   metas: Meta[];
 }
 
-export type PatchInput = { code?: string; name?: string; description?: string | null; with_used?: boolean; meta_ids?: number[] };
+export type PatchInput = { code?: string; name?: string; description?: string | null; with_used?: boolean; data_tables?: string[]; meta_ids?: number[] };
+
+/** A table some metas need, which their patch's file brings along. */
+export interface PatchTable {
+  table: string;
+  rows: number;
+  triggers: number;
+  can_ship_rows: boolean;
+}
 
 /** A patch file installed here, with what it did to each meta. */
 export interface PatchInstall {
@@ -46,6 +56,8 @@ export const patchApi = {
   /** Writes the patch's file and freezes it. */
   release: (id: number) => api<Patch>(`/patches/${id}/release`, { method: 'POST' }),
   download: (patch: Patch) => downloadFile(`/patches/${patch.id}/download`, `${patch.code}.patch.json`),
+  /** The tables these metas need. */
+  tables: (metaIds: number[], withUsed: boolean) => api<PatchTable[]>('/patches/tables', { method: 'POST', body: JSON.stringify({ meta_ids: metaIds, with_used: withUsed }), notify: false }),
   /** Metas changed since a time; without one, since the newest release. */
   changed: (since?: string) => api<Meta[]>(`/patches/changed${since ? `?since=${encodeURIComponent(since)}` : ''}`),
 

@@ -1,19 +1,40 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaParam, type MetaParamInput } from '../../lib/metaApi';
-import { CornerDownRight, Edit01, Link01, Plus, Trash01 } from '@untitledui/icons';
+import { CornerDownRight, Edit01, Grid01, Link01, List, Plus, Trash01 } from '@untitledui/icons';
 import { Alert, IconAction } from '../../components/ui';
 import { Section } from '../../components/form';
 import { Badge, BadgeWithIcon } from '@/components/base/badges/badges';
+import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
+import { Tooltip } from '@/components/base/tooltip/tooltip';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 import { AutonumberEditor } from './AutonumberEditor';
 import { t } from '@/i18n';
+
+type RowsView = 'cards' | 'inline';
+const ROWS_VIEW_KEY = 'meta_rows_view';
+
+function readRowsView(): RowsView {
+  try {
+    return localStorage.getItem(ROWS_VIEW_KEY) === 'cards' ? 'cards' : 'inline';
+  } catch {
+    return 'inline';
+  }
+}
+
+function saveRowsView(view: RowsView) {
+  try {
+    localStorage.setItem(ROWS_VIEW_KEY, view);
+  } catch {
+    // Storage can be blocked; the toggle still works for this visit.
+  }
+}
 
 const DATA_TYPES = ['string', 'text', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'json', 'detail', 'subgrid', 'signature', 'singlefile', 'multifile', 'document'];
 
@@ -195,6 +216,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
   const look = typeLook(meta.type?.code);
   const noun = look.rowNoun;
 
+  const [view, setView] = useState<RowsView>(readRowsView);
   const [tree, setTree] = useState<MetaParam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,6 +313,7 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
   const blocked = editing && editing !== 'new' ? descendantIds(editing).add(editing.id) : new Set<number>();
   const parentChoices = flatten(tree).filter((c) => !blocked.has(c.id));
   const dataTypes = DATA_TYPES.includes(form.data_type) ? DATA_TYPES : [form.data_type, ...DATA_TYPES];
+  const listClass = view === 'cards' ? 'grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5' : 'flex flex-col gap-2';
 
   return (
     <section aria-labelledby="rows-heading">
@@ -301,9 +324,29 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
           </h2>
           <p className="mt-1 text-sm text-tertiary">{refHint(meta.type?.code)}</p>
         </div>
-        <Button size="md" iconLeading={Plus} onPress={() => openNew(null)}>
-          {t('Add {row}', { row: t(noun) })}
-        </Button>
+        <div className="flex items-center gap-3">
+          <ButtonGroup
+            aria-label={t("View")}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[view]}
+            onSelectionChange={(keys) => {
+              const next: RowsView = keys.has('cards') ? 'cards' : 'inline';
+              setView(next);
+              saveRowsView(next);
+            }}
+          >
+            <Tooltip title={t("Cards")}>
+              <ButtonGroupItem id="cards" aria-label={t("Cards")} iconLeading={Grid01} />
+            </Tooltip>
+            <Tooltip title={t("Inline cards")}>
+              <ButtonGroupItem id="inline" aria-label={t("Inline cards")} iconLeading={List} />
+            </Tooltip>
+          </ButtonGroup>
+          <Button size="md" iconLeading={Plus} onPress={() => openNew(null)}>
+            {t('Add {row}', { row: t(noun) })}
+          </Button>
+        </div>
       </div>
 
       {error && !editing && (
@@ -313,9 +356,9 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
       )}
 
       {loading ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
+        <div className={listClass}>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-44 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+            <div key={i} className={`${view === 'cards' ? 'h-44' : 'h-16'} animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none`} />
           ))}
         </div>
       ) : tree.length === 0 ? (
@@ -327,19 +370,22 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
-          {tree.map((p) => (
-            <RowCard
-              key={p.id}
-              node={p}
-              accent={look.ink}
-              noun={noun}
-              optionName={optionName}
-              onAdd={openNew}
-              onEdit={openEdit}
-              onDelete={setDeleting}
-            />
-          ))}
+        <div className={listClass}>
+          {tree.map((p) => {
+            const Row = view === 'cards' ? RowCard : RowInline;
+            return (
+              <Row
+                key={p.id}
+                node={p}
+                accent={look.ink}
+                noun={noun}
+                optionName={optionName}
+                onAdd={openNew}
+                onEdit={openEdit}
+                onDelete={setDeleting}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -597,6 +643,47 @@ function RowCard({ node, accent, noun, optionName, onAdd, onEdit, onDelete }: Ro
           {t("Add inside")}
         </Button>
       </div>
+    </article>
+  );
+}
+
+/** A top-level row on one line, its nested rows listed under it. */
+function RowInline({ node, accent, noun, optionName, onAdd, onEdit, onDelete }: RowProps & { accent: string }) {
+  const children = node.children ?? [];
+  return (
+    <article className={`rounded-xl bg-primary shadow-xs ring-1 ring-secondary ring-inset ${node.is_show ? '' : 'opacity-75'}`}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <span className="size-2.5 shrink-0 rounded-full" style={{ background: accent }} aria-hidden="true" />
+        <div className="min-w-0 flex-1 sm:w-64 sm:flex-none">
+          <h3 className="truncate text-sm font-semibold text-primary">{rowLabel(node)}</h3>
+          <p className="truncate text-sm text-tertiary">{node.field_path}</p>
+        </div>
+        <div className="order-last w-full sm:order-none sm:w-auto sm:min-w-0 sm:flex-1">
+          <RowFacts node={node} optionName={optionName} />
+        </div>
+        <div className="flex shrink-0 gap-0.5">
+          <IconAction icon={Plus} label={t('Add {row} inside {name}', { row: t(noun), name: rowLabel(node) })} onPress={() => onAdd(node.id)} />
+          <IconAction icon={Edit01} label={t('Edit {name}', { name: rowLabel(node) })} onPress={() => onEdit(node)} />
+          <IconAction icon={Trash01} danger label={t('Delete {name}', { name: rowLabel(node) })} onPress={() => onDelete(node)} />
+        </div>
+      </div>
+
+      {children.length > 0 && (
+        <ul className="space-y-0.5 border-t border-secondary px-3 py-2">
+          {children.map((c) => (
+            <NestedRow
+              key={c.id}
+              node={c}
+              depth={0}
+              noun={noun}
+              optionName={optionName}
+              onAdd={onAdd}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </ul>
+      )}
     </article>
   );
 }

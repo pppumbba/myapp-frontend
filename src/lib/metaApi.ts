@@ -19,6 +19,17 @@ export interface Tag {
 /** How a grid can show its records as widgets (json_config.view), and where a column sits on one. */
 export const RECORD_LOOKS = ['cards', 'inline', 'tiles'] as const;
 export type RecordLook = (typeof RECORD_LOOKS)[number];
+export const GRID_VIEWS = ['table', ...RECORD_LOOKS] as const;
+export type GridViewName = (typeof GRID_VIEWS)[number];
+export const GRID_VIEW_LABELS: Record<GridViewName, string> = { table: 'Table', cards: 'Cards', inline: 'Inline cards', tiles: 'Tiles' };
+/** The view a grid opens in (json_config.view). */
+export const gridViewOf = (config?: Record<string, unknown> | null): GridViewName => GRID_VIEWS.find((v) => v === config?.view) ?? 'table';
+/** What a grid's view buttons offer: its own view and those in json_config.view_buttons; none when that leaves only one. */
+export function gridViewButtons(config?: Record<string, unknown> | null): GridViewName[] {
+  const chosen: unknown[] = Array.isArray(config?.view_buttons) ? config.view_buttons : [];
+  const views = GRID_VIEWS.filter((v) => v === gridViewOf(config) || chosen.includes(v));
+  return views.length > 1 ? views : [];
+}
 export const RECORD_SLOTS = ['image', 'title', 'subtitle', 'badge', 'body', 'footer'] as const;
 export type RecordSlot = (typeof RECORD_SLOTS)[number];
 
@@ -136,9 +147,22 @@ export type MetaInput = Partial<Omit<Meta, 'id' | 'type' | 'ref_meta' | 'params_
 export type MetaParamInput = Partial<Omit<MetaParam, 'id' | 'children' | 'main_meta_id' | 'display_as' | 'filter_as'>>;
 
 export type ImportExisting = 'replace' | 'skip' | 'copy';
+/** What a patch adds to the database (backend: PatchSchema). */
+export interface SchemaChanges {
+  tables: string[];
+  columns: string[];
+  keys: string[];
+  triggers: string[];
+  replaced_triggers: string[];
+  roles: string[];
+  rows: Record<string, number> | [];
+  rows_kept: string[];
+}
+
 export interface ImportResult {
   metas: { code: string; name: string; type: string | null; action: 'create' | ImportExisting | 'left out'; id: number | null }[];
   warnings: string[];
+  schema?: SchemaChanges;
 }
 
 /** A meta as the where-used list names it. */

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Check, ClockRewind, Download01, Edit01, Package, Plus, Rocket01, Trash01, Upload01 } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
 import { metaApi, type Meta, type Tag } from '../lib/metaApi';
-import { patchApi, type Patch, type PatchInstall } from '../lib/patchApi';
+import { patchApi, type Patch, type PatchInstall, type PatchTable } from '../lib/patchApi';
 import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
@@ -12,7 +12,7 @@ import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/but
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { TextArea } from '@/components/base/textarea/textarea';
-import { ImportMetasModal, MetaPicker } from './metas/MetaTransferModals';
+import { ImportMetasModal, MetaPicker, SchemaSummary } from './metas/MetaTransferModals';
 import { tagColor } from './metas/MetaTags';
 import { t } from '@/i18n';
 import { cx } from '@/utils/cx';
@@ -26,7 +26,8 @@ type Tab = 'made' | 'installed';
  * Patch management. Made here: named sets of metas; releasing one writes its file, which
  * then stays as it was. Installed here: patch files put into this installation, each with
  * what it did, and a rollback that deletes the metas it added and restores the ones it
- * replaced to their versions from just before.
+ * replaced to their versions from just before. A patch's file also brings the tables,
+ * triggers and picked rows its metas need, so installing it needs no deploy.
  */
 export default function PatchesPage() {
   const [tab, setTab] = useState<Tab>('made');
@@ -98,7 +99,7 @@ export default function PatchesPage() {
     <>
       <PageHeader
         title={t("Patches")}
-        subtitle={t("Ship metas from one installation to another, e.g. from test to live: release a patch here, install its file there, roll it back if needed.")}
+        subtitle={t("Ship metas and the tables they need from one installation to another, e.g. from test to live: release a patch here, install its file there, roll it back if needed.")}
         actions={
           <div className="flex gap-2">
             <Button size="sm" color="secondary" iconLeading={Upload01} onPress={() => setInstalling(true)}>
@@ -286,6 +287,7 @@ function InstallRow({ install: i, busy, onDownload, onRollback }: { install: Pat
                   </li>
                 ))}
               </ul>
+              {i.result.schema && <SchemaSummary schema={i.result.schema} />}
               {i.result.warnings.length > 0 && (
                 <ul className="list-disc space-y-0.5 rounded-lg bg-warning-primary p-3 pl-8 text-sm text-warning-primary">
                   {i.result.warnings.map((w) => (
@@ -322,6 +324,49 @@ function tagGroups(metas: Meta[]): { tag: Tag; ids: number[] }[] {
   return [...groups.values()].sort((a, b) => a.tag.name.localeCompare(b.tag.name));
 }
 
+/** The tables the picked metas need, which the patch brings, and whose rows go with them. */
+function PatchTables({ metaIds, withUsed, picked, onChange }: { metaIds: number[]; withUsed: boolean; picked: string[]; onChange: (tables: string[]) => void }) {
+  const [tables, setTables] = useState<PatchTable[] | null>(null);
+  const key = metaIds.join(',');
+
+  useEffect(() => {
+    if (!metaIds.length) return setTables([]);
+    let live = true;
+    const wait = setTimeout(() => {
+      patchApi.tables(metaIds, withUsed).then((found) => live && setTables(found), () => live && setTables([]));
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(wait);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, withUsed]);
+
+  if (!tables?.length) return null;
+  const withRows = tables.filter((table) => table.can_ship_rows && table.rows > 0);
+
+  return (
+    <fieldset className="rounded-lg p-3 ring-1 ring-secondary">
+      <legend className="px-1 text-sm font-medium text-secondary">{t('Tables it brings ({n})', { n: tables.length })}</legend>
+      <p className="text-sm text-tertiary">{t("Added where they're missing, with their triggers. Tick the ones whose rows the metas can't work without, like tax rates or statuses; rows only go into an empty table.")}</p>
+      <ul className="mt-2 max-h-48 space-y-1.5 overflow-auto">
+        {withRows.map((table) => (
+          <li key={table.table}>
+            <Checkbox
+              isSelected={picked.includes(table.table)}
+              onChange={(on) => onChange(on ? [...picked, table.table] : picked.filter((name) => name !== table.table))}
+              label={t('{table}: {n} rows', { table: table.table, n: table.rows })}
+            />
+          </li>
+        ))}
+      </ul>
+      {tables.length > withRows.length && (
+        <p className="mt-2 truncate text-xs text-quaternary">{t('Without rows: {tables}', { tables: tables.filter((table) => !withRows.includes(table)).map((table) => table.table).join(', ') })}</p>
+      )}
+    </fieldset>
+  );
+}
+
 /** A patch's name and metas; a draft can change until it is released. */
 function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; metas: Meta[]; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState(patch?.code ?? `patch_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`);
@@ -329,6 +374,7 @@ function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; m
   const [description, setDescription] = useState(patch?.description ?? '');
   const [withUsed, setWithUsed] = useState(patch?.with_used ?? false);
   const [picked, setPicked] = useState<number[]>(patch?.metas.map((m) => m.id) ?? []);
+  const [dataTables, setDataTables] = useState<string[]>(patch?.data_tables ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -357,7 +403,7 @@ function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; m
     setBusy(true);
     setError(null);
     setFieldErrors({});
-    const input = { code, name, description: description || null, with_used: withUsed, meta_ids: picked };
+    const input = { code, name, description: description || null, with_used: withUsed, data_tables: dataTables, meta_ids: picked };
     try {
       if (patch) await patchApi.update(patch.id, input);
       else await patchApi.create(input);
@@ -406,6 +452,7 @@ function PatchModal({ patch, metas, onClose, onSaved }: { patch: Patch | null; m
         )}
         <MetaPicker metas={metas} picked={picked} onChange={setPicked} autoFocus={false} />
         <Checkbox isSelected={withUsed} onChange={setWithUsed} label={t("Also the metas they use")} hint={t("Lookups, the forms their buttons open, process steps, linked metas… and the ones those use. Leave it off when the other app already has them: they are found there by code.")} />
+        <PatchTables metaIds={picked} withUsed={withUsed} picked={dataTables} onChange={setDataTables} />
         <div className="flex justify-end gap-2 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>{t("Cancel")}</Button>
           <Button size="sm" type="submit" isLoading={busy} showTextWhileLoading isDisabled={!name.trim() || !code.trim()}>
