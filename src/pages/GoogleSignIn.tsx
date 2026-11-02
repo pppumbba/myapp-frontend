@@ -32,7 +32,8 @@ export function GoogleSignIn() {
   return (
     <>
       <a
-        href={backendUrl('/auth/google/redirect')}
+        // In development through the dev server's proxy, as Google won't send anyone back to a .test address.
+        href={import.meta.env.DEV ? '/auth/google/redirect' : backendUrl('/auth/google/redirect')}
         className="flex w-full items-center justify-center gap-3 rounded-lg bg-primary px-4 py-2.5 text-md font-semibold text-secondary shadow-xs ring-1 ring-primary outline-focus-ring ring-inset hover:bg-primary_hover focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         <GoogleMark />

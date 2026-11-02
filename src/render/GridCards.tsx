@@ -21,10 +21,16 @@ const SKELETONS: Record<RecordLook, string> = { cards: "h-32", inline: "h-16", t
 
 type Slots = Record<RecordSlot, MetaParam[]>;
 
-/** Each column in its place (widget_position). Without one it's a detail, the status a badge, and with no title the first detail is. */
+/**
+ * Each column in its place (widget_position). Without one, or with one that isn't a place, it's a
+ * detail, the status a badge, and with no title the first detail is.
+ */
 function slotsOf(columns: MetaParam[]): Slots {
   const slots: Slots = { image: [], title: [], subtitle: [], badge: [], body: [], footer: [] };
-  for (const c of columns) slots[c.widget_position ?? (c.id > 0 ? "body" : "badge")].push(c);
+  for (const c of columns) {
+    const place = c.widget_position && c.widget_position in slots ? c.widget_position : c.id > 0 ? "body" : "badge";
+    slots[place].push(c);
+  }
   if (!slots.title.length && slots.body.length) slots.title.push(slots.body.shift()!);
   return slots;
 }
