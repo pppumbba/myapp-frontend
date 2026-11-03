@@ -1,5 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AdminRoute, GuestRoute, ProtectedRoute } from './auth/routes';
+import { AdminRoute, BuilderRoute, GuestRoute, ProtectedRoute } from './auth/routes';
 import { AppShell } from './components/AppShell';
 import { ScreenApp } from './render/ScreenApp';
 import AdminPage from './pages/AdminPage';
@@ -54,9 +54,9 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/apps" element={<AppsPage />} />
-        <Route path="/metas" element={<AdminRoute><MetasPage /></AdminRoute>} />
+        <Route path="/metas" element={<BuilderRoute><MetasPage /></BuilderRoute>} />
         <Route path="/metas/usage" element={<AdminRoute><MetaUsagePage /></AdminRoute>} />
-        <Route path="/metas/:id" element={<AdminRoute><MetaDetailPage /></AdminRoute>} />
+        <Route path="/metas/:id" element={<BuilderRoute><MetaDetailPage /></BuilderRoute>} />
         <Route path="/query-builder" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
         <Route path="/query-builder/:id" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
         <Route path="/sites" element={<AdminRoute><SitesPage /></AdminRoute>} />
@@ -90,8 +90,8 @@ export default function App() {
         <Route path="/market/tenders/:id/bid" element={<BidEditor />} />
         <Route path="/market/bids" element={<MyBidsPage />} />
       </Route>
-      <Route path="/studio" element={<AdminRoute><StudioPage /></AdminRoute>} />
-      <Route path="/studio/:id" element={<AdminRoute><StudioPage /></AdminRoute>} />
+      <Route path="/studio" element={<BuilderRoute feature="studio"><StudioPage /></BuilderRoute>} />
+      <Route path="/studio/:id" element={<BuilderRoute feature="studio"><StudioPage /></BuilderRoute>} />
       <Route path="/site-preview/:id/*" element={<AdminRoute><SitePreviewPage /></AdminRoute>} />
       <Route path="/run/:id" element={<ProtectedRoute><RunPage /></ProtectedRoute>} />
       {/* Public metas, for anyone: no sign-in needed. */}

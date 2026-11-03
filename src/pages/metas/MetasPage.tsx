@@ -46,7 +46,7 @@ export default function MetasPage() {
   const [options, setOptions] = useState<MetaOption[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [managingTags, setManagingTags] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, user, access } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,9 +74,10 @@ export default function MetasPage() {
     setError(null);
     try {
       const [m, item, o, g] = await Promise.all([metaApi.list(), metaApi.types(), metaApi.options(), metaApi.tags()]);
-      // Apps have their own page; this one is for the screens they link to.
-      setMetas(m.filter((x) => x.type?.code !== 'app'));
-      setTypes(item.filter((x) => x.code !== 'app'));
+      // Apps have their own page; this one is for the screens they link to. A builder sees the
+      // metas they made and makes only the types they may.
+      setMetas(m.filter((x) => x.type?.code !== 'app' && (isAdmin || x.created_by === user?.id)));
+      setTypes(item.filter((x) => x.code !== 'app' && (isAdmin || !!access?.build_types?.includes(x.code))));
       setOptions(o);
       setTags(g);
     } catch (err) {
@@ -164,9 +165,11 @@ export default function MetasPage() {
                 {t("Create from Excel")}
               </Button>
             )}
-            <Button size="sm" color="secondary" iconLeading={ClockRewind} onPress={() => setShowDeleted(true)}>
-              {t("Deleted")}
-            </Button>
+            {isAdmin && (
+              <Button size="sm" color="secondary" iconLeading={ClockRewind} onPress={() => setShowDeleted(true)}>
+                {t("Deleted")}
+              </Button>
+            )}
             <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
               {t("New meta")}
             </Button>

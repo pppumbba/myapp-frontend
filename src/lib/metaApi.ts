@@ -54,6 +54,8 @@ export interface Meta {
   is_public?: boolean;
   /** Every signed-in user may view it, without a role (e.g. the market app and its screens). */
   is_open?: boolean;
+  /** Who made it: a builder may change the metas they made (an admin all of them). */
+  created_by?: number | null;
   description: string | null;
   table_name: string | null;
   query_string: string | null;
@@ -89,6 +91,8 @@ export interface MetaOption {
   id: number;
   code: string;
   name: string;
+  /** Who made it (see Meta.created_by). */
+  created_by?: number | null;
   type: string | null;
 }
 

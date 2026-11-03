@@ -24,12 +24,16 @@ import { TranslationsPanel } from './TranslationsPanel';
 import { MetaPermissionsPanel, StatusPermissionsPanel } from './PermissionsPanel';
 import { WidgetDesigner } from './WidgetDesigner';
 import { WorkflowDesigner } from './WorkflowDesigner';
+import { useAuth } from '../../auth/AuthContext';
 import { t } from '@/i18n';
 
 export default function MetaDetailPage() {
   const { id } = useParams();
   const metaId = Number(id);
   const navigate = useNavigate();
+  // A builder changes only the metas they made, and the versions, permissions, translations and
+  // process flow stay with admins.
+  const { isAdmin, designs, hasFeature, access } = useAuth();
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [types, setTypes] = useState<MetaType[]>([]);
@@ -48,7 +52,7 @@ export default function MetaDetailPage() {
     try {
       const [m, item, o] = await Promise.all([metaApi.get(metaId), metaApi.types(), metaApi.options()]);
       setMeta(m);
-      setTypes(item);
+      setTypes(isAdmin ? item : item.filter((x) => !!access?.build_types?.includes(x.code)));
       setOptions(o);
     } catch (err) {
       setError(
@@ -59,7 +63,7 @@ export default function MetaDetailPage() {
             : t('This meta could not be loaded.'),
       );
     }
-  }, [metaId]);
+  }, [metaId, isAdmin, access]);
 
   useEffect(() => {
     load();
@@ -79,6 +83,7 @@ export default function MetaDetailPage() {
   }
 
   const look = typeLook(meta?.type?.code);
+  const mine = designs(meta);
 
   return (
     <>
@@ -114,11 +119,15 @@ export default function MetaDetailPage() {
                   <p className="mt-1 text-sm text-tertiary">{meta.code}</p>
                 </div>
                 <div className="flex gap-3">
-                  <Button color="secondary-destructive" iconLeading={Trash01} onPress={() => setDeleting(true)} aria-label={t('Delete meta')} />
-                  <Button color="secondary" iconLeading={Edit01} onPress={() => setEditing(true)}>
-                    {t('Edit')}
-                  </Button>
-                  {meta.type?.code === 'app' && (
+                  {mine && (
+                    <>
+                      <Button color="secondary-destructive" iconLeading={Trash01} onPress={() => setDeleting(true)} aria-label={t('Delete meta')} />
+                      <Button color="secondary" iconLeading={Edit01} onPress={() => setEditing(true)}>
+                        {t('Edit')}
+                      </Button>
+                    </>
+                  )}
+                  {mine && hasFeature('studio') && meta.type?.code === 'app' && (
                     <Button color="secondary" iconLeading={Dataflow03} onPress={() => navigate(`/studio/${meta.id}`)}>
                       {t('Open in studio')}
                     </Button>
@@ -160,6 +169,15 @@ export default function MetaDetailPage() {
             </div>
           </header>
 
+          {!mine && (
+            <div className="mb-8">
+              <Alert>{t('You can only change metas you made.')}</Alert>
+            </div>
+          )}
+
+          {mine && (
+          <>
+          {isAdmin && (
           <VersionsPanel
             meta={meta}
             onRestored={async () => {
@@ -167,6 +185,7 @@ export default function MetaDetailPage() {
               setRevision((r) => r + 1);
             }}
           />
+          )}
 
           {/* The page spaces its sections; they keep no outer margins of their own. */}
           <div key={revision} className="space-y-8">
@@ -196,7 +215,7 @@ export default function MetaDetailPage() {
             </>
           ) : (
             <>
-              <MetaPermissionsPanel key={`permissions-${meta.id}`} meta={meta} />
+              {isAdmin && <MetaPermissionsPanel key={`permissions-${meta.id}`} meta={meta} />}
               {meta.type?.code === 'chart' ? (
                 // Keyed on the source too, so editing the table or query reloads the columns.
                 <ChartDesigner key={`chart-${meta.id}-${meta.table_name}-${meta.query_string}`} meta={meta} options={options} />
@@ -217,12 +236,14 @@ export default function MetaDetailPage() {
               ) : (
                 <MetaParamsPanel key={`${meta.id}-${paramsVersion}`} meta={meta} options={options} />
               )}
-              {meta.type?.code === 'form' && <ProcessFlowPanel key={`process-flow-${meta.id}`} meta={meta} options={options} />}
+              {isAdmin && meta.type?.code === 'form' && <ProcessFlowPanel key={`process-flow-${meta.id}`} meta={meta} options={options} />}
             </>
           )}
-          {meta.type?.code !== 'theme' && <TranslationsPanel key={`translations-${meta.id}-${paramsVersion}`} meta={meta} />}
+          {isAdmin && meta.type?.code !== 'theme' && <TranslationsPanel key={`translations-${meta.id}-${paramsVersion}`} meta={meta} />}
 
           </div>
+          </>
+          )}
 
           {editing && (
             <MetaFormModal

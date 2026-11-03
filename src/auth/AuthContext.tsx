@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, tokenStore } from '../lib/api';
-import { accessApi, type Ability, type Access } from '../lib/accessApi';
+import { accessApi, type Ability, type Access, type Feature } from '../lib/accessApi';
 import { sessionApi, setSession, type SessionValues } from '../lib/sessionApi';
 
 export interface User {
@@ -47,6 +47,12 @@ interface AuthState {
   /** Reloads access, e.g. after an admin changes their own roles. */
   refreshAccess: () => Promise<void>;
   isAdmin: boolean;
+  /** Whether one of the user's roles gives this builder feature; an admin has them all. */
+  hasFeature: (feature: Feature) => boolean;
+  /** Whether the user may make metas: an admin or a builder. */
+  isBuilder: boolean;
+  /** Whether the user may change this meta: an admin, or the builder who made it. */
+  designs: (meta: { created_by?: number | null } | null | undefined) => boolean;
   /** Whether the user (or guest) may do this with the meta. Metas without permission rows are for admins only, unless public. */
   can: (metaId: number | null | undefined, ability: Ability) => boolean;
   /** The user's custom session values (e.g. sessionemployeeid), worked out at login. */
@@ -145,6 +151,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isAdmin = !!access?.is_admin;
+  const hasFeature = useCallback((feature: Feature) => isAdmin || !!access?.features?.includes(feature), [access, isAdmin]);
+  const isBuilder = isAdmin || !!access?.features?.length;
+  const designs = useCallback(
+    (meta: { created_by?: number | null } | null | undefined) => isAdmin || (isBuilder && !!meta && meta.created_by === user?.id),
+    [isAdmin, isBuilder, user],
+  );
   const can = useCallback(
     (metaId: number | null | undefined, ability: Ability) => {
       if (isAdmin || !metaId) return true;
@@ -154,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, access, loading, login, loginWithGoogle, register, logout, updateUser: setUser, refreshAccess, isAdmin, can, session, refreshSession }}>
+    <AuthContext.Provider value={{ user, access, loading, login, loginWithGoogle, register, logout, updateUser: setUser, refreshAccess, isAdmin, hasFeature, isBuilder, designs, can, session, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

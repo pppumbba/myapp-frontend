@@ -84,6 +84,7 @@ import {
   type StudioMode,
   type StudioNode,
 } from './tree';
+import { useAuth } from '../../auth/AuthContext';
 import { t } from '@/i18n';
 
 /** What is being edited: the app (its fields and menu) and the screens opened or made in it. Undo steps through these. */
@@ -143,6 +144,8 @@ export default function StudioPage() {
   const history = useRef<{ past: Doc[]; future: Doc[]; last?: { key: string; at: number } }>({ past: [], future: [] });
   const [, setHistoryTick] = useState(0);
 
+  // A builder builds the apps they made; an admin all of them.
+  const { designs } = useAuth();
   const loadOptions = useCallback(() => metaApi.options().then(setOptions), []);
   useEffect(() => {
     Promise.all([metaApi.types(), loadOptions()]).then(
@@ -163,6 +166,9 @@ export default function StudioPage() {
     (async () => {
       try {
         const app = await metaApi.get(appId);
+        if (!designs(app)) {
+          throw new ApiError(403, t('You can only build apps you made.'));
+        }
         if (app.type?.code !== 'app') {
           throw new ApiError(422, t('The studio opens apps. "{name}" is a {type}: open the app it belongs to, and design it from there.', { name: app.name, type: app.type?.name ?? t('meta without a type') }));
         }
@@ -177,7 +183,7 @@ export default function StudioPage() {
     return () => {
       live = false;
     };
-  }, [appId]);
+  }, [appId, designs]);
 
   // Undoing the drop that made a screen takes it away; don't stay inside it.
   const openKey = path.filter((k) => doc?.screens[k]).at(-1) ?? null;
@@ -1256,7 +1262,8 @@ function Preview({ screen, dirty, previewKey, runUrl }: { screen: Screen | null;
 
 /** With nothing open: make a new app or open one. */
 function StartScreen({ options, onNew, onOpen }: { options: MetaOption[]; onNew: () => void; onOpen: (id: number) => void }) {
-  const apps = options.filter((o) => o.type === 'app');
+  const { designs } = useAuth();
+  const apps = options.filter((o) => o.type === 'app' && designs(o));
   return (
     <div className="min-h-0 flex-1 overflow-auto bg-secondary_alt">
       <div className="mx-auto max-w-3xl px-6 py-12">

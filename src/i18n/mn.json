@@ -2528,5 +2528,13 @@
   "Already in the group": "Группт байгаа",
   "Add {count}": "{count} нэмэх",
   "Create group": "Групп үүсгэх",
-  "Drag to move": "Чирж зөөнө үү"
+  "Drag to move": "Чирж зөөнө үү",
+  "Builder": "Бүтээгч",
+  "Build metas": "Мета бүтээх",
+  "Make new metas and change and use their own. Others use them once an admin gives them to a role. No system tables, SQL, scripts or external services.": "Шинэ мета үүсгэж, өөрийн метаг өөрчилж ашиглана. Бусад хүмүүс админ тэдгээрийг дүрд олгосны дараа ашиглана. Системийн хүснэгт, SQL, скрипт, гадаад үйлчилгээ ашиглахгүй.",
+  "Use the studio": "Студи ашиглах",
+  "Build their own apps and the screens inside them in the studio.": "Өөрийн апп болон доторх дэлгэцүүдийг студид бүтээнэ.",
+  "You can only change metas you made.": "Та зөвхөн өөрийн үүсгэсэн метаг өөрчилж болно.",
+  "You can only build apps you made.": "Та зөвхөн өөрийн үүсгэсэн аппыг бүтээж болно.",
+  "The table this screen reads and writes. System tables, such as users and roles, cannot be used.": "Энэ дэлгэцийн уншиж, бичих хүснэгт. Хэрэглэгч, дүр зэрэг системийн хүснэгтийг ашиглах боломжгүй."
 }

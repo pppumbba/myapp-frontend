@@ -9,10 +9,13 @@ const everyone = [
   { href: '/', label: 'Home', icon: HomeLine },
   { href: '/apps', label: 'Apps', icon: Grid01 },
 ];
-// The builder and user management.
+// Builders: their own metas, and with the studio feature their own apps.
+const metas = { href: '/metas', label: 'Metas', icon: LayersThree01 };
+const studio = { href: '/studio', label: 'Studio', icon: Dataflow03 };
+// The rest of the builder, and user management.
 const admins = [
-  { href: '/metas', label: 'Metas', icon: LayersThree01 },
-  { href: '/studio', label: 'Studio', icon: Dataflow03 },
+  metas,
+  studio,
   { href: '/query-builder', label: 'Query builder', icon: Database01 },
   { href: '/widgets', label: 'Widget library', icon: LayoutAlt01 },
   { href: '/sites', label: 'Websites', icon: Globe01 },
@@ -45,12 +48,13 @@ export function Logo() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isBuilder, hasFeature } = useAuth();
   // A new screen starts at the top; Back and Forward leave the scroll where the browser puts it.
   useEffect(() => {
     if (navigationType !== 'POP') window.scrollTo(0, 0);
   }, [pathname, navigationType]);
-  const nav = (isAdmin ? [...everyone, ...admins] : everyone).map((item) => ({ ...item, label: t(item.label) }));
+  const builders = [...(isBuilder ? [metas] : []), ...(hasFeature('studio') ? [studio] : [])];
+  const nav = (isAdmin ? [...everyone, ...admins] : [...everyone, ...builders]).map((item) => ({ ...item, label: t(item.label) }));
   // /metas/12 still highlights Metas; the longest match wins, so /admin/roles/3 is Users & roles, not Home.
   const activeUrl =
     nav

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import type { Feature } from '../lib/accessApi';
 import { t } from '@/i18n';
 
 const RETURN_KEY = 'return_to';
@@ -56,6 +57,18 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   if (loading) return <FullPageSpinner />;
   if (!user) return <ToLogin />;
   if (!isAdmin) {
+    setReturnPath(null);
+    return <Navigate to="/" replace />;
+  }
+  return <Arrived>{children}</Arrived>;
+}
+
+/** Only admins and builders, or with a feature only those whose roles give it. Others go home. */
+export function BuilderRoute({ feature, children }: { feature?: Feature; children: ReactNode }) {
+  const { user, isBuilder, hasFeature, loading } = useAuth();
+  if (loading) return <FullPageSpinner />;
+  if (!user) return <ToLogin />;
+  if (feature ? !hasFeature(feature) : !isBuilder) {
     setReturnPath(null);
     return <Navigate to="/" replace />;
   }

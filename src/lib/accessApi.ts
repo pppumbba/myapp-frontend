@@ -2,11 +2,16 @@ import { api } from './api';
 
 export type Ability = 'view' | 'create' | 'edit' | 'delete';
 
+/** Builder abilities a role can give: build makes metas and changes the user's own, studio builds their own apps. */
+export type Feature = 'build' | 'studio';
+export const FEATURES: Feature[] = ['build', 'studio'];
+
 export interface Role {
   id: number;
   code: string;
   name: string;
   description?: string | null;
+  features?: Feature[] | null;
   users_count?: number;
 }
 
@@ -17,6 +22,10 @@ export interface Role {
 export interface Access {
   is_admin: boolean;
   roles: Role[];
+  /** The builder features the user's roles give; an admin has them all. */
+  features: Feature[];
+  /** The meta types the user may make: null is every type (an admin), empty none. */
+  build_types: string[] | null;
   metas: Record<string, Record<Ability, boolean>>;
 }
 

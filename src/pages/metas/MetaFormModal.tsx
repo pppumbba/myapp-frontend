@@ -14,6 +14,7 @@ import { CodeEditor } from '../../components/CodeEditor';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { SCRIPT_COLUMNS } from '../../render/formScript';
 import { TagPicker } from './MetaTags';
+import { useAuth } from '../../auth/AuthContext';
 import { t } from '@/i18n';
 
 type ScriptColumn = (typeof SCRIPT_COLUMNS)[keyof typeof SCRIPT_COLUMNS];
@@ -174,6 +175,8 @@ export function MetaFormModal({
   const [script, setScript] = useState<ScriptColumn>('event_expression_string');
   const [tags, setTags] = useState<Tag[]>([]);
   const typeCode = types.find((item) => String(item.id) === form.type_id)?.code;
+  // SQL, external services, scripts and opening a meta to everyone are for admins only (config/builders.php).
+  const { isAdmin } = useAuth();
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const fe = (field: string) => fieldErrors[field]?.[0];
@@ -294,7 +297,7 @@ export function MetaFormModal({
                 onChange={(v) => set('table_name', v)}
                 placeholder="customers"
                 isInvalid={!!fe('table_name')}
-                hint={fe('table_name') ?? t('The table this screen reads and writes.')}
+                hint={fe('table_name') ?? (isAdmin ? t('The table this screen reads and writes.') : t('The table this screen reads and writes. System tables, such as users and roles, cannot be used.'))}
               />
             </div>
             <TextArea
@@ -314,7 +317,7 @@ export function MetaFormModal({
             />
           </Section>
 
-          {types.find((item) => String(item.id) === form.type_id)?.code === 'stage_query' ? (
+          {!isAdmin ? null : types.find((item) => String(item.id) === form.type_id)?.code === 'stage_query' ? (
             <Section title={t('Query')}>
               <TextArea
                 label={t('SQL that changes data')}
@@ -348,7 +351,7 @@ export function MetaFormModal({
             </Section>
           )}
 
-          {(typeCode === 'form' || typeCode === 'datagrid') && (
+          {isAdmin && (typeCode === 'form' || typeCode === 'datagrid') && (
             <Section title={t('External service')}>
               <p className="text-sm text-tertiary">
                 {t(typeCode === 'form'
@@ -453,7 +456,7 @@ export function MetaFormModal({
             </Section>
           )}
 
-          {typeCode === 'form' && (
+          {isAdmin && typeCode === 'form' && (
             <Section title={t('Scripts')}>
               <ButtonGroup
                 size="sm"
@@ -507,6 +510,8 @@ export function MetaFormModal({
               ]}
             />
             <Toggle label={t('Active')} hint={t('Inactive metas stay saved but are hidden from apps.')} isSelected={form.is_active} onChange={(v) => set('is_active', v)} />
+            {isAdmin && (
+            <>
             <Toggle
               label={t('Public')}
               hint={
@@ -523,6 +528,8 @@ export function MetaFormModal({
               isSelected={form.is_open}
               onChange={(v) => set('is_open', v)}
             />
+            </>
+            )}
             {(typeCode === 'form' || typeCode === 'excel_import' || typeCode === 'matrix') && (
               <Toggle
                 label={t('Keep a log of changes')}

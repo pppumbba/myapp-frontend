@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Edit01, Plus, SearchLg, Trash01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../lib/api';
-import { accessApi, type Role, type UserWithRoles } from '../lib/accessApi';
+import { accessApi, FEATURES, type Feature, type Role, type UserWithRoles } from '../lib/accessApi';
 import { PageHeader } from '../components/AppShell';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Alert, IconAction } from '../components/ui';
@@ -148,10 +148,16 @@ function RolesCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
   );
 }
 
+const FEATURE_LABELS: Record<Feature, { label: string; hint: string }> = {
+  build: { label: 'Build metas', hint: 'Make new metas and change and use their own. Others use them once an admin gives them to a role. No system tables, SQL, scripts or external services.' },
+  studio: { label: 'Use the studio', hint: 'Build their own apps and the screens inside them in the studio.' },
+};
+
 export function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState(role?.code ?? '');
   const [name, setName] = useState(role?.name ?? '');
   const [description, setDescription] = useState(role?.description ?? '');
+  const [features, setFeatures] = useState<Feature[]>(role?.features ?? []);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -163,7 +169,7 @@ export function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClo
     setError(null);
     setFieldErrors({});
     try {
-      const input = { code, name, description: description || null };
+      const input = { code, name, description: description || null, features: FEATURES.filter((f) => features.includes(f)) };
       if (role) await accessApi.updateRole(role.id, input);
       else await accessApi.createRole(input);
       onSaved();
@@ -190,6 +196,20 @@ export function RoleModal({ role, onClose, onSaved }: { role: Role | null; onClo
           hint={fe('code') ?? t("Lowercase letters, numbers, - and _.")}
         />
         <TextArea label={t("Description")} value={description} onChange={setDescription} rows={3} />
+        {role?.code !== 'admin' && (
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-medium text-secondary">{t("Builder")}</legend>
+            {FEATURES.map((f) => (
+              <Checkbox
+                key={f}
+                label={t(FEATURE_LABELS[f].label)}
+                hint={t(FEATURE_LABELS[f].hint)}
+                isSelected={features.includes(f)}
+                onChange={(on) => setFeatures((current) => (on ? [...current, f] : current.filter((x) => x !== f)))}
+              />
+            ))}
+          </fieldset>
+        )}
         <div className="modal-footer flex justify-end gap-3 border-t border-secondary pt-4">
           <Button size="sm" color="secondary" onPress={onClose}>
             {t("Cancel")}
