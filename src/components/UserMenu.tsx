@@ -91,7 +91,7 @@ export function UserMenu({ collapsed = false, below = false }: { collapsed?: boo
               <Dropdown.Item id="admin" icon={Users01} label={t('Users & roles')} />
             </Dropdown.Section>
           )}
-          {user?.is_platform_owner && (
+          {!!user?.is_platform_owner && (
             <Dropdown.Section>
               <Dropdown.Item id="platform" icon={Server01} label={t('All customers')} />
             </Dropdown.Section>
