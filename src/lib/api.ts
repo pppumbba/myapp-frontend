@@ -179,8 +179,12 @@ export function guestCustomerCode(): string | null {
   return window.location.pathname.match(/^\/c\/([^/]+)\//)?.[1] ?? null;
 }
 
+// What the server answers per address (routes/api.php: the public group, also under /c/{code}).
+const PUBLIC = /^\/((metas|workflows)\/\d+|site(\?|$)|user\/access$)/;
+
+/** On another customer's public page even a signed-in person is a guest there (the server drops the token). */
 function withCustomer(path: string): string {
-  const code = tokenStore.get() ? null : guestCustomerCode();
+  const code = PUBLIC.test(path) ? guestCustomerCode() : null;
   return code ? `/c/${encodeURIComponent(code)}${path}` : path;
 }
 
