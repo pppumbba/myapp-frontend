@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Globe01, Plus } from '@untitledui/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
+import { useAuth } from '../../auth/AuthContext';
+import { publicPath } from '../../lib/customerApi';
 import { siteApi, type SiteSummary } from '../../lib/siteApi';
 import { PageHeader } from '../../components/AppShell';
 import { Modal } from '../../components/Modal';
@@ -13,6 +15,7 @@ import { t } from '@/i18n';
 
 /** /sites — every website: where it answers, how many pages are live, and its visits this week. */
 export default function SitesPage() {
+  const { customer } = useAuth();
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -52,7 +55,7 @@ export default function SitesPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-md font-semibold text-primary">{s.title || s.name}</p>
-                    <p className="truncate font-mono text-sm text-tertiary">{s.host ?? `/site/${s.code}`}</p>
+                    <p className="truncate font-mono text-sm text-tertiary">{s.host ?? publicPath(customer, `/site/${s.code}`)}</p>
                   </div>
                   {!s.is_active && (
                     <Badge type="color" size="sm" color="gray">

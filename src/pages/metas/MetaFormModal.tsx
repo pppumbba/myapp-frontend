@@ -15,6 +15,7 @@ import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/but
 import { SCRIPT_COLUMNS } from '../../render/formScript';
 import { TagPicker } from './MetaTags';
 import { useAuth } from '../../auth/AuthContext';
+import { publicPath } from '../../lib/customerApi';
 import { t } from '@/i18n';
 
 type ScriptColumn = (typeof SCRIPT_COLUMNS)[keyof typeof SCRIPT_COLUMNS];
@@ -176,7 +177,7 @@ export function MetaFormModal({
   const [tags, setTags] = useState<Tag[]>([]);
   const typeCode = types.find((item) => String(item.id) === form.type_id)?.code;
   // SQL, external services, scripts and opening a meta to everyone are for admins only (config/builders.php).
-  const { isAdmin } = useAuth();
+  const { isAdmin, customer } = useAuth();
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const fe = (field: string) => fieldErrors[field]?.[0];
@@ -516,7 +517,7 @@ export function MetaFormModal({
               label={t('Public')}
               hint={
                 form.is_public && meta
-                  ? t('Anyone may open it at {url} and add records through it, without signing in. The screens, lines and lookups it shows must be public too. Nobody edits or deletes records this way, and a form never shows what others sent.', { url: `${window.location.origin}/portal/${meta.id}` })
+                  ? t('Anyone may open it at {url} and add records through it, without signing in. The screens, lines and lookups it shows must be public too. Nobody edits or deletes records this way, and a form never shows what others sent.', { url: `${window.location.origin}${publicPath(customer, `/portal/${meta.id}`)}` })
                   : t('Anyone may open it and add records through it, without signing in, e.g. the screens of a portal.')
               }
               isSelected={form.is_public}

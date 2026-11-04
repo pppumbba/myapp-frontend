@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, tokenStore } from '../lib/api';
+import { api, tokenStore, whenCustomerLost } from '../lib/api';
+import type { Customer, MyCustomer, OpenedCustomer } from '../lib/customerApi';
 import { accessApi, type Ability, type Access, type Feature } from '../lib/accessApi';
 import { sessionApi, setSession, type SessionValues } from '../lib/sessionApi';
 
@@ -18,6 +19,14 @@ export interface User {
   preferences?: { form_saved_notice?: boolean; chat_sound?: boolean } | null;
   /** The language picked; null follows the browser. */
   locale?: string | null;
+  /** Sees every customer on the platform. */
+  is_platform_owner?: boolean;
+}
+
+/** GET /user: the person, the customer this login works in (null: none picked yet) and all their customers. */
+interface Me extends User {
+  customer: Customer | null;
+  customers: MyCustomer[];
 }
 
 export interface RegisterInput {
@@ -37,6 +46,14 @@ interface AuthState {
   /** The user's roles and what they may do; for a guest, the public metas only. */
   access: Access | null;
   loading: boolean;
+  /** The customer this login works in; null until one is picked (or made, or joined). */
+  customer: Customer | null;
+  /** All the person's customers. */
+  customers: MyCustomer[];
+  /** Works in the customer just made, joined or picked, with the token that came with it. */
+  openCustomer: (opened: OpenedCustomer) => Promise<void>;
+  /** Replaces the list, e.g. after leaving one. */
+  setCustomers: (customers: MyCustomer[]) => void;
   login: (email: string, password: string) => Promise<void>;
   /** Signs in with the one-time code the backend hands back after Google sign-in. */
   loginWithGoogle: (code: string) => Promise<void>;
@@ -74,12 +91,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<Access | null>(null);
   const [loading, setLoading] = useState(true);
   const [session, setSessionState] = useState<SessionValues>({});
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customers, setCustomers] = useState<MyCustomer[]>([]);
 
   // Kept in step for code outside React (default values, presets, form scripts).
   const keepSession = useCallback((u: User | null, values: SessionValues) => {
     setSession(u, values);
     setSessionState(values);
   }, []);
+
+  // Who the token belongs to and which customer it works in; what they may do is that customer's,
+  // so it is only asked for once there is one.
+  const loadMe = useCallback(async () => {
+    const { customer: current, customers: all, ...u } = await api<Me>('/user');
+    const [a, values] = current ? await Promise.all([accessApi.mine(), loadSession()]) : [null, {} as SessionValues];
+    keepSession(u, values);
+    setCustomer(current);
+    setCustomers(all);
+    setAccess(a);
+    setUser(u);
+  }, [keepSession]);
 
   // On page load, if a token is stored, ask the API who it belongs to and what they may do.
   // Without one (or with a stale one) the visitor is a guest, who may use the public metas.
@@ -89,12 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       asGuest().finally(() => setLoading(false));
       return;
     }
-    Promise.all([api<User>('/user'), accessApi.mine(), loadSession()])
-      .then(([u, a, values]) => {
-        keepSession(u, values);
-        setUser(u);
-        setAccess(a);
-      })
+    loadMe()
       .catch(() => {
         tokenStore.clear();
         return asGuest();
@@ -102,13 +128,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // The login lost its customer on the way (taken out of it, or none picked): pick another.
+  useEffect(() => {
+    whenCustomerLost((all) => {
+      setCustomer(null);
+      setCustomers(all);
+      setAccess(null);
+    });
+    return () => whenCustomerLost(null);
+  }, []);
+
+  // With one customer the token comes bound to it; with several, the person picks one next.
   const signIn = useCallback(async (res: AuthResponse) => {
     tokenStore.set(res.token);
-    const [a, values] = await Promise.all([accessApi.mine(), loadSession()]);
-    setAccess(a);
-    keepSession(res.user, values);
-    setUser(res.user);
-  }, [keepSession]);
+    await loadMe();
+  }, [loadMe]);
+
+  const openCustomer = useCallback(async (opened: OpenedCustomer) => {
+    tokenStore.set(opened.token);
+    await loadMe();
+  }, [loadMe]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -138,6 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStore.clear();
       keepSession(null, {});
       setUser(null);
+      setCustomer(null);
+      setCustomers([]);
       setAccess(await loadGuestAccess());
     }
   }, [keepSession]);
@@ -166,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, access, loading, login, loginWithGoogle, register, logout, updateUser: setUser, refreshAccess, isAdmin, hasFeature, isBuilder, designs, can, session, refreshSession }}>
+    <AuthContext.Provider value={{ user, access, loading, customer, customers, openCustomer, setCustomers, login, loginWithGoogle, register, logout, updateUser: setUser, refreshAccess, isAdmin, hasFeature, isBuilder, designs, can, session, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

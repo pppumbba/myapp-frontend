@@ -12,6 +12,8 @@ import { Button } from '@/components/base/buttons/button';
 import { Checkbox } from '@/components/base/checkbox/checkbox';
 import { Input } from '@/components/base/input/input';
 import { LanguagesCard } from './LanguagesCard';
+import { InvitesCard } from './InvitesCard';
+import { customerApi } from '../lib/customerApi';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { t } from '@/i18n';
 
@@ -48,6 +50,9 @@ export default function AdminPage() {
       <div className="grid gap-5 xl:grid-cols-[2fr_3fr]">
         <RolesCard roles={roles} onChanged={loadRoles} />
         <UsersCard roles={roles} onChanged={loadRoles} />
+      </div>
+      <div className="mt-5 max-w-3xl">
+        <InvitesCard roles={roles} card={Card} />
       </div>
       <div className="mt-5 max-w-3xl">
         <LanguagesCard />
@@ -228,7 +233,24 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
   const [users, setUsers] = useState<UserWithRoles[] | null>(null);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<UserWithRoles | null>(null);
+  const [removing, setRemoving] = useState<UserWithRoles | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function remove() {
+    if (!removing) return;
+    setBusy(true);
+    try {
+      await customerApi.removeMember(removing.id);
+      setUsers((list) => list?.filter((u) => u.id !== removing.id) ?? null);
+      onChanged();
+    } catch {
+      // The error dialog has told them (e.g. the last admin).
+    } finally {
+      setBusy(false);
+      setRemoving(null);
+    }
+  }
 
   useEffect(() => {
     let live = true;
@@ -252,7 +274,7 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
   }
 
   return (
-    <Card title={t("People")} description={t("Everyone with an account, and their roles.")}>
+    <Card title={t("People")} description={t("Everyone in this customer, and their roles.")}>
       <div className="px-4 pt-4 sm:px-5">
         <Input aria-label={t("Search people")} placeholder={t("Search by name or email")} icon={SearchLg} value={search} onChange={setSearch} />
       </div>
@@ -282,12 +304,23 @@ function UsersCard({ roles, onChanged }: { roles: Role[]; onChanged: () => void 
             <Button size="sm" color="secondary" onPress={() => setEditing(u)}>
               {t("Roles")}
             </Button>
+            {u.id !== me?.id && <IconAction icon={Trash01} label={t('Remove {name} from this customer', { name: u.name })} onPress={() => setRemoving(u)} />}
           </li>
         ))}
         {users?.length === 0 && <li className="px-4 py-6 text-center text-sm text-tertiary sm:px-5">{t("No one matches.")}</li>}
       </ul>
 
       {editing && <UserRolesModal user={editing} roles={roles} onClose={() => setEditing(null)} onSaved={saved} />}
+      {removing && (
+        <ConfirmDialog
+          title={t('Remove {name}?', { name: removing.name })}
+          message={t('They lose their roles here and can no longer open this customer. Their account stays; a new invite code brings them back.')}
+          confirmLabel={t('Remove')}
+          busy={busy}
+          onConfirm={remove}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </Card>
   );
 }

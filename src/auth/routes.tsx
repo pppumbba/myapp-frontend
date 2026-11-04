@@ -43,19 +43,36 @@ function Arrived({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Only signed-in users may see this. Others go to /login. */
+/** Only signed-in users may see this. Others go to /login; those without a customer yet, to /start. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { user, customer, loading } = useAuth();
+  if (loading) return <FullPageSpinner />;
+  if (!user) return <ToLogin />;
+  if (!customer) return <ToStart />;
+  return <Arrived>{children}</Arrived>;
+}
+
+/** Signed in, with or without a customer: picking, making or joining one. */
+export function SignedInRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <FullPageSpinner />;
   if (!user) return <ToLogin />;
-  return <Arrived>{children}</Arrived>;
+  return <>{children}</>;
+}
+
+/** A signed-in person without a customer picks, makes or joins one first, then comes back here. */
+function ToStart() {
+  const { pathname, search } = useLocation();
+  if (pathname !== '/') setReturnPath(pathname + search);
+  return <Navigate to="/start" replace />;
 }
 
 /** Only admins: the builder and user management. Others go home. */
 export function AdminRoute({ children }: { children: ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, customer, isAdmin, loading } = useAuth();
   if (loading) return <FullPageSpinner />;
   if (!user) return <ToLogin />;
+  if (!customer) return <ToStart />;
   if (!isAdmin) {
     setReturnPath(null);
     return <Navigate to="/" replace />;
@@ -65,9 +82,10 @@ export function AdminRoute({ children }: { children: ReactNode }) {
 
 /** Only admins and builders, or with a feature only those whose roles give it. Others go home. */
 export function BuilderRoute({ feature, children }: { feature?: Feature; children: ReactNode }) {
-  const { user, isBuilder, hasFeature, loading } = useAuth();
+  const { user, customer, isBuilder, hasFeature, loading } = useAuth();
   if (loading) return <FullPageSpinner />;
   if (!user) return <ToLogin />;
+  if (!customer) return <ToStart />;
   if (feature ? !hasFeature(feature) : !isBuilder) {
     setReturnPath(null);
     return <Navigate to="/" replace />;

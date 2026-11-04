@@ -18,6 +18,8 @@ import {
 } from '@untitledui/icons';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
+import { useAuth } from '../../auth/AuthContext';
+import { publicPath } from '../../lib/customerApi';
 import {
   siteApi,
   SOCIAL_NETWORKS,
@@ -136,6 +138,7 @@ const LEVELS: Record<CheckLevel, { label: string; hint: string; icon: typeof Ale
 /** /sites/:id — one website: its pages (addresses, menu, publishing), settings, domains, forms and visits. */
 export default function SiteManagerPage() {
   const id = Number(useParams().id);
+  const { customer } = useAuth();
   const [site, setSite] = useState<Site | null>(null);
   const [pages, setPages] = useState<DraftPage[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -205,13 +208,13 @@ export default function SiteManagerPage() {
       </Link>
       <PageHeader
         title={site.meta.name}
-        subtitle={primary ?? `/site/${site.meta.code}`}
+        subtitle={primary ?? publicPath(customer, `/site/${site.meta.code}`)}
         actions={
           <>
             <Button size="sm" color="secondary" iconLeading={Eye} href={`/site-preview/${id}`} target="_blank">
               {t('Preview drafts')}
             </Button>
-            <Button size="sm" color="secondary" iconLeading={LinkExternal01} href={`/site/${site.meta.code}`} target="_blank">
+            <Button size="sm" color="secondary" iconLeading={LinkExternal01} href={publicPath(customer, `/site/${site.meta.code}`)} target="_blank">
               {t('Open site')}
             </Button>
             <Button size="sm" isDisabled={!dirty} isLoading={saving} showTextWhileLoading onPress={save}>

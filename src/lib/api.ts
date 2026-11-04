@@ -92,6 +92,7 @@ const DONE: [RegExp, string][] = [
  */
 function tell(err: unknown, path: string, write: boolean): void {
   if (!(err instanceof ApiError)) return;
+  if (customerLost(err)) return;
   if (err.status === 401) {
     if (!/^\/(login|register|auth\/)/.test(path) && tokenStore.get()) {
       showError(t('Your session has ended. Sign in again to carry on.'), { title: 'Signed out', session: true });
@@ -107,6 +108,22 @@ function tell(err: unknown, path: string, write: boolean): void {
 export interface ApiOptions extends RequestInit {
   /** false: no toast or error dialog; the screen tells the user itself. */
   notify?: boolean;
+}
+
+type CustomersHandler = (customers: { id: number; code: string; name: string; is_admin: boolean }[]) => void;
+let onCustomerLost: CustomersHandler | null = null;
+
+/** Called when the login no longer has a customer to work in (none picked, or taken out of it). */
+export function whenCustomerLost(handler: CustomersHandler | null): void {
+  onCustomerLost = handler;
+}
+
+/** 409 "Pick a customer." and 403 "You are no longer in this customer." carry the person's customers: off to pick one. */
+function customerLost(err: ApiError): boolean {
+  const customers = err.body?.customers;
+  if ((err.status !== 409 && err.status !== 403) || !Array.isArray(customers)) return false;
+  onCustomerLost?.(customers);
+  return true;
 }
 
 /** Single place that adds the token and turns errors into ApiError; reads are shared and setup kept (see SETUP). */

@@ -1,26 +1,35 @@
 import type { Key } from 'react-aria-components';
 import { Button as AriaButton } from 'react-aria-components';
 import { useNavigate } from 'react-router-dom';
-import { ChevronSelectorVertical, Grid01, HomeLine, LayersThree01, LogOut01, User01, Users01 } from '@untitledui/icons';
+import { Building07, Check, ChevronSelectorVertical, Grid01, HomeLine, LayersThree01, LogOut01, Plus, Server01, User01, Users01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
+import { customerApi } from '../lib/customerApi';
+import { clearRenderCache } from '../render/definitions';
 import { initials } from '../lib/initials';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
 
-const pages: Record<string, string> = { profile: '/profile', home: '/', apps: '/apps', metas: '/metas', admin: '/admin' };
+const pages: Record<string, string> = { profile: '/profile', home: '/', apps: '/apps', metas: '/metas', admin: '/admin', start: '/start', platform: '/platform/customers' };
 
 /**
- * The signed-in user at the foot of every sidebar. Pressing it opens a menu: profile, the
- * builder's pages and log out. Collapsed, only the avatar shows.
+ * The signed-in user at the foot of every sidebar. Pressing it opens a menu: their customers to
+ * switch between, profile, the builder's pages and log out. Collapsed, only the avatar shows.
  */
 export function UserMenu({ collapsed = false, below = false }: { collapsed?: boolean; /** In a top bar: opens downwards. */ below?: boolean }) {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, customer, customers, openCustomer } = useAuth();
   const navigate = useNavigate();
 
   async function onAction(key: Key) {
-    if (key === 'logout') {
+    const other = String(key).match(/^customer-(\d+)$/);
+    if (other) {
+      if (Number(other[1]) === customer?.id) return;
+      await openCustomer(await customerApi.open(Number(other[1])));
+      // Another customer's metas: nothing kept from this one may show.
+      clearRenderCache();
+      navigate('/', { replace: true });
+    } else if (key === 'logout') {
       await logout();
       navigate('/login', { replace: true });
     } else if (pages[String(key)]) {
@@ -64,6 +73,13 @@ export function UserMenu({ collapsed = false, below = false }: { collapsed?: boo
           </div>
         </div>
         <Dropdown.Menu onAction={onAction}>
+          <Dropdown.Section aria-label={t('Customers')}>
+            {customers.map((c) => (
+              <Dropdown.Item key={c.id} id={`customer-${c.id}`} icon={c.id === customer?.id ? Check : Building07} label={c.name} />
+            ))}
+            <Dropdown.Item id="start" icon={Plus} label={t('New or join a customer')} />
+          </Dropdown.Section>
+          <Dropdown.Separator />
           <Dropdown.Section>
             <Dropdown.Item id="profile" icon={User01} label={t('Profile')} />
             <Dropdown.Item id="home" icon={HomeLine} label={t('Home')} />
@@ -73,6 +89,11 @@ export function UserMenu({ collapsed = false, below = false }: { collapsed?: boo
             <Dropdown.Section>
               <Dropdown.Item id="metas" icon={LayersThree01} label={t('Metas')} />
               <Dropdown.Item id="admin" icon={Users01} label={t('Users & roles')} />
+            </Dropdown.Section>
+          )}
+          {user?.is_platform_owner && (
+            <Dropdown.Section>
+              <Dropdown.Item id="platform" icon={Server01} label={t('All customers')} />
             </Dropdown.Section>
           )}
           <Dropdown.Separator />

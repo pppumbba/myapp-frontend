@@ -1,4 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { customerApi, type MyCustomer } from '../lib/customerApi';
+import { ConfirmDialog } from '../components/Modal';
+import { Badge } from '@/components/base/badges/badges';
 import { CheckCircle, Monitor01, Moon01, Sun } from '@untitledui/icons';
 import { useAuth, type User } from '../auth/AuthContext';
 import { api, ApiError } from '../lib/api';
@@ -41,6 +45,7 @@ export default function ProfilePage() {
 
       <div className="max-w-3xl space-y-5">
         <DetailsCard />
+        <CustomersCard />
         <AppearanceCard />
         <FormsCard />
         <LanguageCard />
@@ -149,6 +154,75 @@ function DetailsCard() {
           </Button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+function CustomersCard() {
+  const { customer, customers, setCustomers } = useAuth();
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState<MyCustomer | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function leave() {
+    if (!leaving) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { customers: left } = await customerApi.leave(leaving.id);
+      setCustomers(left);
+      setLeaving(null);
+      // Leaving the one this login works in: pick, make or join another.
+      if (leaving.id === customer?.id) navigate('/start', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('Something went wrong. Try again.'));
+      setLeaving(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title={t('Customers')} description={t('The companies you work in. Each has its own apps, people and data.')}>
+      {error && (
+        <div className="mb-4">
+          <Alert>{error}</Alert>
+        </div>
+      )}
+      <ul className="divide-y divide-secondary rounded-lg ring-1 ring-secondary">
+        {customers.map((c) => (
+          <li key={c.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-primary">
+              {c.name}
+              {c.id === customer?.id && <span className="font-normal text-tertiary"> {t('(open now)')}</span>}
+            </span>
+            {c.is_admin && (
+              <Badge type="pill-color" size="sm" color="brand">
+                {t('Admin')}
+              </Badge>
+            )}
+            <Button size="sm" color="secondary-destructive" onPress={() => setLeaving(c)}>
+              {t('Leave')}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4">
+        <Button size="sm" color="secondary" onPress={() => navigate('/start')}>
+          {t('New or join a customer')}
+        </Button>
+      </div>
+      {leaving && (
+        <ConfirmDialog
+          title={t('Leave {name}?', { name: leaving.name })}
+          message={t('You lose your roles there and its apps. Coming back needs a new invite code.')}
+          confirmLabel={t('Leave')}
+          busy={busy}
+          onConfirm={leave}
+          onCancel={() => setLeaving(null)}
+        />
+      )}
     </Card>
   );
 }

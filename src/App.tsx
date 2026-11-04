@@ -1,5 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AdminRoute, BuilderRoute, GuestRoute, ProtectedRoute } from './auth/routes';
+import { AdminRoute, BuilderRoute, GuestRoute, ProtectedRoute, SignedInRoute } from './auth/routes';
 import { AppShell } from './components/AppShell';
 import { ScreenApp } from './render/ScreenApp';
 import AdminPage from './pages/AdminPage';
@@ -14,6 +14,8 @@ import RoleWorkspacePage from './pages/RoleWorkspacePage';
 import SchedulesPage from './pages/SchedulesPage';
 import PatchesPage from './pages/PatchesPage';
 import PortalPage from './pages/PortalPage';
+import PlatformCustomersPage from './pages/PlatformCustomersPage';
+import StartPage from './pages/StartPage';
 import SessionValuesPage from './pages/SessionValuesPage';
 import QueryBuilderPage from './pages/QueryBuilderPage';
 import WidgetsPage from './pages/WidgetsPage';
@@ -47,11 +49,14 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+      {/* Pick, make or join a customer: right after signing up or in, and later from the account menu. */}
+      <Route path="/start" element={<SignedInRoute><StartPage /></SignedInRoute>} />
       {/* Screens inside the main sidebar. The shell stays mounted while they change, so moving
           between them doesn't rebuild the menu or refetch its notifications. */}
       <Route element={<ProtectedRoute><AppShell><Outlet /></AppShell></ProtectedRoute>}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/platform/customers" element={<PlatformCustomersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/metas" element={<BuilderRoute><MetasPage /></BuilderRoute>} />
