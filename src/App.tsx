@@ -98,6 +98,9 @@ export default function App() {
       <Route path="/portal/:id" element={<PortalPage />} />
       {/* Websites' published pages, before they have (or besides) their own domain. */}
       <Route path="/site/:code/*" element={<PublicSitePage />} />
+      {/* The same, of a named customer: links made after customers came in carry its code. */}
+      <Route path="/c/:customer/portal/:id" element={<PortalPage />} />
+      <Route path="/c/:customer/site/:code/*" element={<PublicSitePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

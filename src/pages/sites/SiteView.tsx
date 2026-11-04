@@ -187,8 +187,9 @@ export function SiteLoader({ base, load, banner }: { base: string; load: (path: 
 
 /** /site/:code/* — a website's published pages at the app's own address, before (or besides) its domain. */
 export function PublicSitePage() {
-  const { code = '' } = useParams();
-  return <SiteLoader key={code} base={`/site/${code}`} load={(path) => siteApi.byCode(code, path)} />;
+  const { code = '', customer } = useParams();
+  const base = customer ? `/c/${customer}/site/${code}` : `/site/${code}`;
+  return <SiteLoader key={code} base={base} load={(path) => siteApi.byCode(code, path)} />;
 }
 
 /** /site-preview/:id/* — admins see every page of a site as it is in the builder, unpublished changes too. */

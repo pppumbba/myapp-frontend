@@ -154,6 +154,19 @@ export function api<T>(path: string, { notify = true, ...options }: ApiOptions =
 
 const copy = <T,>(data: T): T => (data === null || typeof data !== 'object' ? data : structuredClone(data));
 
+/**
+ * Guests on a customer's public page (/c/{code}/portal/… or /c/{code}/site/…) ask that customer:
+ * without a token, the address is all the server has to go by.
+ */
+export function guestCustomerCode(): string | null {
+  return window.location.pathname.match(/^\/c\/([^/]+)\//)?.[1] ?? null;
+}
+
+function withCustomer(path: string): string {
+  const code = tokenStore.get() ? null : guestCustomerCode();
+  return code ? `/c/${encodeURIComponent(code)}${path}` : path;
+}
+
 async function send<T>(path: string, options: RequestInit): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -163,7 +176,7 @@ async function send<T>(path: string, options: RequestInit): Promise<T> {
   const token = tokenStore.get();
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers }).catch((err: unknown) => {
+  const res = await fetch(`${BASE_URL}${withCustomer(path)}`, { ...options, headers }).catch((err: unknown) => {
     // Aborted on purpose: not a failure to tell anyone about.
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
     throw new ApiError(0, t('The server could not be reached. Check your connection and try again.'));
