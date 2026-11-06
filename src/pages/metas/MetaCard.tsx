@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Meta } from '../../lib/metaApi';
-import { TypePreview, typeLook } from '../../components/TypePreview';
+import { typeColors, typeLook } from '../../components/TypePreview';
+import { TypeIcon } from '../../components/TypeIcon';
 import { DotsVertical, Edit01, Link01, Trash01 } from '@untitledui/icons';
 import type { MouseEvent } from 'react';
 import { menuAt, type MenuAt } from './MetaContextMenu';
@@ -16,11 +17,11 @@ function rowsText(meta: Meta): string {
 }
 
 function TypeTag({ meta }: { meta: Meta }) {
-  const look = typeLook(meta.type?.code);
+  const colors = typeColors(meta.type?.code);
   return (
     <span
-      className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-current/15 ring-inset"
-      style={{ background: look.tint, color: look.ink }}
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-current/15 ring-inset ${colors.className}`}
+      style={colors.style}
     >
       {meta.type?.name ?? t("No type")}
     </span>
@@ -83,50 +84,44 @@ function MoreButton({ meta, onMenu }: { meta: Meta; onMenu: NonNullable<CardProp
   );
 }
 
-/** Off-screen type drawings and rows are not drawn (content-visibility), so a list of hundreds stays quick; auto keeps each one's last drawn height. */
+/** Off-screen cards and rows are not drawn (content-visibility), so a list of hundreds stays quick; auto keeps each one's last drawn height. */
 const offscreen = '[content-visibility:auto]';
 
-/** Grid view: the type drawing on top, details and actions below. */
+/** Grid view: the type icon and name on top, details and actions below. */
 export function MetaCard({ meta, onEdit, onDelete, onMenu }: CardProps) {
-  const look = typeLook(meta.type?.code);
   return (
-    <article onContextMenu={contextMenu(meta, onMenu)} className="group relative flex flex-col overflow-hidden rounded-xl bg-primary shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset hover:shadow-md">
-      <div className={`relative px-5 pt-5 pb-3 ${offscreen} [contain-intrinsic-size:auto_112px]`} style={{ background: look.tint }}>
-        <TypePreview code={meta.type?.code} className="mx-auto h-20 w-full max-w-[180px]" />
+    <article onContextMenu={contextMenu(meta, onMenu)} className={`group relative flex flex-col gap-2.5 rounded-xl bg-primary p-3.5 shadow-xs ring-1 ring-secondary transition duration-100 ease-linear ring-inset hover:shadow-md ${offscreen} [contain-intrinsic-size:auto_140px]`}>
+      <div className="flex items-center gap-2.5">
+        <TypeIcon code={meta.type?.code} size="sm" />
+        <div className="min-w-0 flex-1">
+          {/* The whole card is clickable through this link's ::after overlay. */}
+          <Link
+            to={`/metas/${meta.id}`}
+            className="block truncate text-sm font-semibold text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-focus-ring"
+          >
+            {meta.name}
+          </Link>
+          <p className="truncate text-xs text-tertiary">{meta.code}</p>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            {/* The whole card is clickable through this link's ::after overlay. */}
-            <Link
-              to={`/metas/${meta.id}`}
-              className="block truncate text-md font-semibold text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-focus-ring"
-            >
-              {meta.name}
-            </Link>
-            <p className="truncate text-sm text-tertiary">{meta.code}</p>
-          </div>
-          <TypeTag meta={meta} />
-        </div>
+      {meta.description && <p className="line-clamp-2 text-xs text-tertiary">{meta.description}</p>}
+      <Tags meta={meta} max={2} />
 
-        {meta.description && <p className="line-clamp-2 text-sm text-tertiary">{meta.description}</p>}
-        <Tags meta={meta} />
-
-        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-secondary pt-3 text-sm text-tertiary">
-          <span>{rowsText(meta)}</span>
-          {meta.ref_meta && (
-            <span className="inline-flex items-center gap-1">
-              <Link01 className="size-3.5 text-fg-quaternary" />
-              {meta.ref_meta.name}
-            </span>
-          )}
-          <Status active={meta.is_active} />
-        </div>
+      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-secondary pt-2.5 text-xs text-tertiary">
+        <TypeTag meta={meta} />
+        <span>{rowsText(meta)}</span>
+        {meta.ref_meta && (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <Link01 className="size-3 shrink-0 text-fg-quaternary" />
+            <span className="truncate">{meta.ref_meta.name}</span>
+          </span>
+        )}
+        <Status active={meta.is_active} />
       </div>
 
       {(onEdit || onDelete || onMenu) && (
-        <div className="absolute top-3 right-3 z-10 flex gap-0.5 rounded-lg bg-primary p-0.5 opacity-100 shadow-sm ring-1 ring-secondary sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        <div className="absolute top-2.5 right-2.5 z-10 flex gap-0.5 rounded-lg bg-primary p-0.5 opacity-100 shadow-sm ring-1 ring-secondary sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           {onEdit && <IconAction icon={Edit01} label={t('Edit {name}', { name: meta.name })} onPress={() => onEdit(meta)} />}
           {onDelete && <IconAction icon={Trash01} danger label={t('Delete {name}', { name: meta.name })} onPress={() => onDelete(meta)} />}
           {onMenu && <MoreButton meta={meta} onMenu={onMenu} />}
@@ -138,12 +133,9 @@ export function MetaCard({ meta, onEdit, onDelete, onMenu }: CardProps) {
 
 /** List view: one compact row per meta, same information. */
 export function MetaRow({ meta, onEdit, onDelete, onMenu }: CardProps) {
-  const look = typeLook(meta.type?.code);
   return (
-    <article onContextMenu={contextMenu(meta, onMenu)} className={`group relative flex items-center gap-4 bg-primary px-4 py-3 transition duration-100 ease-linear hover:bg-primary_hover ${offscreen} [contain-intrinsic-size:auto_72px]`}>
-      <div className="w-16 shrink-0 rounded-lg p-1.5" style={{ background: look.tint }}>
-        <TypePreview code={meta.type?.code} className="w-full" />
-      </div>
+    <article onContextMenu={contextMenu(meta, onMenu)} className={`group relative flex items-center gap-4 bg-primary px-4 py-3 transition duration-100 ease-linear hover:bg-primary_hover ${offscreen} [contain-intrinsic-size:auto_64px]`}>
+      <TypeIcon code={meta.type?.code} />
       <div className="min-w-0 flex-1">
         <Link
           to={`/metas/${meta.id}`}

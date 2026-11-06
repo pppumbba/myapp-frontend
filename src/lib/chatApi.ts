@@ -5,10 +5,19 @@ export interface ChatMessage {
   chat_id: number;
   user_id: number | null;
   user_name: string | null;
-  /** system: a line the messenger wrote (joined, left, renamed). */
-  kind: 'text' | 'system';
+  /** system: a line the messenger wrote (joined, left, renamed); record: a shared grid row (data), the body its note. */
+  kind: 'text' | 'system' | 'record';
   body: string;
+  data?: SharedRecord | null;
   created_at: string;
+}
+
+/** A grid row shared into a chat: the values as the sender saw them, and where to open it (/run/{meta_id}?row={record_id}). */
+export interface SharedRecord {
+  meta_id: number;
+  record_id: string;
+  title: string;
+  fields: { label: string; value: string }[];
 }
 
 export interface ChatSummary {
@@ -45,6 +54,8 @@ export interface Person {
   email: string;
 }
 
+export const SHOW_CHAT = 'messenger:show';
+
 const post = <T,>(path: string, body: unknown = {}) => api<T>(path, { method: 'POST', body: JSON.stringify(body) });
 
 /** The messenger's backend (ChatController). Clients poll; writes here show no toast and keep cached screens (see api.ts). */
@@ -56,9 +67,11 @@ export const chatApi = {
   rename: (chatId: number, name: string) => api<ChatSummary>(`/chats/${chatId}`, { method: 'PUT', body: JSON.stringify({ name }) }),
   add: (chatId: number, userIds: number[]) => post<ChatSummary>(`/chats/${chatId}/members`, { user_ids: userIds }),
   leave: (chatId: number) => api<{ left: boolean }>(`/chats/${chatId}/members/me`, { method: 'DELETE' }),
-  send: (chatId: number, body: string) => post<ChatMessage>(`/chats/${chatId}/messages`, { body }),
+  send: (chatId: number, body: string, record?: SharedRecord) => post<ChatMessage>(`/chats/${chatId}/messages`, record ? { body, record } : { body }),
   read: (chatId: number, messageId: number) => api(`/chats/${chatId}/read`, { method: 'POST', body: JSON.stringify({ message_id: messageId }), notify: false }),
   typing: (chatId: number) => api(`/chats/${chatId}/typing`, { method: 'POST', notify: false }),
+  /** The messenger opens on this chat (after sharing a record into it from elsewhere). */
+  show: (chatId: number) => window.dispatchEvent(new CustomEvent<number>(SHOW_CHAT, { detail: chatId })),
   people: (q: string) => api<Person[]>(`/chats/people?q=${encodeURIComponent(q)}`),
   search: (q: string) => api<ChatMessage[]>(`/chats/search?q=${encodeURIComponent(q)}`),
 };

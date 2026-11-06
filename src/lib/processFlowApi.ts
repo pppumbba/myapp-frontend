@@ -1,8 +1,11 @@
 import { api } from './api';
 
-/** One value a step's form takes (backend: meta_process_behaviour). */
+/** One value a step takes (backend: meta_process_behaviour). */
 export interface ProcessBehaviour {
-  /** A field of the record just saved, "main.field" of the main form's record, or "=text". */
+  /**
+   * "=text", "main.field" of the main form's record, "stepN.field" of what step N passed on
+   * (sent as "step:key.field" when saving), or a bare field of the record that led here.
+   */
   source_path: string;
   target_path: string;
 }
@@ -20,7 +23,9 @@ export interface ProcessStep {
   id: number;
   process_id: number;
   order_number: number;
-  process: { id: number; code: string; name: string } | null;
+  pos_x: number | null;
+  pos_y: number | null;
+  process: { id: number; code: string; name: string; type: { code: string } | null } | null;
   behaviours: ProcessBehaviour[];
 }
 
@@ -33,13 +38,16 @@ export interface ProcessTransition {
 }
 
 export interface ProcessFlow {
+  /** Where the main form's node sits on the canvas. */
+  main_at: { x: number; y: number } | null;
   steps: ProcessStep[];
   transitions: ProcessTransition[];
 }
 
-/** What the builder saves: keys tie transitions to steps within one save. */
+/** What the builder saves: keys tie transitions and values to steps within one save. */
 export interface ProcessFlowInput {
-  steps: { key: string; process_id: number; behaviours: ProcessBehaviour[] }[];
+  main_at: { x: number; y: number } | null;
+  steps: { key: string; process_id: number; x: number; y: number; behaviours: ProcessBehaviour[] }[];
   transitions: { source: string | null; target: string; criteria: ProcessCondition[] }[];
 }
 
@@ -51,7 +59,17 @@ export interface ProcessRun {
   id: number | null;
 }
 
+/** A value a node takes in or passes on. */
+export interface ProcessPort {
+  field: string;
+  label: string;
+}
+
+/** What each meta takes in (inputs) and passes on once it has run (outputs), by meta id. */
+export type ProcessPorts = Record<string, { inputs: ProcessPort[]; outputs: ProcessPort[] }>;
+
 export const processFlowApi = {
   get: (formId: number) => api<ProcessFlow>(`/metas/${formId}/process-flow`),
+  ports: (formId: number, ids: number[]) => api<ProcessPorts>(`/metas/${formId}/process-flow/ports?ids=${ids.join(',')}`),
   save: (formId: number, input: ProcessFlowInput) => api<ProcessFlow>(`/metas/${formId}/process-flow`, { method: 'PUT', body: JSON.stringify(input) }),
 };

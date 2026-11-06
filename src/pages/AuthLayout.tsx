@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Logo } from '../components/AppShell';
-import { TypePreview, typeLook } from '../components/TypePreview';
+import { TypeIcon } from '../components/TypeIcon';
 import { t } from '@/i18n';
 
 /*
@@ -44,8 +44,8 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
               key={tile.code}
               className={`absolute flex flex-col overflow-hidden rounded-xl bg-primary p-[6%] shadow-xl ${tile.box} ${tile.tone} animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 ${tile.delay}`}
             >
-              <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg p-[6%]" style={{ background: typeLook(tile.code).tint }}>
-                <TypePreview code={tile.code} className="w-full" />
+              <div className="min-h-0 flex-1">
+                <TypeIcon code={tile.code} size="fill" />
               </div>
               {tile.code !== 'calendar' && <figcaption className="mt-[5%] truncate text-sm font-semibold text-primary">{t(tile.label)}</figcaption>}
             </figure>

@@ -7,7 +7,8 @@ import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { BadgeWithDot } from '@/components/base/badges/badges';
 import { ConfirmDialog } from '../../components/Modal';
-import { TypePreview, typeLook } from '../../components/TypePreview';
+import { typeColors } from '../../components/TypePreview';
+import { TypeIcon } from '../../components/TypeIcon';
 import { MetaFormModal } from './MetaFormModal';
 import { ChartDesigner } from './ChartDesigner';
 import { DashboardDesigner } from './DashboardDesigner';
@@ -15,6 +16,7 @@ import { MetaActionsPanel } from './MetaActionsPanel';
 import { AppSettingsPanel, ExcelImportDesigner, FormSettingsPanel, GridColumnsPanel, GridDrilldownPanel, GridFilterLayoutPanel, MatrixDesigner, ReportDesigner, StageQueryPanel, StatementDesigner, WorkspaceDesigner } from './MetaSettings';
 import { MetaParamsPanel } from './MetaParamsPanel';
 import { ProcessFlowPanel } from './ProcessFlowPanel';
+import { StructurePanel } from './StructurePanel';
 import { VersionsPanel } from './VersionsPanel';
 import { NotificationDesigner } from './NotificationDesigner';
 import { PageDesigner } from './PageDesigner';
@@ -82,7 +84,7 @@ export default function MetaDetailPage() {
     }
   }
 
-  const look = typeLook(meta?.type?.code);
+  const colors = typeColors(meta?.type?.code);
   const mine = designs(meta);
 
   return (
@@ -102,16 +104,14 @@ export default function MetaDetailPage() {
 
       {meta && (
         <>
-          <header className="mb-10 flex flex-col gap-6 overflow-hidden rounded-2xl bg-primary shadow-xs ring-1 ring-secondary sm:flex-row">
-            <div className="flex items-center justify-center px-8 py-6 sm:w-64" style={{ background: look.tint }}>
-              <TypePreview code={meta.type?.code} className="h-24 w-full max-w-[200px]" />
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-4 px-6 pb-6 sm:py-6 sm:pr-8 sm:pl-0">
+          <header className="mb-10 flex flex-col gap-5 rounded-2xl bg-primary p-6 shadow-xs ring-1 ring-secondary sm:flex-row sm:items-center sm:pr-8">
+            <TypeIcon code={meta.type?.code} size="xl" />
+            <div className="flex flex-1 flex-col justify-center gap-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <span
-                    className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-current/15 ring-inset"
-                    style={{ background: look.tint, color: look.ink }}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-current/15 ring-inset ${colors.className}`}
+                    style={colors.style}
                   >
                     {meta.type?.name ?? t('No type')}
                   </span>
@@ -237,6 +237,7 @@ export default function MetaDetailPage() {
                 <MetaParamsPanel key={`${meta.id}-${paramsVersion}`} meta={meta} options={options} />
               )}
               {isAdmin && meta.type?.code === 'form' && <ProcessFlowPanel key={`process-flow-${meta.id}`} meta={meta} options={options} />}
+              {isAdmin && meta.type?.code === 'structure' && <StructurePanel key={`structure-${meta.id}-${meta.table_name}`} meta={meta} />}
             </>
           )}
           {isAdmin && meta.type?.code !== 'theme' && <TranslationsPanel key={`translations-${meta.id}-${paramsVersion}`} meta={meta} />}

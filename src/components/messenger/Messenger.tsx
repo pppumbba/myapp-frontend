@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowLeft, Check, DotsVertical, Edit05, LogOut01, MessageChatCircle, SearchLg, Send01, Users01, UsersPlus, VolumeMax, VolumeX, XClose } from '@untitledui/icons';
+import { ArrowLeft, ArrowUpRight, Check, DotsVertical, Edit05, LogOut01, MessageChatCircle, SearchLg, Send01, Users01, UsersPlus, VolumeMax, VolumeX, XClose } from '@untitledui/icons';
 import { Button as AriaButton } from 'react-aria-components';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Button } from '@/components/base/buttons/button';
@@ -8,7 +8,8 @@ import { Input } from '@/components/base/input/input';
 import { cx } from '@/utils/cx';
 import { useAuth, type User } from '../../auth/AuthContext';
 import { api, ApiError } from '../../lib/api';
-import { chatApi, type ChatMessage, type ChatSummary, type Person } from '../../lib/chatApi';
+import { Link } from 'react-router-dom';
+import { chatApi, SHOW_CHAT, type ChatMessage, type ChatSummary, type Person, type SharedRecord } from '../../lib/chatApi';
 import { initials } from '../../lib/initials';
 import { useMessenger, type OpenState } from './useMessenger';
 import { panelPlace, useChatPosition } from './useChatPosition';
@@ -82,6 +83,18 @@ function MessengerFor({ user, updateUser, menuRight }: { user: User; updateUser:
     m.openChat(null);
     setView({ kind: 'list' });
   };
+
+  // A record shared from a grid opens the messenger on the chat it went to.
+  const { openChat } = m;
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      setOpen(true);
+      openChat((e as CustomEvent<number>).detail);
+      setView({ kind: 'chat' });
+    };
+    window.addEventListener(SHOW_CHAT, onShow);
+    return () => window.removeEventListener(SHOW_CHAT, onShow);
+  }, [openChat]);
 
   async function toggleSound() {
     try {
@@ -337,7 +350,7 @@ function ChatList({
                             <span className="shrink-0 text-xs text-quaternary">{when(msg.created_at)}</span>
                           </span>
                           <span className="block truncate text-xs text-tertiary">
-                            {msg.user_id === userId ? t('You') : msg.user_name}: {msg.body}
+                            {msg.user_id === userId ? t('You') : msg.user_name}: {messageText(msg)}
                           </span>
                         </span>
                       </AriaButton>
@@ -362,7 +375,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function ChatRow({ chat, userId, onOpen }: { chat: ChatSummary; userId: number; onOpen: () => void }) {
-  const last = chat.last;
+  const last = chat.last && { ...chat.last, body: messageText(chat.last) };
   const preview = chat.typing.length
     ? typingLine(chat.typing)
     : !last
@@ -486,7 +499,7 @@ function Conversation({
   }
 
   // "Seen" under the user's own last message: by the other person, or by whom in a group.
-  const mineLast = [...open.messages].reverse().find((msg) => msg.user_id === userId && msg.kind === 'text');
+  const mineLast = [...open.messages].reverse().find((msg) => msg.user_id === userId && msg.kind !== 'system');
   const seenBy = mineLast && chat ? chat.members.filter((p) => p.id !== userId && (open.read[p.id] ?? 0) >= mineLast.id).map((p) => p.name) : [];
   const seenText = !seenBy.length ? '' : chat?.type === 'direct' ? t('Seen') : t('Seen by {names}', { names: seenBy.join(', ') });
 
@@ -635,6 +648,21 @@ function Messages({ messages, userId, group, seenId, seenText }: { messages: Cha
           );
         }
         const mine = msg.user_id === userId;
+        if (msg.kind === 'record' && msg.data) {
+          return (
+            <FragmentLi key={msg.id} day={day}>
+              <li className={cx('mt-2 flex flex-col', mine ? 'items-end' : 'items-start')}>
+                {group && !mine && <span className="mb-0.5 px-1 text-xs font-medium text-tertiary">{msg.user_name}</span>}
+                <RecordCard record={msg.data} />
+                {msg.body && <p className={cx('mt-0.5 max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap', mine ? 'bg-brand-solid text-white' : 'bg-secondary text-primary')}>{msg.body}</p>}
+                <span className="mt-0.5 px-1 text-xs text-quaternary">
+                  {time(msg.created_at)}
+                  {msg.id === seenId && <span className="ml-2">{seenText}</span>}
+                </span>
+              </li>
+            </FragmentLi>
+          );
+        }
         // A run: messages from the same person within five minutes on the same day.
         const sameRun = (a?: ChatMessage, b?: ChatMessage) =>
           !!a && !!b && a.kind === 'text' && b.kind === 'text' && a.user_id === b.user_id && Math.abs(Date.parse(b.created_at) - Date.parse(a.created_at)) < 300000 && new Date(a.created_at).toDateString() === new Date(b.created_at).toDateString();
@@ -666,6 +694,36 @@ function Messages({ messages, userId, group, seenId, seenText }: { messages: Cha
         );
       })}
     </ol>
+  );
+}
+
+/** A message as one line of text: a shared record reads as its note, else its title. */
+function messageText(msg: ChatMessage) {
+  return msg.kind === 'record' && msg.data ? msg.body || `${t('Shared')}: ${msg.data.title}` : msg.body;
+}
+
+/** A shared grid row: its title and values as the sender saw them; opening it goes to the grid with that row. */
+function RecordCard({ record }: { record: SharedRecord }) {
+  return (
+    <Link
+      to={`/run/${record.meta_id}?row=${encodeURIComponent(record.record_id)}`}
+      className="block w-[85%] max-w-72 rounded-xl bg-primary px-3 py-2.5 text-left ring-1 ring-secondary outline-focus-ring transition duration-100 ease-linear hover:bg-primary_hover focus-visible:outline-2"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold text-primary">{record.title}</span>
+        <ArrowUpRight className="size-4 shrink-0 text-fg-quaternary" aria-hidden="true" />
+      </span>
+      {record.fields.length > 0 && (
+        <dl className="mt-1.5 space-y-0.5">
+          {record.fields.map((f, i) => (
+            <div key={i} className="flex gap-2 text-xs">
+              <dt className="w-24 shrink-0 truncate text-tertiary">{f.label}</dt>
+              <dd className="min-w-0 truncate text-secondary">{f.value || '—'}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </Link>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType, type Tag } from '../../lib/metaApi';
 import { useAuth } from '../../auth/AuthContext';
@@ -9,7 +9,8 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { ConfirmDialog } from '../../components/Modal';
-import { TypePreview, typeLook } from '../../components/TypePreview';
+import { typeLook } from '../../components/TypePreview';
+import { TypeIcon } from '../../components/TypeIcon';
 import { MetaCard, MetaRow } from './MetaCard';
 import { DeletedMetasModal } from './DeletedMetasModal';
 import { ExcelStructureModal } from './ExcelStructureModal';
@@ -111,6 +112,14 @@ export default function MetasPage() {
         (!q || m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q) || !!m.tags?.some((item) => item.name.toLowerCase().includes(q))),
     );
   }, [metas, query, typeFilter, tagFilter]);
+
+  // Cards are drawn PAGE at a time, PAGE more as the list's end scrolls into view; a new search,
+  // filter or view starts again from the top.
+  const listKey = `${query}|${typeFilter}|${tagFilter.join(',')}|${view}`;
+  const [page, setPage] = useState({ key: listKey, count: PAGE });
+  if (page.key !== listKey) setPage({ key: listKey, count: PAGE });
+  const shown = visible.slice(0, page.key === listKey ? page.count : PAGE);
+  const showMore = useCallback(() => setPage((p) => ({ ...p, count: p.count + PAGE })), []);
 
   const tagCounts = useMemo(() => {
     const byTag = new Map<number, number>();
@@ -286,17 +295,23 @@ export default function MetasPage() {
           </Button>
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-4">
-          {visible.map((m) => (
-            <MetaCard key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {shown.map((m) => (
+              <MetaCard key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
+            ))}
+          </div>
+          <LoadMore shown={shown.length} total={visible.length} onMore={showMore} />
+        </>
       ) : (
-        <div className="divide-y divide-secondary overflow-hidden rounded-xl bg-primary shadow-xs ring-1 ring-secondary">
-          {visible.map((m) => (
-            <MetaRow key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
-          ))}
-        </div>
+        <>
+          <div className="divide-y divide-secondary overflow-hidden rounded-xl bg-primary shadow-xs ring-1 ring-secondary">
+            {shown.map((m) => (
+              <MetaRow key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
+            ))}
+          </div>
+          <LoadMore shown={shown.length} total={visible.length} onMore={showMore} />
+        </>
       )}
 
       {editing !== undefined && (
@@ -392,10 +407,40 @@ function FilterChip({
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-4" aria-label={t("Loading metas")}>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3" aria-label={t("Loading metas")}>
       {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="h-60 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+        <div key={i} className="h-36 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
       ))}
+    </div>
+  );
+}
+
+/** How many metas are drawn at a time. */
+const PAGE = 20;
+
+/**
+ * The end of the list: asks for more when it comes within a screen of view (and again while it
+ * stays there, since the observer is renewed after each batch), with a button as a fallback.
+ */
+function LoadMore({ shown, total, onMore }: { shown: number; total: number; onMore: () => void }) {
+  const end = useRef<HTMLDivElement>(null);
+  const more = shown < total;
+  useEffect(() => {
+    const el = end.current;
+    if (!more || !el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && onMore(), { rootMargin: '0px 0px 600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [more, shown, onMore]);
+
+  return (
+    <div ref={end} className="mt-4 flex flex-col items-center gap-2 text-sm text-tertiary">
+      <span>{t('Showing {shown} of {total}', { shown, total })}</span>
+      {more && (
+        <Button size="sm" color="secondary" onPress={onMore}>
+          {t('Show more')}
+        </Button>
+      )}
     </div>
   );
 }
@@ -406,9 +451,7 @@ function EmptyState({ types, onCreate }: { types: MetaType[]; onCreate: () => vo
     <div className="rounded-2xl bg-primary px-6 py-14 text-center shadow-xs ring-1 ring-secondary ring-inset">
       <div className="mx-auto flex max-w-md justify-center gap-3">
         {shown.map((code) => (
-          <div key={code} className="w-16 rounded-lg p-1.5" style={{ background: typeLook(code).tint }}>
-            <TypePreview code={code} className="w-full" />
-          </div>
+          <TypeIcon key={code} code={code} size="lg" />
         ))}
       </div>
       <h2 className="mt-8 text-lg font-semibold text-primary">{t("Start with your first app")}</h2>

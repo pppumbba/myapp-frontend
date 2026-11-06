@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash01 } from '@untitledui/icons';
+import { ChevronDown, ChevronRight, Plus, ShoppingCart01, Trash01 } from '@untitledui/icons';
 import type { DataRow } from '../lib/dataApi';
 import type { MetaParam } from '../lib/metaApi';
 import { ComboField } from '../components/ComboField';
@@ -9,9 +9,9 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
-import { filledFrom, isOneToOne, optionsOf, primaryKey, title, visibleParams, type DetailNode } from './definitions';
+import { filledFrom, isOneToOne, lookupFields, optionsOf, primaryKey, title, visibleParams, type DetailNode } from './definitions';
 import { startValues, toPayload } from './formValues';
-import { LookupField } from './LookupField';
+import { LookupDialog, LookupField } from './LookupField';
 import { t } from '@/i18n';
 
 /** Where a line keeps its own lines, by sub-detail field. A symbol, so it never mixes with field values. */
@@ -127,7 +127,21 @@ export function DetailLines({
   const name = detail.label_name || title(def.meta);
   const listError = errors[`${prefix}${detail.field_path}`]?.[0];
   const [open, setOpen] = useState<Set<string>>(() => new Set());
+  // The first lookup column: the button above the table fills its basket, a line per record.
+  const basketField = columns.find((c) => c.is_select && !!c.ref_meta_id);
+  const [choosing, setChoosing] = useState(false);
 
+  /**
+   * A line for each record picked in a lookup's basket. They go into line `at` when given (a
+   * cell's own basket), else into new lines still empty in that field; the rest are added.
+   */
+  const pickMany = (f: MetaParam, rows: DataRow[], at?: number) => {
+    const values = rows.map((r) => ({ [f.field_path]: String(r[lookupFields(f).value] ?? ''), ...filledFrom(f, r) }));
+    const free = at !== undefined ? [at] : lines.flatMap((l, j) => (!l._id && !l[f.field_path] ? [j] : []));
+    const kept = lines.map((l, j) => (free.includes(j) && free.indexOf(j) < values.length ? ({ ...l, ...values[free.indexOf(j)] } as Line) : l));
+    const added = values.slice(free.length).map((v) => ({ ...blankLine(node), ...v }) as Line);
+    onChange([...kept, ...added]);
+  };
   // Line fields their own lines add up into: total_field -> the sub-detail.
   const subTotals = new Map(
     children.flatMap((c) => {
@@ -152,10 +166,30 @@ export function DetailLines({
     <section aria-label={name} className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-primary">{name}</h3>
-        <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => onChange([...lines, blankLine(node)])}>
-          {t('Add line')}
-        </Button>
+        <div className="flex items-center gap-4">
+          {basketField && (
+            <Button size="sm" color="link-color" iconLeading={ShoppingCart01} onPress={() => setChoosing(true)}>
+              {t('Choose {name}', { name: basketField.label_name || basketField.param_name })}
+            </Button>
+          )}
+          <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => onChange([...lines, blankLine(node)])}>
+            {t('Add line')}
+          </Button>
+        </div>
       </div>
+      {choosing && basketField && (
+        <LookupDialog
+          refId={basketField.ref_meta_id!}
+          value=""
+          valueField={lookupFields(basketField).value}
+          onPick={() => {}}
+          onPickMany={(rows) => {
+            pickMany(basketField, rows);
+            setChoosing(false);
+          }}
+          onClose={() => setChoosing(false)}
+        />
+      )}
 
       <div className="overflow-x-auto rounded-xl bg-primary ring-1 ring-secondary">
         <table className="w-full min-w-[44rem] text-sm">
@@ -200,6 +234,7 @@ export function DetailLines({
                               value={line[c.field_path]}
                               error={errors[`${at}${c.field_path}`]?.[0]}
                               onChange={(v, fill) => update(i, { [c.field_path]: v, ...fill })}
+                              onPickMany={(rows) => pickMany(c, rows, i)}
                             />
                           )}
                         </td>
@@ -333,12 +368,15 @@ function LineField({
   value,
   error,
   onChange,
+  onPickMany,
 }: {
   param: MetaParam;
   label: string;
   value: string | boolean | undefined;
   error?: string;
   onChange: (value: string | boolean, fill?: Record<string, string>) => void;
+  /** A lookup in a lines table: its browse dialog gets a basket, picking several records at once. */
+  onPickMany?: (rows: DataRow[]) => void;
 }) {
   const options = optionsOf(f);
   const common = { 'aria-label': label, size: 'sm' as const, isRequired: f.is_required, isInvalid: !!error, hint: error };
@@ -348,7 +386,7 @@ function LineField({
   }
 
   if (f.is_select && f.ref_meta_id) {
-    return <LookupField {...common} param={f} value={String(value ?? '')} onChange={(v, row) => onChange(v, filledFrom(f, row))} />;
+    return <LookupField {...common} param={f} value={String(value ?? '')} onChange={(v, row) => onChange(v, filledFrom(f, row))} onPickMany={onPickMany} />;
   }
 
   if (options) {

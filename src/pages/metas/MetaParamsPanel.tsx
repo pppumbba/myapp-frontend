@@ -212,6 +212,54 @@ function toParamInput(f: ParamForm): MetaParamInput {
   };
 }
 
+/** The groups a form's params use so far (json_config.group), in order. */
+function groupNames(params: MetaParam[]): string[] {
+  return [...new Set(params.map((p) => (typeof p.json_config?.group === 'string' ? p.json_config.group.trim() : '')).filter(Boolean))];
+}
+
+/** A form field's group (json_config.group), kept in the config JSON text; unusable while that JSON is invalid. */
+function GroupInput({ json, groups, onChange }: { json: string; groups: string[]; onChange: (json: string) => void }) {
+  let config: Record<string, unknown> | null = null;
+  try {
+    config = json.trim() ? (JSON.parse(json) as Record<string, unknown>) : {};
+  } catch {
+    config = null;
+  }
+  const value = typeof config?.group === 'string' ? config.group : '';
+  const setGroup = (group: string) => {
+    const next = { ...(config ?? {}) };
+    if (group.trim()) next.group = group;
+    else delete next.group;
+    onChange(Object.keys(next).length ? JSON.stringify(next, null, 2) : '');
+  };
+  return (
+    <div className="space-y-2">
+      <Input
+        label={t("Group")}
+        value={value}
+        onChange={setGroup}
+        isDisabled={config === null}
+        placeholder={t("General")}
+        hint={config === null ? t("Fix the config JSON below first.") : t("The section, tab or wizard step it sits in, when the form has a layout (form settings). Same name, same group.")}
+      />
+      {groups.length > 0 && config !== null && (
+        <div className="flex flex-wrap gap-1.5">
+          {groups.map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGroup(g)}
+              className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset outline-focus-ring focus-visible:outline-2 ${g === value ? 'bg-brand-primary text-brand-secondary ring-brand' : 'bg-primary text-secondary ring-secondary hover:bg-primary_hover'}`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOption[] }) {
   const look = typeLook(meta.type?.code);
   const noun = look.rowNoun;
@@ -500,6 +548,12 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                   fields={tree.map((p) => p.field_path).filter((f) => f !== form.field_path)}
                   onChange={(v) => set('json_config', v)}
                 />
+              </Section>
+            )}
+
+            {meta.type?.code === 'form' && !form.parent_id && (
+              <Section title={t("Form layout")}>
+                <GroupInput json={form.json_config} groups={groupNames(tree)} onChange={(v) => set('json_config', v)} />
               </Section>
             )}
 

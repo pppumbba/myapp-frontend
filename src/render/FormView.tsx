@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CheckCircle, ClockRewind, Plus, Printer } from '@untitledui/icons';
+import { ArrowLeft, ArrowRight, Check, CheckCircle, ClockRewind, Plus, Printer } from '@untitledui/icons';
+import { Tab, TabList, TabPanel, Tabs } from '@/components/application/tabs/tabs';
+import { cx } from '@/utils/cx';
 import { Modal } from '../components/Modal';
 import { ReportView } from './ReportView';
 import { RecordHistory } from './RecordHistory';
@@ -151,6 +153,13 @@ export function FormView({
   // The forms its process flow saved along with it.
   const [alsoSaved, setAlsoSaved] = useState<ProcessRun[]>([]);
   const [nextNumbers, setNextNumbers] = useState<Record<string, string>>({});
+  // The open tab or wizard step, and the furthest step reached (earlier ones can be gone back to).
+  const [step, setStep] = useState(0);
+  const [reached, setReached] = useState(0);
+  useEffect(() => {
+    setStep(0);
+    setReached(0);
+  }, [currentId, fresh]);
 
   // Scripts: the form's own, and each line form's (by detail field).
   const scripts = useMemo(() => scriptsOf(def?.meta), [def]);
@@ -309,6 +318,34 @@ export function FormView({
         }),
   );
 
+  // The form's layout (json_config.layout): its fields and details in groups (their
+  // json_config.group), as titled sections, tabs or wizard steps. Without groups it is one grid.
+  const layout = LAYOUTS.find((l) => l === config.layout) ?? null;
+  const groups = layout ? formGroups(fields.filter((f) => !hidden.has(f.field_path)), shown.nodes) : [];
+  const grouped = groups.length > 1 || (groups.length === 1 && groups[0].name !== '');
+  const active = Math.min(step, Math.max(0, groups.length - 1));
+  // A wizard step before the last: Next instead of the save buttons.
+  const midStep = grouped && layout === 'wizard' && active < groups.length - 1;
+
+  const goTo = (i: number) => {
+    setStep(i);
+    setReached((r) => Math.max(r, i));
+  };
+
+  /** Next in a wizard: on, unless a required field of this step is still empty. */
+  function goNext() {
+    const missing = groups[active].fields.filter((f) => {
+      const v = values![f.field_path];
+      return f.is_required && f.data_type !== 'boolean' && !isFileParam(f) && f.data_type !== 'document' && !autonumberOf(f) && !totals.has(f.field_path) && !locked.has(f.field_path) && (v === '' || v == null);
+    });
+    if (missing.length) {
+      setFieldErrors(Object.fromEntries(missing.map((f) => [f.field_path, [t('Fill this in before going on.')]])));
+      return;
+    }
+    setFieldErrors({});
+    goTo(active + 1);
+  }
+
   function payload(state: ScriptState): DataRow {
     const out = { ...toPayload(fields, state.values), ...fixed };
     totals.forEach((sum, field) => (out[field] = Math.round(sum * 100) / 100));
@@ -356,6 +393,9 @@ export function FormView({
     } catch (err) {
       if (err instanceof ApiError) {
         setFieldErrors(err.errors ?? {});
+        // Open the first tab or step with an error, so it can be seen.
+        const bad = grouped ? groups.findIndex((g) => groupHasError(g, err.errors ?? {})) : -1;
+        if (bad >= 0) goTo(bad);
         if (!err.errors) setError(err.message);
       } else {
         setError(t('This could not be saved. Check that the API is running.'));
@@ -367,9 +407,78 @@ export function FormView({
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    submit('save');
+    if (midStep) goNext();
+    else submit('save');
   }
   const canAdd = config.save_and_add !== false && (embedded || !!currentId);
+
+  /** One field of the form, in the grid. */
+  const renderField = (f: MetaParam) => {
+    const auto = autonumberOf(f);
+    const next = recordId ? undefined : nextNumbers[f.field_path];
+    const readOnly = locked.has(f.field_path);
+    return (
+      <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
+        {f.data_type === 'document' ? (
+          <DocumentCard param={f} value={values[f.field_path]} onOpen={() => setEditing(f)} />
+        ) : auto && !auto.editable ? (
+          <Input
+            label={f.label_name || f.param_name}
+            value={recordId ? String(values[f.field_path] ?? '') : (next ?? '…')}
+            isReadOnly
+            isInvalid={!!fe(f.field_path)}
+            hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
+            wrapperClassName="bg-secondary shadow-none"
+            inputClassName="tabular-nums"
+          />
+        ) : totals.has(f.field_path) ? (
+          <Input
+            label={f.label_name || f.param_name}
+            value={formatNumber(totals.get(f.field_path))}
+            isReadOnly
+            hint={t('Worked out from the lines below.')}
+            wrapperClassName="bg-secondary shadow-none"
+            inputClassName="font-semibold tabular-nums"
+          />
+        ) : readOnly && isNumber(f) ? (
+          // A number a script works out, shown like a total.
+          <Input
+            label={f.label_name || f.param_name}
+            value={values[f.field_path] === '' ? '' : formatNumber(Number(values[f.field_path]))}
+            isReadOnly
+            isInvalid={!!fe(f.field_path)}
+            hint={fe(f.field_path)}
+            wrapperClassName="bg-secondary shadow-none"
+            inputClassName="font-semibold tabular-nums"
+          />
+        ) : readOnly ? (
+          <fieldset disabled className="contents">
+            <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={() => {}} />
+          </fieldset>
+        ) : (
+          <Field
+            param={f}
+            value={values[f.field_path]}
+            error={fe(f.field_path)}
+            hint={auto && next ? t('Leave blank for {next}.', { next }) : undefined}
+            optional={!!auto && !recordId}
+            onChange={(v, fill) => set(f.field_path, v, fill)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  /** Fields and details as the form's two-column grid. */
+  const fieldGrid = (fs: MetaParam[], nodes: DetailNode[]) => (
+    <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+      {fs.map(renderField)}
+      {nodes.map((n) => (
+        <DetailSection key={n.detail.field_path} node={n} lines={lines[n.detail.field_path] ?? []} errors={fieldErrors} onChange={(next) => setDetail(n.detail.field_path, next)} />
+      ))}
+    </div>
+  );
+  const groupName = (g: FormGroup) => g.name || t('General');
 
   const form = (
     // In a modal only .modal-scroll scrolls, so the scrollbar stops above the buttons (index.css).
@@ -393,79 +502,46 @@ export function FormView({
           </div>
         )}
 
-        <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
-          {fields
-            .filter((f) => !hidden.has(f.field_path))
-            .map((f) => {
-              const auto = autonumberOf(f);
-              const next = recordId ? undefined : nextNumbers[f.field_path];
-              const readOnly = locked.has(f.field_path);
-              return (
-                <div key={f.field_path} className={wide(f) ? 'sm:col-span-2' : undefined}>
-                  {f.data_type === 'document' ? (
-                    <DocumentCard param={f} value={values[f.field_path]} onOpen={() => setEditing(f)} />
-                  ) : auto && !auto.editable ? (
-                    <Input
-                      label={f.label_name || f.param_name}
-                      value={recordId ? String(values[f.field_path] ?? '') : (next ?? '…')}
-                      isReadOnly
-                      isInvalid={!!fe(f.field_path)}
-                      hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
-                      wrapperClassName="bg-secondary shadow-none"
-                      inputClassName="tabular-nums"
-                    />
-                  ) : totals.has(f.field_path) ? (
-                    <Input
-                      label={f.label_name || f.param_name}
-                      value={formatNumber(totals.get(f.field_path))}
-                      isReadOnly
-                      hint={t('Worked out from the lines below.')}
-                      wrapperClassName="bg-secondary shadow-none"
-                      inputClassName="font-semibold tabular-nums"
-                    />
-                  ) : readOnly && isNumber(f) ? (
-                    // A number a script works out, shown like a total.
-                    <Input
-                      label={f.label_name || f.param_name}
-                      value={values[f.field_path] === '' ? '' : formatNumber(Number(values[f.field_path]))}
-                      isReadOnly
-                      isInvalid={!!fe(f.field_path)}
-                      hint={fe(f.field_path)}
-                      wrapperClassName="bg-secondary shadow-none"
-                      inputClassName="font-semibold tabular-nums"
-                    />
-                  ) : readOnly ? (
-                    <fieldset disabled className="contents">
-                      <Field param={f} value={values[f.field_path]} error={fe(f.field_path)} onChange={() => {}} />
-                    </fieldset>
-                  ) : (
-                    <Field
-                      param={f}
-                      value={values[f.field_path]}
-                      error={fe(f.field_path)}
-                      hint={auto && next ? t('Leave blank for {next}.', { next }) : undefined}
-                      optional={!!auto && !recordId}
-                      onChange={(v, fill) => set(f.field_path, v, fill)}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          {shown.problems.map((p) => (
-            <div key={p} className="sm:col-span-2">
-              <Alert>{p}</Alert>
-            </div>
-          ))}
-          {shown.nodes.map((n) => (
-            <DetailSection
-              key={n.detail.field_path}
-              node={n}
-              lines={lines[n.detail.field_path] ?? []}
-              errors={fieldErrors}
-              onChange={(next) => setDetail(n.detail.field_path, next)}
-            />
-          ))}
-        </div>
+        {shown.problems.map((p) => (
+          <Alert key={p}>{p}</Alert>
+        ))}
+
+        {!grouped ? (
+          fieldGrid(
+            fields.filter((f) => !hidden.has(f.field_path)),
+            shown.nodes,
+          )
+        ) : layout === 'sections' ? (
+          <div className="space-y-8">
+            {groups.map((g) => (
+              <section key={g.name} aria-label={groupName(g)}>
+                <h3 className="mb-4 border-b border-secondary pb-2 text-md font-semibold text-primary">{groupName(g)}</h3>
+                {fieldGrid(g.fields, g.nodes)}
+              </section>
+            ))}
+          </div>
+        ) : layout === 'tabs' ? (
+          <Tabs selectedKey={String(active)} onSelectionChange={(k) => goTo(Number(k))}>
+            <TabList type="underline" size="sm" aria-label={title(def.meta)} className="mb-5">
+              {groups.map((g, i) => (
+                <Tab key={g.name} id={String(i)}>
+                  {groupName(g)}
+                  {groupHasError(g, fieldErrors) && <span className="size-1.5 rounded-full bg-error-solid" role="img" aria-label={t('Has errors')} />}
+                </Tab>
+              ))}
+            </TabList>
+            {groups.map((g, i) => (
+              <TabPanel key={g.name} id={String(i)}>
+                {fieldGrid(g.fields, g.nodes)}
+              </TabPanel>
+            ))}
+          </Tabs>
+        ) : (
+          <div className="space-y-6">
+            <WizardSteps groups={groups.map(groupName)} active={active} reached={reached} errors={groups.map((g) => groupHasError(g, fieldErrors))} onPick={setStep} />
+            <section aria-label={groupName(groups[active])}>{fieldGrid(groups[active].fields, groups[active].nodes)}</section>
+          </div>
+        )}
       </div>
 
       <div className="modal-footer flex justify-end gap-2 border-t border-secondary pt-4">
@@ -479,19 +555,30 @@ export function FormView({
             {t('Cancel')}
           </Button>
         )}
-        {canAdd && (
+        {grouped && layout === 'wizard' && active > 0 && (
+          <Button size="sm" color="secondary" iconLeading={ArrowLeft} onPress={() => setStep(active - 1)}>
+            {t('Back')}
+          </Button>
+        )}
+        {canAdd && !midStep && (
           <Button size="sm" color="secondary" iconLeading={Plus} isDisabled={saving} onPress={() => submit('add')}>
             {t('Save and add')}
           </Button>
         )}
-        {printDef && (
+        {printDef && !midStep && (
           <Button size="sm" color="secondary" iconLeading={Printer} isDisabled={saving} onPress={() => submit('print')}>
             {t('Save and print')}
           </Button>
         )}
-        <Button size="sm" type="submit" isLoading={saving} showTextWhileLoading>
-          {saving ? t('Saving…') : currentId ? t('Save changes') : t('Save')}
-        </Button>
+        {midStep ? (
+          <Button size="sm" type="submit" iconTrailing={ArrowRight}>
+            {t('Next')}
+          </Button>
+        ) : (
+          <Button size="sm" type="submit" isLoading={saving} showTextWhileLoading>
+            {saving ? t('Saving…') : currentId ? t('Save changes') : t('Save')}
+          </Button>
+        )}
       </div>
       {showHistory && currentId && def && <RecordHistory metaId={def.meta.id} recordId={currentId} params={def.params} tree={tree ?? []} onClose={() => setShowHistory(false)} />}
       {editing && (
@@ -546,6 +633,79 @@ export function FormView({
       </div>
       <div className="px-4 py-5 sm:px-5">{form}</div>
     </div>
+  );
+}
+
+const LAYOUTS = ['sections', 'tabs', 'wizard'] as const;
+
+/** A group of a form's fields and details (their json_config.group; '' for those without one). */
+interface FormGroup {
+  name: string;
+  fields: MetaParam[];
+  nodes: DetailNode[];
+}
+
+const groupOf = (p: MetaParam) => (typeof p.json_config?.group === 'string' ? p.json_config.group.trim() : '');
+
+/** Fields and details in groups, in the order of their params; those without a group come first. */
+function formGroups(fields: MetaParam[], nodes: DetailNode[]): FormGroup[] {
+  const items = [...fields.map((f) => ({ param: f, node: null })), ...nodes.map((n) => ({ param: n.detail, node: n }))].sort((a, b) => a.param.order_number - b.param.order_number);
+  const byName = new Map<string, FormGroup>();
+  if (items.some((i) => groupOf(i.param) === '')) byName.set('', { name: '', fields: [], nodes: [] });
+  for (const { param, node } of items) {
+    const name = groupOf(param);
+    if (!byName.has(name)) byName.set(name, { name, fields: [], nodes: [] });
+    if (node) byName.get(name)!.nodes.push(node);
+    else byName.get(name)!.fields.push(param);
+  }
+  // Those without a group show as General: a group named so takes them in, first, rather than
+  // making two groups of the same name.
+  const ungrouped = byName.get('');
+  const general = [...byName.values()].find((g) => g.name !== '' && [t('General'), 'General'].some((n) => n.toLowerCase() === g.name.toLowerCase()));
+  if (ungrouped && general) {
+    const byOrder = (a: MetaParam, b: MetaParam) => a.order_number - b.order_number;
+    byName.delete(general.name);
+    byName.set('', {
+      name: general.name,
+      fields: [...ungrouped.fields, ...general.fields].sort(byOrder),
+      nodes: [...ungrouped.nodes, ...general.nodes].sort((a, b) => byOrder(a.detail, b.detail)),
+    });
+  }
+  return [...byName.values()];
+}
+
+/** Whether an error belongs to a field of the group, or to a detail of it or one of its lines. */
+function groupHasError(g: FormGroup, errors: Record<string, string[]>): boolean {
+  return Object.keys(errors).some((k) => g.fields.some((f) => k === f.field_path) || g.nodes.some((n) => k === n.detail.field_path || k.startsWith(`${n.detail.field_path}.`)));
+}
+
+/** A wizard's steps: done ones checked, the open one highlighted; reached steps can be gone back to. */
+function WizardSteps({ groups, active, reached, errors, onPick }: { groups: string[]; active: number; reached: number; errors: boolean[]; onPick: (i: number) => void }) {
+  return (
+    <ol className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label={t('Steps')}>
+      {groups.map((name, i) => (
+        <li key={name || i} className="flex items-center gap-3">
+          {i > 0 && <span aria-hidden="true" className={cx('h-px w-6 sm:w-10', i <= reached ? 'bg-brand-solid' : 'bg-quaternary')} />}
+          <button
+            type="button"
+            disabled={i > reached}
+            aria-current={i === active ? 'step' : undefined}
+            onClick={() => onPick(i)}
+            className="flex items-center gap-2 rounded-md text-sm font-medium outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
+          >
+            <span
+              className={cx(
+                'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ring-1 ring-inset',
+                errors[i] ? 'bg-error-primary text-error-primary ring-error_subtle' : i === active ? 'bg-brand-solid text-white ring-transparent' : i < reached || i < active ? 'bg-brand-primary text-brand-secondary ring-brand' : 'bg-primary text-quaternary ring-secondary',
+              )}
+            >
+              {i < active && !errors[i] ? <Check className="size-4" aria-hidden="true" /> : i + 1}
+            </span>
+            <span className={i === active ? 'text-primary' : i <= reached ? 'text-secondary' : 'text-quaternary'}>{name}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
 

@@ -26,6 +26,7 @@ import {
   List,
   Plus,
   SearchLg,
+  Send01,
   Table as TableIcon,
   Trash01,
   Upload01,
@@ -42,6 +43,9 @@ import { Alert, IconAction } from "../components/ui";
 import { useFillHeight } from "./useFillHeight";
 import { ContextMenu, pointOf, type MenuEntry, type MenuPoint } from "../components/ContextMenu";
 import { ConfirmDialog, Modal } from "../components/Modal";
+import { ShareRecord } from "../components/messenger/ShareRecord";
+import type { SharedRecord } from "../lib/chatApi";
+import { FILE_TYPES } from "../lib/contentApi";
 import { Table, TableCard } from "@/components/application/table/table";
 import { PaginationCardMinimal } from "@/components/application/pagination/pagination";
 import { Badge } from "@/components/base/badges/badges";
@@ -217,6 +221,13 @@ function useFrozenOffsets(count: number, deps: unknown[]) {
   return { ref, lefts, viewWidth };
 }
 
+/** The text each cell of a row shows, by field: lookups by their labels, numbers and dates formatted. */
+function cellTexts(rowElement: HTMLElement): Record<string, string> {
+  return Object.fromEntries(
+    [...rowElement.querySelectorAll<HTMLElement>("[data-field]")].map((el) => [el.dataset.field!, el.innerText.trim()]),
+  );
+}
+
 const VIEW_ICONS: Record<GridViewName, FC<{ className?: string }>> = { table: TableIcon, cards: Grid01, inline: List, tiles: LayoutGrid01 };
 const viewKey = (metaId: number) => `grid_view_${metaId}`;
 
@@ -363,7 +374,7 @@ export function GridView({
   );
   const key = primaryKey(params);
   const actions = useActions(meta.id);
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const toolbar = useMemo(
     () =>
       (actions ?? []).filter((a) => can(a.form_meta_id, abilityOf[a.action])),
@@ -429,9 +440,11 @@ export function GridView({
   const [exporting, setExporting] = useState(false);
   // The right-click menu: on a row (and the cell clicked), or on the grid around the rows;
   // more: the toolbar's ⋯ menu, for the picked row.
-  const [menu, setMenu] = useState<{ at: MenuPoint; row?: DataRow; field?: string; more?: boolean } | null>(null);
+  // texts: the row's cells as shown (lookups by their labels, numbers formatted), for sharing it.
+  const [menu, setMenu] = useState<{ at: MenuPoint; row?: DataRow; field?: string; more?: boolean; texts?: Record<string, string> } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const moreRef = useRef<HTMLSpanElement>(null);
+  const [sharing, setSharing] = useState<SharedRecord | null>(null);
 
   // A notification links to /run/{grid}?record={id}: open that record's status straight away.
   const { pathname } = useLocation();
@@ -683,7 +696,7 @@ export function GridView({
    * Delete goes last. The ⋯ menu (more) lists those needing a row too, disabled until one is picked,
    * and leaves out the buttons already in the toolbar.
    */
-  function menuEntries(row?: DataRow, field?: string, more?: boolean): MenuEntry[] {
+  function menuEntries(row?: DataRow, field?: string, more?: boolean, texts?: Record<string, string>): MenuEntry[] {
     const usable = toolbar.filter(
       (a) => (row || more || !a.needs_row) && !(more && toolbarButtons.includes(a)),
     );
@@ -707,6 +720,9 @@ export function GridView({
       ...(row && column && value != null && value !== ""
         ? [{ key: "copy", label: t('Copy {name}', { name: column.label_name || column.param_name }), icon: Copy01, onSelect: () => void navigator.clipboard?.writeText(String(value)) }]
         : []),
+      ...(row && user && row[key] != null
+        ? [{ key: "share", label: t("Share to chat"), icon: Send01, onSelect: () => setSharing(shareOf(row, texts)) }]
+        : []),
       { key: "export", label: t("Export"), icon: Download01, disabled: !result?.total, onSelect: () => void exportExcel() },
       { key: "s2", separator: true as const },
       ...usable.filter((a) => a.action === "delete").map(entry),
@@ -719,6 +735,49 @@ export function GridView({
     row && nameColumn && !nameColumn.is_select
       ? String(row[nameColumn.field_path] ?? "")
       : "";
+
+  /** A row as a chat card: its name and first columns, as shown on screen when the cells were there to read. */
+  function shareOf(row: DataRow, texts: Record<string, string> = {}): SharedRecord {
+    const shown = (c: MetaParam) => texts[c.field_path] ?? (row[c.field_path] == null ? "" : String(row[c.field_path]));
+    const id = String(row[key]);
+    const name = (nameColumn && shown(nameColumn)) || t("Record #{id}", { id });
+    return {
+      meta_id: meta.id,
+      record_id: id,
+      title: `${title(meta)} · ${name}`.slice(0, 200),
+      fields: columns
+        .filter((c) => c !== nameColumn && ![...FILE_TYPES, "signature", "json", "document"].includes(c.data_type))
+        .slice(0, 6)
+        .map((c) => ({ label: (c.label_name || c.param_name).slice(0, 100), value: shown(c).slice(0, 500) })),
+    };
+  }
+
+  // A record shared in a chat links to /run/{grid}?row={id}: pick that row and open it (the grid's
+  // drilldown, else its Edit form). One not on the first page is looked up by its key.
+  const sharedRow = pathname === `/run/${meta.id}` ? searchParams.get("row") : null;
+  useEffect(() => {
+    if (!sharedRow || !result) return;
+    const open = (row: DataRow) => {
+      setSelected(sharedRow);
+      if (rowDrill) drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), drawer: rowDrill.open_in === "drawer", label: rowName(row) || title(meta) });
+      else if (editAction) run(editAction, row);
+    };
+    const onPage = result.data.find((r) => String(r[key]) === sharedRow);
+    if (onPage) open(onPage);
+    else
+      dataApi.list(meta.id, { per_page: 1, filter: { ...fixed, [key]: sharedRow }, scope }).then(
+        (r) => r.data[0] && String(r.data[0][key]) === sharedRow && open(r.data[0]),
+        () => {},
+      );
+    setSearchParams(
+      (p) => {
+        p.delete("row");
+        return p;
+      },
+      { replace: true },
+    );
+    // Once per link, when the first records are in.
+  }, [sharedRow, !!result]);
 
   const emptyState = (
     <div className="px-6 py-10 text-center">
@@ -1019,6 +1078,7 @@ export function GridView({
                   at: pointOf(e),
                   row,
                   field: (e.target as HTMLElement).closest<HTMLElement>("[data-field]")?.dataset.field,
+                  texts: cellTexts(e.currentTarget as HTMLElement),
                 });
               }}
               labelOf={(c) => (c === statusColumn ? t("Status") : c.label_name || c.param_name)}
@@ -1227,6 +1287,7 @@ export function GridView({
                           at: pointOf(e),
                           row: records.find((r) => String(r[key]) === row._key),
                           field: (e.target as HTMLElement).closest<HTMLElement>("[data-field]")?.dataset.field,
+                          texts: cellTexts(e.currentTarget as HTMLElement),
                         });
                       }}
                     >
@@ -1319,11 +1380,13 @@ export function GridView({
         <ContextMenu
           at={menu.at}
           title={menu.row ? rowName(menu.row) || title(meta) : title(meta)}
-          entries={menuEntries(menu.row, menu.field, menu.more)}
+          entries={menuEntries(menu.row, menu.field, menu.more, menu.texts)}
           onClose={closeMenu}
           anchor={menu.more ? moreRef : undefined}
         />
       )}
+
+      {sharing && <ShareRecord record={sharing} onClose={() => setSharing(null)} />}
 
       {below.map((s) => (
         <div key={s.id} className="mt-4">

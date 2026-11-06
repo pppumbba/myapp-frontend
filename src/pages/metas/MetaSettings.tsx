@@ -689,19 +689,20 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
   const config = meta.json_config ?? {};
   const [printId, setPrintId] = useState(typeof config.print_meta_id === 'number' ? String(config.print_meta_id) : '');
   const [saveAndAdd, setSaveAndAdd] = useState(config.save_and_add !== false);
-  const [saved, setSaved] = useState(() => JSON.stringify([printId, saveAndAdd]));
+  const [layout, setLayout] = useState(typeof config.layout === 'string' ? config.layout : '');
+  const [saved, setSaved] = useState(() => JSON.stringify([printId, saveAndAdd, layout]));
   const { busy, error, run } = useSaving();
-  const dirty = JSON.stringify([printId, saveAndAdd]) !== saved;
+  const dirty = JSON.stringify([printId, saveAndAdd, layout]) !== saved;
   const reports = options.filter((o) => o.type === 'report');
 
   return (
     <Panel
       title={t("Form")}
-      description={t("The buttons beside Save. Save and add saves and starts the next record; Save and print saves and prints the record with a report on the same table.")}
+      description={t("How the fields are laid out, and the buttons beside Save. Save and add saves and starts the next record; Save and print saves and prints the record with a report on the same table.")}
       actions={
         <Button size="sm" isDisabled={!dirty} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
-          await saveConfig(meta.id, { print_meta_id: printId ? Number(printId) : null, save_and_add: saveAndAdd });
-          setSaved(JSON.stringify([printId, saveAndAdd]));
+          await saveConfig(meta.id, { print_meta_id: printId ? Number(printId) : null, save_and_add: saveAndAdd, layout: layout || null });
+          setSaved(JSON.stringify([printId, saveAndAdd, layout]));
         })}>
           {dirty ? t("Save settings") : t("Saved")}
         </Button>
@@ -714,6 +715,19 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
         </Field>
         <Field title={t("Save and add")} hint={t("Shown in dialogs opened from a grid and when editing a record. A form on its own page already starts a new record after Save.")}>
           <Toggle label={t("Show Save and add")} isSelected={saveAndAdd} onChange={setSaveAndAdd} />
+        </Field>
+        <Field title={t("Layout")} hint={t("Groups the fields by the Group set on each field and detail. Those without one come first, under General.")}>
+          <NativeSelect
+            aria-label={t("Layout")}
+            value={layout}
+            onChange={(e) => setLayout(e.target.value)}
+            options={[
+              { value: '', label: t("One page, no groups") },
+              { value: 'sections', label: t("Sections: groups one under another") },
+              { value: 'tabs', label: t("Tabs: one group at a time") },
+              { value: 'wizard', label: t("Wizard: steps with Back and Next") },
+            ]}
+          />
         </Field>
       </div>
     </Panel>

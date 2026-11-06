@@ -9,7 +9,8 @@ import { NativeSelect } from '@/components/base/select/select-native';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { Modal } from '../../components/Modal';
-import { TypePreview, typeLook } from '../../components/TypePreview';
+import { typeLook } from '../../components/TypePreview';
+import { TypeIcon } from '../../components/TypeIcon';
 import { CodeEditor } from '../../components/CodeEditor';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
 import { SCRIPT_COLUMNS } from '../../render/formScript';
@@ -242,15 +243,13 @@ export function MetaFormModal({
                     type="button"
                     aria-pressed={selected}
                     onClick={() => set('type_id', String(item.id))}
-                    className={`rounded-xl bg-primary p-2 text-left ring-inset transition duration-100 ease-linear ${
+                    className={`flex items-center gap-2.5 rounded-xl bg-primary p-2 text-left ring-inset transition duration-100 ease-linear ${
                       selected ? 'ring-2' : 'ring-1 ring-secondary hover:ring-primary'
                     }`}
                     style={selected ? { boxShadow: `inset 0 0 0 2px ${look.ink}` } : undefined}
                   >
-                    <div className="rounded-lg p-2" style={{ background: look.tint }}>
-                      <TypePreview code={item.code} className="h-12 w-full" />
-                    </div>
-                    <span className="mt-2 block px-1 text-sm font-semibold text-primary">{item.name}</span>
+                    <TypeIcon code={item.code} size="sm" />
+                    <span className="min-w-0 truncate text-sm font-semibold text-primary">{item.name}</span>
                   </button>
                 );
               })}
@@ -298,7 +297,7 @@ export function MetaFormModal({
                 onChange={(v) => set('table_name', v)}
                 placeholder="customers"
                 isInvalid={!!fe('table_name')}
-                hint={fe('table_name') ?? (isAdmin ? t('The table this screen reads and writes.') : t('The table this screen reads and writes. System tables, such as users and roles, cannot be used.'))}
+                hint={fe('table_name') ?? (typeCode === 'structure' ? t('The new table Apply to database makes: small letters, digits and _.') : isAdmin ? t('The table this screen reads and writes.') : t('The table this screen reads and writes. System tables, such as users and roles, cannot be used.'))}
               />
             </div>
             <TextArea
