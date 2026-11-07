@@ -1,10 +1,16 @@
+import { Centrifuge } from 'centrifuge';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatApi, type ChatMessage, type ChatSummary } from '../../lib/chatApi';
 
-/** How often the messenger asks for news: every 3 seconds, slower while the tab is hidden. */
+/**
+ * How often the messenger asks for news: every 3 seconds, slower while the tab is hidden. With push
+ * connected, the server says when a chat changed, and polling is only a safety net (PUSHED_EVERY),
+ * or a quick recheck while someone is shown typing, since that ends without a push (TYPING_RECHECK).
+ */
 const EVERY = 3000;
 const HIDDEN_EVERY = 15000;
-/** Typing pings at most this often; the server shows "typing" for 5 seconds after one. */
+const PUSHED_EVERY = 30000;
+const TYPING_RECHECK = 5500;/** Typing pings at most this often; the server shows "typing" for 5 seconds after one. */
 const TYPING_EVERY = 2500;
 
 export interface OpenState {
@@ -64,9 +70,17 @@ export function useMessenger({ userId, visible, sound }: { userId: number; visib
   const typingSent = useRef(0);
   const timer = useRef<number | undefined>(undefined);
   const busy = useRef(false);
+  // A push came in while a poll was running: poll again right after it.
+  const again = useRef(false);
+  const pushedRef = useRef(false);
+  // Polls now and starts the wait over (set by the polling loop).
+  const restart = useRef<() => void>(() => undefined);
 
   const tick = useCallback(async () => {
-    if (busy.current) return;
+    if (busy.current) {
+      again.current = true;
+      return;
+    }
     busy.current = true;
     const current = openRef.current;
     const after = current && !current.loading ? (current.messages.at(-1)?.id ?? 0) : 0;
@@ -100,20 +114,73 @@ export function useMessenger({ userId, visible, sound }: { userId: number; visib
     } finally {
       busy.current = false;
     }
+    if (again.current) {
+      again.current = false;
+      void tick();
+    }
   }, [userId]);
 
-  // The polling loop: every 3 seconds, every 15 while the tab is hidden, at once when it shows again.
+  // Push: one WebSocket per tab; each note ({chat}) means "fetch now". Without it (local, or the
+  // socket down), polling carries on at full speed.
+  useEffect(() => {
+    let client: Centrifuge | null = null;
+    let stopped = false;
+    chatApi
+      .realtime()
+      .then((rt) => {
+        if (stopped || !rt.url || !rt.token) return;
+        client = new Centrifuge(rt.url, {
+          token: rt.token,
+          getToken: async () => {
+            const next = await chatApi.realtime();
+            if (!next.token) throw new Error('Chat push is off');
+            return next.token;
+          },
+        });
+        const pushing = (on: boolean) => {
+          if (pushedRef.current === on) return;
+          pushedRef.current = on;
+          restart.current();
+        };
+        client.on('connected', () => pushing(true));
+        client.on('disconnected', () => pushing(false));
+        client.on('connecting', () => pushing(false));
+        // The user's channel comes with the token, so its notes arrive as server-side publications.
+        client.on('publication', () => restart.current());
+        client.connect();
+      })
+      .catch(() => {
+        // No push; polling covers it.
+      });
+    return () => {
+      stopped = true;
+      client?.disconnect();
+      pushedRef.current = false;
+    };
+  }, []);
+
+  // The polling loop: every 3 seconds, every 15 while the tab is hidden, at once when it shows again;
+  // with push, every 30 seconds (5.5 while someone is shown typing).
   useEffect(() => {
     let stopped = false;
+    const wait = () => {
+      if (pushedRef.current) return openRef.current?.typing.length ? TYPING_RECHECK : PUSHED_EVERY;
+      return document.hidden ? HIDDEN_EVERY : EVERY;
+    };
+    // Each start of the loop takes over; a poll still running from an older one doesn't schedule.
+    let round = 0;
     const loop = async () => {
+      const mine = ++round;
       await tick();
-      if (!stopped) timer.current = window.setTimeout(loop, document.hidden ? HIDDEN_EVERY : EVERY);
+      if (!stopped && mine === round) timer.current = window.setTimeout(loop, wait());
     };
     void loop();
-    const onShow = () => {
-      if (document.hidden) return;
+    restart.current = () => {
       window.clearTimeout(timer.current);
-      void loop();
+      if (!stopped) void loop();
+    };
+    const onShow = () => {
+      if (!document.hidden) restart.current();
     };
     document.addEventListener('visibilitychange', onShow);
     return () => {

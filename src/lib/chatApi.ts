@@ -56,11 +56,19 @@ export interface Person {
 
 export const SHOW_CHAT = 'messenger:show';
 
+/** Where chat changes are pushed from (Centrifugo), or url null when the server only answers polls. */
+export interface ChatRealtime {
+  url: string | null;
+  token?: string;
+  expires_at?: number;
+}
+
 const post = <T,>(path: string, body: unknown = {}) => api<T>(path, { method: 'POST', body: JSON.stringify(body) });
 
 /** The messenger's backend (ChatController). Clients poll; writes here show no toast and keep cached screens (see api.ts). */
 export const chatApi = {
   poll: (open?: number | null, after = 0) => api<ChatPoll>(`/chats/poll${open ? `?open=${open}&after=${after}` : ''}`, { notify: false }),
+  realtime: () => api<ChatRealtime>('/chats/realtime', { notify: false }),
   older: (chatId: number, before: number) => api<{ messages: ChatMessage[]; more: boolean }>(`/chats/${chatId}/messages?before=${before}`),
   direct: (userId: number) => post<ChatSummary>('/chats/direct', { user_id: userId }),
   group: (name: string, userIds: number[]) => post<ChatSummary>('/chats', { name, user_ids: userIds }),
