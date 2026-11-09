@@ -58,10 +58,10 @@ export const MENU_ICONS: Record<string, FC<{ className?: string }>> = {
   zap: Zap,
 };
 
-const menuLabel = (p: MetaParam) => p.label_name || p.param_name;
+export const menuLabel = (p: MetaParam) => p.label_name || p.param_name;
 
 /** Menu items that open something, in menu order, for picking the first screen. */
-function screens(items: MetaParam[]): MetaParam[] {
+export function screens(items: MetaParam[]): MetaParam[] {
   return items.flatMap((p) => (p.is_show ? [...(p.ref_meta_id ? [p] : []), ...screens(p.children ?? [])] : []));
 }
 
@@ -69,7 +69,7 @@ function screens(items: MetaParam[]): MetaParam[] {
  * The menu as this user may see it: items whose screen they may not view lose their link,
  * and groups left with nothing to open drop out.
  */
-function allowedMenu(items: MetaParam[], canView: (metaId: number) => boolean): MetaParam[] {
+export function allowedMenu(items: MetaParam[], canView: (metaId: number) => boolean): MetaParam[] {
   return items.flatMap((p) => {
     const children = allowedMenu(p.children ?? [], canView);
     const opens = !!p.ref_meta_id && canView(p.ref_meta_id);
@@ -78,7 +78,7 @@ function allowedMenu(items: MetaParam[], canView: (metaId: number) => boolean): 
 }
 
 /** The menu items leading to the one with this id, itself included. */
-function trail(items: MetaParam[], id: number): MetaParam[] | null {
+export function trail(items: MetaParam[], id: number): MetaParam[] | null {
   for (const p of items) {
     if (p.id === id) return [p];
     const below = trail(p.children ?? [], id);

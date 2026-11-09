@@ -19,6 +19,7 @@ import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
 import { MENU_STYLES, menuSideOf, menuStyleOf, type MenuSide, type MenuStyle } from '../../components/AppSidebar';
+import { mobilePreviewUrl, type MobileSettings } from '../../lib/mobileApi';
 import { cx } from '@/utils/cx';
 import { t, tLabels } from '@/i18n';
 
@@ -828,6 +829,73 @@ export function AppSettingsPanel({ meta }: { meta: Meta }) {
           </ButtonGroup>
         </div>
       )}
+    </Panel>
+  );
+}
+
+/** A package id to start from, made from the app's code: mn.wand.assets_app. */
+const packageIdFor = (code: string) => `mn.wand.${code.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^[^a-z]+/, '') || 'app'}`;
+
+/**
+ * An app built into its own phone app (json_config.mobile): its name on the phone, the Android
+ * package id it is published under, and its colour. The phone app opens this app and nothing else.
+ */
+export function MobileSettingsPanel({ meta }: { meta: Meta }) {
+  const saved = (meta.json_config?.mobile ?? {}) as MobileSettings;
+  const [enabled, setEnabled] = useState(!!saved.enabled);
+  const [name, setName] = useState(saved.name ?? '');
+  const [packageId, setPackageId] = useState(saved.package_id ?? packageIdFor(meta.code));
+  const [color, setColor] = useState(saved.color ?? '#4f39f6');
+  // Saved as a phone app: the preview can open it.
+  const [live, setLive] = useState(!!saved.enabled);
+  const { busy, error, run } = useSaving();
+  const validId = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(packageId);
+
+  const save = () =>
+    void run(async () => {
+      await saveConfig(meta.id, { mobile: { enabled, name: name.trim() || null, package_id: packageId.trim(), color } satisfies MobileSettings });
+      setLive(enabled);
+    });
+
+  return (
+    <Panel
+      title={t('Phone app')}
+      description={t('Build this app into its own Android app. It opens straight into this app, with its menu as tabs at the bottom, and none of the builder.')}
+      actions={
+        live ? (
+          <a href={mobilePreviewUrl(meta.id)} target="_blank" rel="noreferrer" className="text-sm font-semibold text-brand-secondary hover:text-brand-secondary_hover">
+            {t('Open phone preview')}
+          </a>
+        ) : undefined
+      }
+    >
+      {error && <div className="mb-4"><Alert>{error}</Alert></div>}
+      <div className="flex max-w-xl flex-col gap-5">
+        <Toggle label={t('Make a phone app')} isSelected={enabled} onChange={setEnabled} />
+        {enabled && (
+          <>
+            <Input label={t('Name on the phone')} placeholder={meta.name} value={name} onChange={setName} maxLength={30} hint={t('Under the icon on the home screen. Empty: the app\'s name.')} />
+            <Input
+              label={t('Package id')}
+              value={packageId}
+              onChange={setPackageId}
+              isInvalid={!validId}
+              hint={validId ? t('Names the app in Google Play. It cannot change once the app is published.') : t('Lower-case words joined by dots, e.g. mn.wand.assets.')}
+            />
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={`mobile-color-${meta.id}`} className="text-sm font-medium text-secondary">{t('Colour')}</label>
+              <div className="flex items-center gap-3">
+                <input id={`mobile-color-${meta.id}`} type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-primary bg-primary p-1" />
+                <span className="text-sm text-tertiary tabular-nums">{color}</span>
+              </div>
+              <p className="text-sm text-tertiary">{t('The sign-in screen and the phone\'s top bar.')}</p>
+            </div>
+          </>
+        )}
+        <div>
+          <Button size="sm" onClick={save} isLoading={busy} isDisabled={enabled && !validId}>{t('Save')}</Button>
+        </div>
+      </div>
     </Panel>
   );
 }

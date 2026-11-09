@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   const backend = (loadEnv(mode, process.cwd(), 'VITE_').VITE_API_BASE_URL ?? '').replace(/\/api\/?$/, '');
   return {
     plugins: [react(), tailwindcss()],
+    // Two pages: the web app, and the phone app (mobile.html, one app meta and no builder; see src/mobile).
+    build: { rollupOptions: { input: { main: 'index.html', mobile: 'mobile.html' } } },
     // Untitled UI components import from "@/...".
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     server: {

@@ -176,11 +176,12 @@ const copy = <T,>(data: T): T => (data === null || typeof data !== 'object' ? da
  * without a token, the address is all the server has to go by.
  */
 export function guestCustomerCode(): string | null {
-  return window.location.pathname.match(/^\/c\/([^/]+)\//)?.[1] ?? null;
+  // A phone app is built for one customer (VITE_MOBILE_CUSTOMER, see mobileApi).
+  return window.location.pathname.match(/^\/c\/([^/]+)\//)?.[1] ?? import.meta.env.VITE_MOBILE_CUSTOMER ?? null;
 }
 
 // What the server answers per address (routes/api.php: the public group, also under /c/{code}).
-const PUBLIC = /^\/((metas|workflows)\/\d+|site(\?|$)|user\/access$)/;
+const PUBLIC = /^\/((metas|workflows|mobile)\/\d+|site(\?|$)|user\/access$)/;
 
 /** On another customer's public page even a signed-in person is a guest there (the server drops the token). */
 function withCustomer(path: string): string {

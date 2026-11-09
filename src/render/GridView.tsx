@@ -395,11 +395,13 @@ export function GridView({
   // A drilldown on the grid opens from each row's button; one on a column, from its values.
   const drill = useDrilldown();
   const rowDrill = drill ? drilldownOf(meta.json_config) : null;
-  // json_config.filter_layout "sidebar": the filters sit beside the grid, always open.
+  // json_config.filter_layout "sidebar": the filters sit beside the grid, always open. Too narrow
+  // for that (a phone), they'd come before the records, so they work as "dropdown" instead.
+  const roomy = useBreakpoint("lg");
   const sidebar =
-    meta.json_config?.filter_layout === "sidebar" && filterParams.length > 0;
+    meta.json_config?.filter_layout === "sidebar" && filterParams.length > 0 && roomy;
   // "dropdown": the Filters button opens them over the grid, closing once they are applied.
-  const dropdown = meta.json_config?.filter_layout === "dropdown";
+  const dropdown = meta.json_config?.filter_layout === "dropdown" || (meta.json_config?.filter_layout === "sidebar" && !roomy);
   const searchable = filterParams.some(
     (p) =>
       (p.data_type === "string" || p.data_type === "text") &&
