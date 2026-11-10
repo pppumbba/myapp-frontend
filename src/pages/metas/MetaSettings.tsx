@@ -179,7 +179,7 @@ export function StatementDesigner({ meta, options }: { meta: Meta; options: Meta
     <>
       <Panel
         title={t("Statement")}
-        description={t("Group the records, total the columns that add up, and pick what a row opens. Add columns and filters in the rows below.")}
+        description={t("Group the records, total the columns that add up, and pick what a row opens. Add columns and filters under Columns.")}
         actions={
           <Button size="sm" isDisabled={!params} isLoading={busy} showTextWhileLoading onPress={save}>
             {t("Save settings")}
@@ -249,7 +249,7 @@ export function StatementDesigner({ meta, options }: { meta: Meta; options: Meta
                       />
                     </div>
                   ))}
-                  {!columns.length && <p className="px-3 py-3 text-sm text-tertiary">{t("Add columns below first.")}</p>}
+                  {!columns.length && <p className="px-3 py-3 text-sm text-tertiary">{t("Add columns under Columns first.")}</p>}
                 </div>
               </Field>
 
@@ -307,7 +307,7 @@ export function ExcelImportDesigner({ meta }: { meta: Meta }) {
     <>
       <Panel
         title={t("Excel import")}
-        description={t("Records go into this meta's table. Each row below is a column of the file: its label is the heading, its field path the table column, and its type, required flag, options and lookup check every value.")}
+        description={t("Records go into this meta's table. Each row under Columns is a column of the file: its label is the heading, its field path the table column, and its type, required flag, options and lookup check every value.")}
         actions={
           <Button size="sm" isDisabled={!params} isLoading={busy} showTextWhileLoading onPress={save}>
             {t("Save settings")}
@@ -473,7 +473,7 @@ export function WorkspaceDesigner({ meta }: { meta: Meta }) {
       title={t("Workspace")}
       description={
         meta.ref_meta_id
-          ? t("The record’s name and the fields shown above the sections. Add each section as a row below: refer it to a grid or matrix, with config { \"scope\": { \"tender_id\": \"id\" } }.")
+          ? t("The record’s name and the fields shown above the sections. Add each section under Sections: refer it to a grid or matrix, with config { \"scope\": { \"tender_id\": \"id\" } }.")
           : t("Set “Refers to” to the form of the record this workspace is about.")
       }
       actions={
@@ -526,7 +526,7 @@ export function GridFilterLayoutPanel({ meta }: { meta: Meta }) {
   return (
     <Panel
       title={t("Filters")}
-      description={filters ? t('{count} fields are filters (Use as filter on the rows below).', { count: filters }) : t("No field is a filter yet: turn on “Use as filter” on the rows below.")}
+      description={filters ? t('{count} fields are filters (Use as filter, under Columns).', { count: filters }) : t("No field is a filter yet: turn on “Use as filter” under Columns.")}
       actions={
         <Button size="sm" isDisabled={layout === saved} isLoading={busy} showTextWhileLoading onPress={() => run(async () => {
           await saveConfig(meta.id, { filter_layout: layout });
