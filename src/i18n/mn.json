@@ -2649,5 +2649,10 @@
   "Package id": "Багцын дугаар",
   "Names the app in Google Play. It cannot change once the app is published.": "Google Play дээр аппыг ялгах нэр. Нийтэлсний дараа өөрчлөх боломжгүй.",
   "Lower-case words joined by dots, e.g. mn.wand.assets.": "Цэгээр холбосон жижиг үсгийн үгс, жишээ нь mn.wand.assets.",
-  "The sign-in screen and the phone's top bar.": "Нэвтрэх дэлгэц болон утасны дээд мөр."
+  "The sign-in screen and the phone's top bar.": "Нэвтрэх дэлгэц болон утасны дээд мөр.",
+  "App icon": "Аппын дүрс тэмдэг",
+  "Icon file": "Дүрс тэмдгийн файл",
+  "The icon could not be loaded.": "Дүрс тэмдгийг ачаалж чадсангүй.",
+  "The icon could not be saved.": "Дүрс тэмдгийг хадгалж чадсангүй.",
+  "A square PNG, JPG or WebP, 512 × 512 or bigger. Phones cut it to their own shape, so keep the logo in the middle. Used from the next build.": "Дөрвөлжин PNG, JPG эсвэл WebP, 512 × 512 буюу түүнээс том. Утас өөрийн хэлбэрээр тайрдаг тул логог голд нь байрлуулна уу. Дараагийн build-ээс хэрэглэгдэнэ."
 }

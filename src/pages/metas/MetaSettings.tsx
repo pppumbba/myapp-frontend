@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Plus, Trash01 } from '@untitledui/icons';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { MagicWand01, Plus, Trash01, Upload01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
 import { GRID_VIEWS, GRID_VIEW_LABELS, gridViewOf, metaApi, RECORD_SLOTS, type GridViewName, type Meta, type MetaOption, type MetaParam, type RecordSlot } from '../../lib/metaApi';
 import { ComboField } from '../../components/ComboField';
@@ -19,7 +19,7 @@ import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
 import { MENU_STYLES, menuSideOf, menuStyleOf, type MenuSide, type MenuStyle } from '../../components/AppSidebar';
-import { mobilePreviewUrl, type MobileSettings } from '../../lib/mobileApi';
+import { mobileApi, mobilePreviewUrl, type MobileSettings } from '../../lib/mobileApi';
 import { cx } from '@/utils/cx';
 import { t, tLabels } from '@/i18n';
 
@@ -846,6 +846,8 @@ export function MobileSettingsPanel({ meta }: { meta: Meta }) {
   const [name, setName] = useState(saved.name ?? '');
   const [packageId, setPackageId] = useState(saved.package_id ?? packageIdFor(meta.code));
   const [color, setColor] = useState(saved.color ?? '#4f39f6');
+  // Saved by its own field at once; kept here so Save sends it back unchanged.
+  const [icon, setIcon] = useState(saved.icon ?? null);
   // Saved as a phone app: the preview can open it.
   const [live, setLive] = useState(!!saved.enabled);
   const { busy, error, run } = useSaving();
@@ -853,7 +855,7 @@ export function MobileSettingsPanel({ meta }: { meta: Meta }) {
 
   const save = () =>
     void run(async () => {
-      await saveConfig(meta.id, { mobile: { enabled, name: name.trim() || null, package_id: packageId.trim(), color } satisfies MobileSettings });
+      await saveConfig(meta.id, { mobile: { enabled, name: name.trim() || null, package_id: packageId.trim(), color, icon } satisfies MobileSettings });
       setLive(enabled);
     });
 
@@ -890,6 +892,7 @@ export function MobileSettingsPanel({ meta }: { meta: Meta }) {
               </div>
               <p className="text-sm text-tertiary">{t('The sign-in screen and the phone\'s top bar.')}</p>
             </div>
+            <MobileIconField appId={meta.id} icon={icon} color={color} onChange={setIcon} />
           </>
         )}
         <div>
@@ -969,5 +972,73 @@ export function StageQueryPanel({ meta, onParamsChanged }: { meta: Meta; onParam
         <p className="text-xs text-quaternary">{t(":user_id and :today are always there. A parameter's default value is used when it is left empty; a required one must be filled in.")}</p>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * The phone app's launcher icon: a preview tile in the app's colour (the Wand mark until one is
+ * uploaded), Upload/Replace and Remove. Saved at once; the next build of the phone app uses it.
+ */
+function MobileIconField({ appId, icon, color, onChange }: { appId: number; icon: string | null; color: string; onChange: (icon: string | null) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // The saved icon comes with the token (and this customer), so it is fetched as a blob.
+  useEffect(() => {
+    if (!icon) return setUrl(null);
+    let gone = false;
+    let made: string | null = null;
+    mobileApi.iconUrl(appId).then(
+      (u) => (gone ? URL.revokeObjectURL(u) : setUrl((made = u))),
+      () => !gone && setUrl(null),
+    );
+    return () => {
+      gone = true;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [appId, icon]);
+
+  const change = async (work: () => Promise<{ icon?: string | null }>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onChange((await work()).icon ?? null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t('The icon could not be saved.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = (file: File | undefined) => {
+    if (input.current) input.current.value = '';
+    if (file) void change(() => mobileApi.uploadIcon(appId, file));
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-secondary">{t('Icon')}</span>
+      <div className="flex items-center gap-4">
+        {/* Rounded like a home screen icon. */}
+        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-xs ring-1 ring-secondary" style={url ? undefined : { backgroundColor: color }}>
+          {url ? <img src={url} alt={t('App icon')} className="size-full object-cover" /> : <MagicWand01 className="size-8 text-white" aria-hidden />}
+        </div>
+        <div className="flex gap-1.5">
+          <Button size="sm" color="secondary" iconLeading={Upload01} isLoading={busy} showTextWhileLoading onPress={() => input.current?.click()}>
+            {icon ? t('Replace') : t('Upload')}
+          </Button>
+          {icon && (
+            <Button size="sm" color="tertiary" isDisabled={busy} onPress={() => void change(() => mobileApi.removeIcon(appId))}>
+              {t('Remove')}
+            </Button>
+          )}
+        </div>
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" aria-label={t('Icon file')} onChange={(e) => pick(e.target.files?.[0])} />
+      <p className="text-sm text-tertiary">{t('A square PNG, JPG or WebP, 512 × 512 or bigger. Phones cut it to their own shape, so keep the logo in the middle. Used from the next build.')}</p>
+      {error && <p className="text-sm text-error-primary">{error}</p>}
+    </div>
   );
 }
