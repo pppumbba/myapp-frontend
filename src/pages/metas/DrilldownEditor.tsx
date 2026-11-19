@@ -14,8 +14,8 @@ import { t } from '@/i18n';
 const TARGETS = ['datagrid', 'statement', 'report', 'form', 'dashboard', 'chart', 'calendar', 'gantt'];
 
 /**
- * Edits a json_config.drilldown: the meta it opens, whether in a modal or a drawer
- * (open_in), and which of its filters or parameters get which value. sources are what the clicked thing offers (a row's fields, or a chart's
+ * Edits a json_config.drilldown: the meta it opens, whether in a modal, a drawer or
+ * full screen (open_in), and which of its filters or parameters get which value. sources are what the clicked thing offers (a row's fields, or a chart's
  * x, x.from, x.to, range.from, range.to). withLabel asks for the row button's text.
  */
 export function DrilldownEditor({
@@ -66,14 +66,16 @@ export function DrilldownEditor({
             aria-label={t('Opens in')}
             selectionMode="single"
             disallowEmptySelection
-            selectedKeys={[value.open_in === 'drawer' ? 'drawer' : 'modal']}
+            selectedKeys={[value.open_in ?? 'modal']}
             onSelectionChange={(keys) => {
               const { open_in: _, ...rest } = value;
-              onChange([...keys][0] === 'drawer' ? { ...rest, open_in: 'drawer' } : rest);
+              const key = [...keys][0];
+              onChange(key === 'drawer' || key === 'page' ? { ...rest, open_in: key } : rest);
             }}
           >
             <ButtonGroupItem id="modal">{t('In a modal')}</ButtonGroupItem>
             <ButtonGroupItem id="drawer">{t('In a drawer')}</ButtonGroupItem>
+            <ButtonGroupItem id="page">{t('Full screen')}</ButtonGroupItem>
           </ButtonGroup>
           {pairs.map(([name, source], i) => (
             <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2">

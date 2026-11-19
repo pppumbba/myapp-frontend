@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { NotificationsMenu } from '../components/NotificationsMenu';
 import { Alert } from '../components/ui';
 import { initials } from '../lib/initials';
+import { avatarUrl } from '../lib/avatarApi';
 import type { MetaParam } from '../lib/metaApi';
 import { mobileCustomerCode } from '../lib/mobileApi';
 import { useScreens } from '../lib/screenApi';
@@ -166,11 +167,11 @@ function AccountButton() {
   return (
     <>
       <AriaButton aria-label={user?.name ? t('Account menu for {name}', { name: user.name }) : t('Account menu')} onPress={() => setOpen(true)} className="rounded-full p-1 outline-focus-ring focus-visible:outline-2">
-        <Avatar size="sm" initials={initials(user?.name)} alt={user?.name} />
+        <Avatar size="sm" src={avatarUrl(user)} initials={initials(user?.name)} alt={user?.name} />
       </AriaButton>
       <Sheet isOpen={open} onOpenChange={setOpen} label={t('Account')}>
         <div className="flex items-center gap-3 border-b border-secondary px-5 py-4">
-          <Avatar size="md" initials={initials(user?.name)} alt={user?.name} />
+          <Avatar size="md" src={avatarUrl(user)} initials={initials(user?.name)} alt={user?.name} />
           <div className="min-w-0">
             <p className="truncate text-md font-semibold text-primary">{user?.name}</p>
             <p className="truncate text-sm text-tertiary">{user?.email}</p>
@@ -279,7 +280,7 @@ export function MobileHome() {
       </div>
     );
   }
-  if (!screenList) return <div className="h-64 animate-pulse rounded-xl bg-primary motion-reduce:animate-none" />;
+  if (!screenList) return <div className="h-64" aria-busy="true" />;
   const href = hrefOf(current);
   if (!href.startsWith('/?')) return <Navigate to={href} replace />;
   return <MetaView key={current.id} metaId={current.ref_meta_id} preset={presetOf(current, user)} fill />;

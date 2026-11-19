@@ -19,6 +19,7 @@ import { DrilldownEditor } from './DrilldownEditor';
 import { MatrixView } from '../../render/MatrixView';
 import type { Matrix, MatrixConfig } from '../../lib/matrixApi';
 import { MENU_STYLES, menuSideOf, menuStyleOf, type MenuSide, type MenuStyle } from '../../components/AppSidebar';
+import { menuSurface, useMenuStyles, type MenuSettings } from '../../lib/menuStyle';
 import { mobileApi, mobilePreviewUrl, type MobileSettings } from '../../lib/mobileApi';
 import { cx } from '@/utils/cx';
 import { t, tLabels } from '@/i18n';
@@ -737,15 +738,38 @@ export function FormSettingsPanel({ meta, options }: { meta: Meta; options: Meta
 
 /** A small drawing of a menu style: the menu on the left, the screen on the right. */
 function MenuStyleSketch({ style, side }: { style: MenuStyle; side: MenuSide }) {
+  if (style === 'header') {
+    // The header: logo, a long search and the user across the top; a few icons down the left.
+    return (
+      <div aria-hidden="true" className="flex h-16 flex-col overflow-hidden rounded-md bg-secondary ring-1 ring-secondary">
+        <div className="flex items-center gap-1.5 border-b border-secondary bg-primary px-1.5 py-1">
+          <span className="size-1.5 rounded-xs bg-brand-solid" />
+          <span className="h-1.5 flex-1 rounded-full ring-1 ring-secondary" />
+          <span className="size-1.5 rounded-full bg-quaternary" />
+        </div>
+        <div className="flex flex-1">
+          <div className="m-1 flex w-4 flex-col items-center justify-center gap-1 self-center rounded-md bg-primary py-1 shadow-sm ring-1 ring-secondary">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="size-1 rounded-full bg-quaternary" />
+            ))}
+          </div>
+          <div className="flex-1 p-1.5 pl-0.5">
+            <span className="block h-full rounded-sm bg-primary ring-1 ring-secondary" />
+          </div>
+        </div>
+      </div>
+    );
+  }
   const onRight = side === 'right' && style !== 'topbar';
   return (
     <div aria-hidden="true" className={cx('flex h-16 overflow-hidden rounded-md ring-1 ring-secondary', style === 'inset' ? 'bg-tertiary' : 'bg-secondary', style === 'topbar' && 'flex-col', onRight && 'flex-row-reverse')}>
       <div
         className={cx(
-          style === 'topbar' ? 'flex items-center gap-1.5 border-b border-secondary bg-primary px-1.5 py-1' : 'flex w-1/3 flex-col gap-1 p-1.5',
+          style === 'topbar' ? 'flex items-center gap-1.5 border-b border-secondary bg-primary px-1.5 py-1' : cx('flex flex-col gap-1 p-1.5', style === 'compact' ? 'w-6' : 'w-1/3'),
           style === 'classic' && (onRight ? 'border-l' : 'border-r'),
           style === 'classic' && 'border-secondary bg-primary',
           style === 'floating' && 'm-1 rounded-md bg-primary shadow-sm ring-1 ring-secondary',
+          style === 'compact' && 'm-1 self-center rounded-md bg-primary shadow-sm ring-1 ring-secondary',
           style === 'dark' && 'bg-gray-900',
         )}
       >
@@ -760,11 +784,69 @@ function MenuStyleSketch({ style, side }: { style: MenuStyle; side: MenuSide }) 
   );
 }
 
-/** An app's menu style and side (json_config.menu_style, menu_side), saved as soon as they are picked. */
+/** A small drawing of a menu style meta, from its settings. */
+function MenuSettingsSketch({ settings, side }: { settings: MenuSettings; side: MenuSide }) {
+  const onRight = side === 'right';
+  const { dark, glass, vars } = menuSurface(settings);
+  return (
+    <div
+      aria-hidden="true"
+      style={vars as React.CSSProperties}
+      className={cx(
+        'flex h-16 overflow-hidden rounded-md ring-1 ring-secondary',
+        settings.backdrop ? '[background:var(--menu-backdrop)]' : settings.frame ? '[background:var(--menu-fill)]' : 'bg-secondary',
+        onRight && 'flex-row-reverse',
+      )}
+    >
+      <div
+        className={cx(
+          'flex w-1/3 flex-col gap-1 p-1.5',
+          (!settings.frame || glass) && '[background:var(--menu-fill)]',
+          glass && 'menu-glass',
+          dark && 'dark-mode',
+          settings.gap > 0 && 'm-1 rounded-md',
+          settings.edge === 'line' && (onRight ? 'border-l border-secondary' : 'border-r border-secondary'),
+          settings.edge === 'shadow' && 'shadow-sm ring-1 ring-secondary',
+        )}
+      >
+        {[0, 1, 2].map((i) => (
+          <span key={i} className={cx('h-1 rounded-full', dark ? 'bg-white/40' : 'bg-quaternary', i === 0 ? 'w-3/4' : 'w-1/2')} />
+        ))}
+      </div>
+      <div className={cx('flex-1 p-1.5', settings.frame && 'my-1 rounded-md bg-secondary ring-1 ring-secondary', settings.frame && (onRight ? 'ml-1' : 'mr-1'))}>
+        <span className="block h-full rounded-sm bg-primary ring-1 ring-secondary" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * An app's menu: a built-in style (json_config.menu_style) or a menu style meta
+ * (menu_style_meta_id), and its side (menu_side), saved as soon as they are picked.
+ */
 export function AppSettingsPanel({ meta }: { meta: Meta }) {
   const [style, setStyle] = useState<MenuStyle>(menuStyleOf(meta.json_config?.menu_style));
+  const [customId, setCustomId] = useState<number | null>(Number(meta.json_config?.menu_style_meta_id) || null);
   const [side, setSide] = useState<MenuSide>(menuSideOf(meta.json_config?.menu_side));
+  const customStyles = useMenuStyles();
   const { busy, error, run } = useSaving();
+  // A picked style that is gone or turned off shows as the built-in the app falls back to.
+  const custom = customStyles?.find((s) => s.id === customId) ?? null;
+
+  const pickCustom = (id: number) => {
+    const before = { style, customId };
+    setStyle('classic');
+    setCustomId(id);
+    void run(async () => {
+      try {
+        await saveConfig(meta.id, { menu_style: null, menu_style_meta_id: id });
+      } catch (err) {
+        setStyle(before.style);
+        setCustomId(before.customId);
+        throw err;
+      }
+    });
+  };
 
   const pickSide = (next: MenuSide) => {
     const before = side;
@@ -780,37 +862,33 @@ export function AppSettingsPanel({ meta }: { meta: Meta }) {
   };
 
   const pick = (next: MenuStyle) => {
-    const before = style;
+    const before = { style, customId };
     setStyle(next);
+    setCustomId(null);
     void run(async () => {
       try {
-        await saveConfig(meta.id, { menu_style: next === 'classic' ? null : next });
+        await saveConfig(meta.id, { menu_style: next === 'classic' ? null : next, menu_style_meta_id: null });
       } catch (err) {
-        setStyle(before);
+        setStyle(before.style);
+        setCustomId(before.customId);
         throw err;
       }
     });
   };
+  const card = (on: boolean) =>
+    cx(
+      'flex flex-col gap-2 rounded-lg p-2.5 text-left outline-focus-ring transition-shadow duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait',
+      on ? 'ring-2 ring-brand' : 'ring-1 ring-secondary hover:ring-primary',
+    );
 
   return (
     <Panel title={t('App menu')} description={t('How the menu sits beside the screens while the app is open. Phones always get the top bar and its drawer.')}>
       {error && <div className="mb-4"><Alert>{error}</Alert></div>}
       <div role="radiogroup" aria-label={t('Menu style')} className="grid max-w-3xl grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
         {MENU_STYLES.map((m) => {
-          const on = style === m.id;
+          const on = !custom && style === m.id;
           return (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              disabled={busy}
-              onClick={() => !on && pick(m.id)}
-              className={cx(
-                'flex flex-col gap-2 rounded-lg p-2.5 text-left outline-focus-ring transition-shadow duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait',
-                on ? 'ring-2 ring-brand' : 'ring-1 ring-secondary hover:ring-primary',
-              )}
-            >
+            <button key={m.id} type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => !on && pick(m.id)} className={card(on)}>
               <MenuStyleSketch style={m.id} side={side} />
               <span>
                 <span className="block text-sm font-semibold text-primary">{t(m.name)}</span>
@@ -819,8 +897,21 @@ export function AppSettingsPanel({ meta }: { meta: Meta }) {
             </button>
           );
         })}
+        {customStyles?.map((s) => {
+          const on = custom?.id === s.id;
+          return (
+            <button key={s.id} type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => !on && pickCustom(s.id)} className={card(on)}>
+              <MenuSettingsSketch settings={s.menu} side={side} />
+              <span>
+                <span className="block text-sm font-semibold text-primary">{s.name}</span>
+                <span className="block text-xs text-tertiary">{t('Your own menu style.')}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
-      {style !== 'topbar' && (
+      {customStyles?.length === 0 && <p className="mt-3 text-xs text-tertiary">{t('Make your own: add a Menu style meta.')}</p>}
+      {(custom || (style !== 'topbar' && style !== 'header')) && (
         <div className="mt-4">
           <p className="mb-1.5 text-sm font-medium text-secondary">{t('Menu side')}</p>
           <ButtonGroup size="sm" aria-label={t('Menu side')} selectionMode="single" disallowEmptySelection isDisabled={busy} selectedKeys={[side]} onSelectionChange={(keys) => pickSide([...keys][0] === 'right' ? 'right' : 'left')}>

@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   BarChart01,
   Calendar,
-  ChevronRight,
   Circle,
   Database01,
   File06,
@@ -25,6 +24,7 @@ import {
 } from '@untitledui/icons';
 import type { MetaParam } from '../lib/metaApi';
 import { AppSidebar, menuSideOf, menuStyleOf } from '../components/AppSidebar';
+import { useMenuStyles } from '../lib/menuStyle';
 import { LogoMark } from '../components/AppShell';
 import type { NavItemType } from '@/components/application/app-navigation/config';
 import { DrilldownHost } from './DrilldownHost';
@@ -100,6 +100,9 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
   useAppTheme(def.meta.id);
   const [search] = useSearchParams();
   const screenList = useScreens();
+  const menuStyles = useMenuStyles();
+  // A picked menu style that is gone or turned off falls back to the built-in style.
+  const customMenu = menuStyles?.find((s) => s.id === Number(def.meta.json_config?.menu_style_meta_id))?.menu ?? null;
   const menu = useMemo(() => allowedMenu(def.params, (id) => can(id, 'view')), [def.params, can]);
   const all = screens(menu);
   const paths = useMemo(() => new Map((screenList ?? []).map((s) => [s.id, s.path])), [screenList]);
@@ -110,8 +113,21 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
     ? all.find((p) => activePath !== undefined && pathOf(p) === activePath)
     : (all.find((p) => String(p.id) === search.get('screen')) ?? all[0]);
   const currentPath = current ? pathOf(current) : undefined;
-  // The Wand mark, in its own indigo whatever the app's theme.
-  const mark = <LogoMark size={32} />;
+  const menuStyle = menuStyleOf(def.meta.json_config?.menu_style);
+  // The header style names the screen (its menu label and description) rather than the path to it,
+  // except dashboards and forms, which draw their own title.
+  const { def: screenDef } = useMetaDef(menuStyle === 'header' && !children ? current?.ref_meta_id : null);
+  const selfTitled = ['dashboard', 'form'].includes(screenDef?.meta.type?.code ?? '');
+  const heading = menuStyle === 'header' && current && (!current.ref_meta_id || screenDef) && !selfTitled ? { title: menuLabel(current), description: screenDef?.meta.description } : undefined;
+  // The Wand mark, in its own indigo whatever the app's theme; the header's pill holds it small, white in a brand circle.
+  const mark =
+    menuStyle === 'header' ? (
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-solid">
+        <LogoMark size={16} className="translate-x-px translate-y-px text-white" />
+      </span>
+    ) : (
+      <LogoMark size={32} />
+    );
 
   // The app's logo is the way home.
   const homeLink = 'rounded-lg outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2';
@@ -119,8 +135,9 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
   return (
     <AppSidebar
       label={t('{name} menu', { name: title(def.meta) })}
-      menuStyle={menuStyleOf(def.meta.json_config?.menu_style)}
+      menuStyle={menuStyle}
       menuSide={menuSideOf(def.meta.json_config?.menu_side)}
+      customMenu={customMenu}
       logo={
         <Link to={home} aria-label={t("Home")} className={`flex items-center gap-2.5 ${homeLink}`}>
           {mark}
@@ -141,29 +158,18 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
       {children ? (
         children
       ) : current?.ref_meta_id && !screenList ? (
-        <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+        <div className="h-64" aria-busy="true" />
       ) : currentPath ? (
         <Navigate to={currentPath} replace />
       ) : current?.ref_meta_id ? (
         <>
-          {/* Each screen draws its own title, so the page only says where you are. */}
-          <nav aria-label={t("Breadcrumb")} className="mb-5">
-            <ol className="flex flex-wrap items-center gap-1.5 text-sm">
-              {[title(def.meta), ...(trail(menu, current.id) ?? [current]).map(menuLabel)].map((label, i, all) => (
-                <li key={i} className="flex items-center gap-1.5">
-                  {i > 0 && <ChevronRight className="size-4 text-fg-quaternary" aria-hidden="true" />}
-                  <span
-                    aria-current={i === all.length - 1 ? 'page' : undefined}
-                    className={i === all.length - 1 ? 'rounded-md bg-primary_hover px-2 py-0.5 font-semibold text-secondary' : 'font-medium text-tertiary'}
-                  >
-                    {label}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </nav>
           <AppMetaContext.Provider value={def.meta.id}>
-            <DrilldownHost>
+            {/* Each screen draws its own title, so the page's breadcrumb only says where you are. */}
+            <DrilldownHost
+              key={current.id}
+              trail={menuStyle === 'header' ? undefined : [title(def.meta), ...(trail(menu, current.id) ?? [current]).map(menuLabel)]}
+              heading={heading}
+            >
               <MetaView key={current.id} metaId={current.ref_meta_id} preset={presetOf(current, user)} fill />
             </DrilldownHost>
           </AppMetaContext.Provider>
@@ -209,6 +215,9 @@ export function RunMeta({ metaId, portal = false }: { metaId: number; portal?: b
   if (def?.meta.type?.code === 'app') return <AppView def={def} home={portal ? `/portal/${metaId}` : '/'} />;
   // A built-in page lives at its own address.
   if (def?.meta.type?.code === 'screen' && typeof def.meta.json_config?.path === 'string') return <Navigate to={def.meta.json_config.path} replace />;
+  // Until it's known whether this is an app (own layout) or not (the frame below), show nothing:
+  // no builder bar flashing before an app opens.
+  if (!def && !error) return <div className="min-h-screen" aria-busy="true" />;
 
   return (
     <div className="min-h-screen">

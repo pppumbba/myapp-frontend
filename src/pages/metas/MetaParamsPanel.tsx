@@ -15,6 +15,7 @@ import { Tooltip } from '@/components/base/tooltip/tooltip';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 import { AutonumberEditor } from './AutonumberEditor';
+import { parse as parseFormula } from '../../render/formula';
 import { t } from '@/i18n';
 
 type RowsView = 'cards' | 'inline';
@@ -130,6 +131,12 @@ interface ParamForm {
   display_field: string;
   value_field: string;
   default_value: string;
+  /** A grid column's width in px; empty: it fits its content. */
+  column_width: string;
+  /** A calculated field's formula (render/formula.ts); empty: typed in. */
+  expression_string: string;
+  /** How a consolidate merges this field (GroupType); empty: first. */
+  group_type: string;
   /** json_config as text; it must be valid JSON. */
   json_config: string;
 }
@@ -156,6 +163,9 @@ function emptyParam(order: number, parentId: number | null): ParamForm {
     display_field: '',
     value_field: '',
     default_value: '',
+    column_width: '',
+    expression_string: '',
+    group_type: '',
     json_config: '',
   };
 }
@@ -182,6 +192,9 @@ function toParamForm(p: MetaParam): ParamForm {
     display_field: p.display_field ?? '',
     value_field: p.value_field ?? '',
     default_value: p.default_value ?? '',
+    column_width: p.column_width ?? '',
+    expression_string: p.expression_string ?? '',
+    group_type: p.group_type ?? '',
     json_config: p.json_config ? JSON.stringify(p.json_config, null, 2) : '',
   };
 }
@@ -208,8 +221,58 @@ function toParamInput(f: ParamForm): MetaParamInput {
     display_field: f.is_select ? f.display_field.trim() || null : null,
     value_field: f.is_select ? f.value_field.trim() || null : null,
     default_value: f.default_value || null,
+    column_width: f.column_width.trim() || null,
+    expression_string: f.expression_string.trim() || null,
+    group_type: (f.group_type || null) as MetaParam['group_type'],
     json_config: f.json_config.trim() ? (JSON.parse(f.json_config) as Record<string, unknown>) : null,
   };
+}
+
+/** How a consolidate merges a field (meta_params.group_type). */
+const GROUP_TYPES: [string, string][] = [
+  ['', 'First value (default)'],
+  ['group', 'Group by'],
+  ['sum', 'Sum'],
+  ['avg', 'Average'],
+  ['min', 'Smallest'],
+  ['max', 'Largest'],
+  ['count', 'Count'],
+  ['concat', 'Join the values (concat)'],
+  ['last', 'Last value'],
+];
+
+/** Param types that hold no value of their own, so they can't be calculated. */
+const NOT_CALCULATED = ['detail', 'subgrid', 'singlefile', 'multifile', 'document', 'signature'];
+
+/**
+ * A field's formula (expression_string): with one, forms work it out and keep it read-only.
+ * It is read as it is typed; the names in it are checked against the form when it is saved.
+ */
+function FormulaInput({ value, error, onChange }: { value: string; error?: string; onChange: (value: string) => void }) {
+  let problem: string | null = null;
+  if (value.trim()) {
+    try {
+      parseFormula(value.trim());
+    } catch (err) {
+      problem = err instanceof Error ? err.message : String(err);
+    }
+  }
+  return (
+    <TextArea
+      label={t("Formula")}
+      rows={2}
+      value={value}
+      onChange={onChange}
+      textAreaClassName="font-mono text-sm"
+      placeholder="quantity * unit_price"
+      isInvalid={!!(error || problem)}
+      hint={
+        error ??
+        problem ??
+        t("Empty: typed in. Use the form's fields, + - * / %, = != < >, and/or, if(test, then, else), round(x, 2), min, max, coalesce, concat, today(), days(from, to), adddays(date, n); sum(lines.amount), avg, count(lines) for a detail's lines; parent.field on a line.")
+      }
+    />
+  );
 }
 
 /** The groups a form's params use so far (json_config.group), in order. */
@@ -547,6 +610,37 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
                   json={form.json_config}
                   fields={tree.map((p) => p.field_path).filter((f) => f !== form.field_path)}
                   onChange={(v) => set('json_config', v)}
+                />
+              </Section>
+            )}
+
+            {meta.type?.code === 'datagrid' && !form.parent_id && (
+              <Section title={t("Grid column")}>
+                <Input
+                  label={t("Width (px)")}
+                  type="number"
+                  value={form.column_width}
+                  onChange={(v) => set('column_width', v)}
+                  isInvalid={!!fe('column_width')}
+                  hint={fe('column_width') ?? t("Empty: fits its content. People can still drag the column's edge to their own width.")}
+                />
+              </Section>
+            )}
+
+            {meta.type?.code === 'form' && !NOT_CALCULATED.includes(form.data_type) && (
+              <Section title={t("Calculated")}>
+                <FormulaInput value={form.expression_string} error={fe('expression_string')} onChange={(v) => set('expression_string', v)} />
+              </Section>
+            )}
+
+            {meta.type?.code === 'form' && !NOT_CALCULATED.includes(form.data_type) && !form.is_primary && (
+              <Section title={t("Consolidate")}>
+                <NativeSelect
+                  label={t("Group")}
+                  value={form.group_type}
+                  onChange={(e) => set('group_type', e.target.value)}
+                  hint={fe('group_type') ?? t("When a consolidate button merges picked records into this form: how this field takes its value from theirs. On lines, Group by puts records with the same value on one line.")}
+                  options={GROUP_TYPES.map(([value, label]) => ({ value, label: t(label) }))}
                 />
               </Section>
             )}

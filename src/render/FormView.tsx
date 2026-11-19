@@ -17,7 +17,8 @@ import { Input } from '@/components/base/input/input';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
-import { blankLine, DetailSection, detailPayload, lineAmount, startLines, type Line } from './DetailLines';
+import { blankLine, DetailSection, detailPayload, lineAmount, newLines, startLines, type Line } from './DetailLines';
+import { applyFormulas, formulaOf } from './formula';
 import { autonumberFields, autonumberOf, detailParams, filledFrom, isOneToOne, optionsOf, primaryKey, title, useDetailTree, useMetaDef, visibleParams } from './definitions';
 import { startValues, toPayload, type Values } from './formValues';
 import { lineChanges, runScript, scriptsOf, type ScriptEvent, type ScriptKind, type ScriptState } from './formScript';
@@ -30,6 +31,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useAppMetaId } from './appContext';
 import { criteriaPasses, type CriteriaVars } from './criteria';
 import type { DetailNode } from './definitions';
+import { BlurWords, wordCount } from '../components/motion';
 import { t } from '@/i18n';
 
 const wide = (f: MetaParam) => f.render_type === 'textarea' || f.data_type === 'text' || f.data_type === 'boolean' || f.data_type === 'document' || isFileParam(f);
@@ -63,6 +65,13 @@ const NOT_ON_PAGE = ['document', 'detail', 'subgrid', 'signature'];
 /** A typed-in number, not a lookup's id or a choice from a list. */
 const isNumber = (f: MetaParam) => (f.data_type === 'integer' || f.data_type === 'decimal') && !f.is_select && !optionsOf(f);
 
+/** A calculated field's value as it reads: numbers formatted, yes/no for a boolean. */
+const calculatedText = (f: MetaParam, v: string | boolean | undefined) =>
+  typeof v === 'boolean' ? (v ? t('Yes') : t('No')) : v === '' || v === undefined ? '' : isNumber(f) ? formatNumber(Number(v)) : String(v);
+
+/** Rows picked in a grid for its consolidate button, and the grid's filters they were picked under. */
+export type Consolidating = { gridId: number; actionId: number; ids: string[]; filter?: Record<string, string>; scope?: Record<string, string> };
+
 /**
  * A form meta as a working form. With recordId it edits that record, otherwise it adds one.
  * embedded: inside a modal opened from a grid. Otherwise it's a page of its own (e.g. a
@@ -70,6 +79,8 @@ const isNumber = (f: MetaParam) => (f.data_type === 'integer' || f.data_type ===
  * defaults: starting values for a new record, e.g. the day picked on a calendar.
  * fill: a get meta and its named parameters; its first row decides the values the form
  * opens with (over the record's own values when editing).
+ * consolidate: rows picked in a grid; a new record opens with them merged by the form's
+ * group_type fields (lines included), from the grid's consolidate button.
  * fixed: values the record always has, e.g. a workspace's tender_id; their fields are not
  * shown, and they are sent with every save.
  * Besides Save: Save and add saves and starts a new record (json_config.save_and_add false
@@ -90,6 +101,7 @@ export function FormView({
   recordId,
   defaults,
   fill,
+  consolidate,
   fixed,
   embedded,
   onSaved,
@@ -100,6 +112,7 @@ export function FormView({
   defaults?: DataRow;
   fixed?: Record<string, string>;
   fill?: { metaId: number; params: Record<string, string> };
+  consolidate?: Consolidating;
   embedded?: boolean;
   onSaved?: (row: DataRow, next?: 'new') => void;
   onCancel?: () => void;
@@ -173,8 +186,20 @@ export function FormView({
   latest.current = { values: values ?? {}, lines, hidden, readonly: locked };
   const mode: ScriptEvent['mode'] = currentId ? 'edit' : 'new';
 
-  /** Takes over what a script left: values, lines, hidden and read-only fields. */
-  function adopt(state: ScriptState) {
+  // Why a calculated field's formula failed, by field (shown under it).
+  const [formulaErrors, setFormulaErrors] = useState<Record<string, string>>({});
+
+  /**
+   * Takes over what a script left: values, lines, hidden and read-only fields, with every
+   * calculated field (formula.ts) worked out again from them.
+   */
+  function adopt(given: ScriptState) {
+    let state = given;
+    if (def && tree) {
+      const errors: Record<string, string> = {};
+      state = { ...given, ...applyFormulas(def.params, tree, given.values, given.lines, errors) };
+      setFormulaErrors(errors);
+    }
     latest.current = state;
     setValues(state.values);
     setLines(state.lines);
@@ -222,12 +247,14 @@ export function FormView({
   const freshLines = () => Object.fromEntries((tree ?? []).map((n) => [n.detail.field_path, [blankLine(n)]]));
 
   // The get meta's values win over the record's own and over defaults.
-  const fillKey = fill ? `${fill.metaId}:${JSON.stringify(fill.params)}` : '';
+  const fillKey = consolidate ? `c${consolidate.actionId}:${consolidate.ids.join(',')}` : fill ? `${fill.metaId}:${JSON.stringify(fill.params)}` : '';
 
   useEffect(() => {
     if (!def || !tree) return;
     let live = true;
-    const filled: Promise<DataRow> = fill ? dataApi.fill(fill.metaId, fill.params) : Promise.resolve({});
+    const filled: Promise<DataRow> = consolidate
+      ? dataApi.consolidate(consolidate.gridId, consolidate.actionId, consolidate.ids, { filter: consolidate.filter, scope: consolidate.scope })
+      : fill ? dataApi.fill(fill.metaId, fill.params) : Promise.resolve({});
     const fail = (err: unknown) => live && setLoadError(err instanceof ApiError ? err.message : t('This record could not be loaded.'));
 
     // The load script gets the starting values before they are shown.
@@ -240,7 +267,13 @@ export function FormView({
     if (!currentId) {
       filled.then((values) => {
         if (!live) return;
-        return start(startValues(fields, null, { ...defaults, ...values }), freshLines());
+        // Lines it brings (a consolidate's merged lines) replace the empty first line.
+        const brought = Object.fromEntries(tree.flatMap((n) => {
+          const given = values[n.detail.field_path];
+          const rows = Array.isArray(given) ? (given as DataRow[]) : given && typeof given === 'object' ? [given as DataRow] : [];
+          return rows.length ? [[n.detail.field_path, newLines(n, rows)]] : [];
+        }));
+        return start(startValues(fields, null, { ...defaults, ...values }), { ...freshLines(), ...brought });
       }, fail);
     } else {
       Promise.all([dataApi.get(def.meta.id, currentId), filled]).then(([row, values]) => {
@@ -336,7 +369,7 @@ export function FormView({
   function goNext() {
     const missing = groups[active].fields.filter((f) => {
       const v = values![f.field_path];
-      return f.is_required && f.data_type !== 'boolean' && !isFileParam(f) && f.data_type !== 'document' && !autonumberOf(f) && !totals.has(f.field_path) && !locked.has(f.field_path) && (v === '' || v == null);
+      return f.is_required && f.data_type !== 'boolean' && !isFileParam(f) && f.data_type !== 'document' && !autonumberOf(f) && !formulaOf(f) && !totals.has(f.field_path) && !locked.has(f.field_path) && (v === '' || v == null);
     });
     if (missing.length) {
       setFieldErrors(Object.fromEntries(missing.map((f) => [f.field_path, [t('Fill this in before going on.')]])));
@@ -430,6 +463,17 @@ export function FormView({
             hint={fe(f.field_path) ?? (currentId ? t('Numbered when it was added.') : t('Given when saved: this is the next number.'))}
             wrapperClassName="bg-secondary shadow-none"
             inputClassName="tabular-nums"
+          />
+        ) : formulaOf(f) ? (
+          // A calculated field: worked out as the form changes, and again by the server on save.
+          <Input
+            label={f.label_name || f.param_name}
+            value={calculatedText(f, values[f.field_path])}
+            isReadOnly
+            isInvalid={!!(formulaErrors[f.field_path] || fe(f.field_path))}
+            hint={formulaErrors[f.field_path] ?? fe(f.field_path) ?? t('Worked out: {formula}', { formula: formulaOf(f)! })}
+            wrapperClassName="bg-secondary shadow-none"
+            inputClassName={isNumber(f) ? 'font-semibold tabular-nums' : undefined}
           />
         ) : totals.has(f.field_path) ? (
           <Input
@@ -628,8 +672,14 @@ export function FormView({
     // Opened from an app's menu, the form sits in the middle of the page.
     <div className={`${details.some((d) => !isOneToOne(d)) ? 'max-w-6xl' : 'max-w-3xl'} ${appMetaId ? 'mx-auto' : ''} rounded-xl bg-primary shadow-xs ring-1 ring-secondary`}>
       <div className="border-b border-secondary px-4 py-4 sm:px-5">
-        <h2 className="text-lg font-semibold text-primary">{title(def.meta)}</h2>
-        {def.meta.description && <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>}
+        <h2 className="text-lg font-semibold text-primary">
+          <BlurWords text={title(def.meta)} />
+        </h2>
+        {def.meta.description && (
+          <p className="mt-1 text-sm text-tertiary">
+            <BlurWords text={def.meta.description} delay={wordCount(title(def.meta))} />
+          </p>
+        )}
       </div>
       <div className="px-4 py-5 sm:px-5">{form}</div>
     </div>

@@ -35,10 +35,11 @@ export function Modal({
   description?: string;
   onClose: () => void;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  /** full: as wide as the window allows (a datagrid). */
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   fill?: boolean;
 }) {
-  const width = { sm: 'sm:max-w-100', md: 'sm:max-w-2xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' }[size];
+  const width = { sm: 'sm:max-w-100', md: 'sm:max-w-2xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl', full: 'sm:max-w-none' }[size];
   const boxRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
@@ -92,7 +93,8 @@ export function Modal({
     <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()} className={fill ? 'max-sm:items-start' : undefined}>
       <UModal
         ref={boxRef}
-        className={cx('relative flex flex-col max-sm:overflow-hidden', width, fill && 'max-sm:h-full', active && 'select-none')}
+        // Full size is full height too: its top stays put, so a grid filling it measures once.
+        className={cx('relative flex flex-col max-sm:overflow-hidden', width, fill && 'max-sm:h-full', size === 'full' && 'sm:h-full', active && 'select-none')}
         style={{
           translate: `${offset.x}px ${offset.y}px`,
           ...(box && { width: box.w, height: box.h, maxWidth: 'none' }),

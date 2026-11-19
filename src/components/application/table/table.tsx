@@ -67,19 +67,21 @@ const TableCardRoot = ({
 };
 
 interface TableCardHeaderProps {
-    /** The title of the table card header. */
-    title: string;
+    /** The title of the table card header. Left out, the header is only a toolbar. */
+    title?: string;
     /** The badge displayed next to the title. */
     badge?: ReactNode;
     /** The description of the table card header. */
     description?: string;
+    /** Content shown right after the title, on the left (e.g. search); the trailing content is pushed right. */
+    contentLeading?: ReactNode;
     /** The content displayed after the title and badge. */
     contentTrailing?: ReactNode;
     /** The class name of the table card header. */
     className?: string;
 }
 
-const TableCardHeader = ({ title, badge, description, contentTrailing, className }: TableCardHeaderProps) => {
+const TableCardHeader = ({ title, badge, description, contentLeading, contentTrailing, className }: TableCardHeaderProps) => {
     const { size } = useContext(TableContext);
 
     return (
@@ -90,21 +92,24 @@ const TableCardHeader = ({ title, badge, description, contentTrailing, className
                 className,
             )}
         >
-            <div className="flex flex-1 flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-md font-semibold text-primary">{title}</h2>
-                    {badge ? (
-                        isValidElement(badge) ? (
-                            badge
-                        ) : (
-                            <Badge color="gray" size="sm" type="modern">
-                                {badge}
-                            </Badge>
-                        )
-                    ) : null}
+            {title && (
+                <div className={cx("flex flex-col gap-0.5", !contentLeading && "flex-1")}>
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-md font-semibold text-primary">{title}</h2>
+                        {badge ? (
+                            isValidElement(badge) ? (
+                                badge
+                            ) : (
+                                <Badge color="gray" size="sm" type="modern">
+                                    {badge}
+                                </Badge>
+                            )
+                        ) : null}
+                    </div>
+                    {description && <p className="text-sm text-tertiary">{description}</p>}
                 </div>
-                {description && <p className="text-sm text-tertiary">{description}</p>}
-            </div>
+            )}
+            {contentLeading && <div className="flex w-full flex-1 flex-wrap items-center gap-2 md:w-auto">{contentLeading}</div>}
             {contentTrailing}
         </div>
     );
@@ -181,9 +186,13 @@ interface TableHeadProps extends AriaColumnProps, Omit<ThHTMLAttributes<HTMLTabl
     label?: string;
     /** Help text shown in a tooltip when hovering the help icon next to the heading. */
     tooltip?: string;
+    /** The column's width in px, padding included; the heading is cut short to fit. Empty: it fits its content. */
+    width?: number;
+    /** Drawn over the heading, e.g. handles to drag its width or move it. */
+    handles?: ReactNode;
 }
 
-const TableHead = ({ className, tooltip, label, children, ...props }: TableHeadProps) => {
+const TableHead = ({ className, tooltip, label, children, width, handles, ...props }: TableHeadProps) => {
     const { selectionBehavior } = useTableOptions();
 
     return (
@@ -191,7 +200,7 @@ const TableHead = ({ className, tooltip, label, children, ...props }: TableHeadP
             {...props}
             className={(state) =>
                 cx(
-                    "relative p-0 px-6 py-2 outline-hidden focus-visible:z-1 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary focus-visible:ring-inset",
+                    "group/head relative p-0 px-6 py-2 outline-hidden focus-visible:z-1 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary focus-visible:ring-inset",
                     selectionBehavior === "toggle" && "nth-2:pl-3",
                     state.allowsSorting && "cursor-pointer",
                     typeof className === "function" ? className(state) : className,
@@ -199,9 +208,11 @@ const TableHead = ({ className, tooltip, label, children, ...props }: TableHeadP
             }
         >
             {(state) => (
-                <AriaGroup className="flex items-center gap-1">
-                    <div className="flex items-center gap-1">
-                        {label && <span className="text-xs font-semibold whitespace-nowrap text-quaternary">{label}</span>}
+                <>
+                {/* A width on the content, not the cell: an auto table never makes a cell narrower than what is in it. px-6 is 48px. */}
+                <AriaGroup className="flex items-center gap-1" style={width ? { width: Math.max(width - 48, 0) } : undefined}>
+                    <div className={cx("flex items-center gap-1", width && "min-w-0")}>
+                        {label && <span className={cx("text-xs font-semibold whitespace-nowrap text-quaternary", width && "truncate")}>{label}</span>}
                         {typeof children === "function" ? children(state) : children}
                     </div>
 
@@ -217,9 +228,11 @@ const TableHead = ({ className, tooltip, label, children, ...props }: TableHeadP
                         (state.sortDirection ? (
                             <ArrowDown className={cx("size-3 stroke-[3px] text-fg-quaternary", state.sortDirection === "ascending" && "rotate-180")} />
                         ) : (
-                            <ChevronSelectorVertical size={12} strokeWidth={3} className="text-fg-quaternary" />
+                            <ChevronSelectorVertical size={12} strokeWidth={3} className="shrink-0 text-fg-quaternary" />
                         ))}
                 </AriaGroup>
+                {handles}
+                </>
             )}
         </AriaColumn>
     );

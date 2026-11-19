@@ -140,6 +140,8 @@ export interface MetaParam {
   max_value: string | null;
   column_width: string | null;
   expression_string: string | null;
+  /** How the field takes its value when a consolidate button merges records: group (lines with the same value become one), sum, avg, min, max, count, concat, first, last. Null: first. */
+  group_type: GroupType | null;
   json_config: Record<string, unknown> | null;
   children?: MetaParam[];
 }
@@ -239,7 +241,9 @@ export const metaApi = {
   removeAction: (actionId: number) => api<null>(`/actions/${actionId}`, { method: 'DELETE' }),
 };
 
-export type ActionKind = 'add' | 'edit' | 'delete' | 'custom' | 'import' | 'stage_query';
+export type GroupType = 'group' | 'sum' | 'avg' | 'min' | 'max' | 'count' | 'concat' | 'first' | 'last';
+
+export type ActionKind = 'add' | 'edit' | 'delete' | 'custom' | 'import' | 'stage_query' | 'consolidate';
 
 /**
  * One toolbar button of a datagrid (backend: meta_actions). form_meta_id is the form it

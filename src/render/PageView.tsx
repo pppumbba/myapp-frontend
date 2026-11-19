@@ -23,7 +23,7 @@ export function PageView({ def }: { def: MetaDef }) {
   }, [def.meta.id]);
 
   if (error) return <Alert>{error}</Alert>;
-  if (!page) return <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
+  if (!page) return <div className="h-64" aria-busy="true" />;
   if (!page.items.length) {
     return (
       <div className="rounded-xl bg-primary px-6 py-14 text-center shadow-xs ring-1 ring-secondary">

@@ -1,7 +1,7 @@
 import type { FC, SVGProps } from 'react';
 import {
   AlignLeft01, BarChartSquare02, Bell01, Briefcase01, Calendar, Cube01, Database01, Database02, Dataflow03, File04, FileCheck02,
-  FileSearch02, Folder, Globe01, Grid03, LayoutAlt02, LayoutGrid01, LineChartUp01, Monitor01, Palette, PuzzlePiece01,
+  FileSearch02, Folder, Globe01, Grid03, LayoutAlt02, LayoutGrid01, LayoutLeft, LineChartUp01, Monitor01, Palette, PuzzlePiece01,
   PuzzlePiece02, Rows03, Table, TerminalSquare, Upload04,
 } from '@untitledui/icons';
 import { typeColors } from './TypePreview';
@@ -29,6 +29,7 @@ const icons: Record<string, Icon> = {
   structure: Database02,
   tabs: Folder,
   theme: Palette,
+  menu_style: LayoutLeft,
   website: Globe01,
   widget: PuzzlePiece01,
   widget_template: PuzzlePiece02,

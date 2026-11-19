@@ -33,6 +33,7 @@ const looks: Record<string, TypeLook> = {
   matrix: { ink: '#4D7C0F', tint: '#F7FEE7', rowNoun: 'row' },
   stage_query: { ink: '#B45309', tint: '#FFFBEB', rowNoun: 'parameter' },
   theme: { ink: '#C026D3', tint: '#FDF4FF', rowNoun: 'setting' },
+  menu_style: { ink: '#C026D3', tint: '#FDF4FF', rowNoun: 'setting' },
   structure: { ink: '#475569', tint: '#F1F5F9', rowNoun: 'column' },
 };
 

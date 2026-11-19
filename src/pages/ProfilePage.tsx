@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { customerApi, type MyCustomer } from '../lib/customerApi';
 import { ConfirmDialog } from '../components/Modal';
 import { Badge } from '@/components/base/badges/badges';
-import { CheckCircle, Monitor01, Moon01, Sun } from '@untitledui/icons';
+import { CheckCircle, Monitor01, Moon01, Sun, Upload01 } from '@untitledui/icons';
 import { useAuth, type User } from '../auth/AuthContext';
 import { api, ApiError } from '../lib/api';
 import { initials } from '../lib/initials';
+import { avatarApi, avatarUrl } from '../lib/avatarApi';
 import { languageApi, type Language } from '../lib/languageApi';
 import { clearRenderCache } from '../render/definitions';
 import { NativeSelect } from '@/components/base/select/select-native';
@@ -33,7 +34,7 @@ export default function ProfilePage() {
       <PageHeader title={t("Profile")} subtitle={t("Your name, email and password.")} />
 
       <div className="mb-5 flex items-center gap-3">
-        <Avatar size="lg" initials={initials(user?.name)} alt={user?.name} />
+        <Avatar size="lg" src={avatarUrl(user)} initials={initials(user?.name)} alt={user?.name} />
         <div className="min-w-0">
           <p className="truncate text-md font-semibold text-primary">{user?.name}</p>
           <p className="truncate text-sm text-tertiary">
@@ -118,7 +119,8 @@ function DetailsCard() {
 
   return (
     <Card title={t("Personal info")} description={t("How you appear in the app, and the email you log in with.")}>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <PhotoField />
+      <form onSubmit={onSubmit} className="mt-4 space-y-4 border-t border-secondary pt-4">
         {save.error && <Alert>{save.error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -155,6 +157,53 @@ function DetailsCard() {
         </div>
       </form>
     </Card>
+  );
+}
+
+/** The profile picture: Upload/Replace and Remove, saved at once. Initials show without one. */
+function PhotoField() {
+  const { user, updateUser } = useAuth();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function change(work: () => Promise<User>) {
+    setBusy(true);
+    setError(null);
+    try {
+      updateUser(await work());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('The photo could not be saved.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function pick(file: File | undefined) {
+    if (input.current) input.current.value = '';
+    if (file) void change(() => avatarApi.upload(file));
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-secondary">{t('Photo')}</span>
+      <div className="flex items-center gap-4">
+        <Avatar size="xl" src={avatarUrl(user)} initials={initials(user?.name)} alt={user?.name} />
+        <div className="flex gap-1.5">
+          <Button size="sm" color="secondary" iconLeading={Upload01} isLoading={busy} showTextWhileLoading onPress={() => input.current?.click()}>
+            {user?.avatar ? t('Replace') : t('Upload')}
+          </Button>
+          {user?.avatar && (
+            <Button size="sm" color="tertiary" isDisabled={busy} onPress={() => void change(avatarApi.remove)}>
+              {t('Remove')}
+            </Button>
+          )}
+        </div>
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" aria-label={t('Photo file')} onChange={(e) => pick(e.target.files?.[0])} />
+      <p className="text-sm text-tertiary">{t('A PNG, JPG, WebP or GIF up to 5 MB. It shows round, so keep your face in the middle.')}</p>
+      {error && <p className="text-sm text-error-primary">{error}</p>}
+    </div>
   );
 }
 

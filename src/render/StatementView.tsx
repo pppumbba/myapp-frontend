@@ -162,7 +162,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
     return (
       <button
         type="button"
-        onClick={() => drill({ metaId: target.meta_id, params: drillParams(target, row), drawer: target.open_in === 'drawer', label: text(p, row[p.field_path]) || title(meta) })}
+        onClick={() => drill({ metaId: target.meta_id, params: drillParams(target, row), open: target.open_in, label: text(p, row[p.field_path]) || title(meta) })}
         className="rounded text-left font-medium text-brand-secondary underline-offset-2 outline-focus-ring hover:underline focus-visible:outline-2"
       >
         {content}

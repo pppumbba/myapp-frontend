@@ -27,7 +27,9 @@ export const NavList = ({ activeUrl, items, className }: NavListProps) => {
 
                 if (item.items?.length) {
                     return (
-                        <details key={item.label} open={activeItem?.href === item.href} className="appearance-none py-0.25">
+                        // Only the group holding the current item starts open (a group has no href of its
+                        // own, so compare the item itself). Unfolding the menu builds this list again.
+                        <details key={item.label} open={activeItem === item} className="appearance-none py-0.25">
                             <NavItemBase badge={item.badge} icon={item.icon} type="collapsible">
                                 {item.label}
                             </NavItemBase>

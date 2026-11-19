@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from '@untitledui/icons';
 import type { Bucket, ChartData, ChartFormat, ChartRow } from '../../lib/chartApi';
 import { cx } from '@/utils/cx';
 import { formatDate } from '../Cell';
+import { CountUp, easeOut, staggered, useProgress } from '../../components/motion';
 import { t } from '@/i18n';
 
 /*
@@ -215,7 +216,10 @@ function CartesianChart({ data, onSelect }: { data: ChartData; onSelect?: OnSele
   const every = Math.max(1, Math.ceil(64 / Math.max(band, 1)));
   const markers = data.rows.length <= 24;
 
-  const points = (key: string) => data.rows.map((r, i) => [mid(i), y(r.values[key] ?? 0)] as const);
+  // Grows in from nothing: columns one after another, lines and areas rising from zero.
+  const grow = useProgress(data);
+  const rise = easeOut(grow);
+  const points = (key: string) => data.rows.map((r, i) => [mid(i), y((r.values[key] ?? 0) * rise)] as const);
 
   return (
     <Frame chartRef={ref} label={describe(data)} legend={<Legend series={data.series} />}>
@@ -246,7 +250,7 @@ function CartesianChart({ data, onSelect }: { data: ChartData; onSelect?: OnSele
               data.series.map((s, j) => {
                 const v = r.values[s.key];
                 if (v === null || v === undefined) return null;
-                return <path key={`${i}-${s.key}`} d={columnPath(mid(i) - groupW / 2 + j * (barW + 2), y(0), y(v), barW)} fill={seriesColor(j)} />;
+                return <path key={`${i}-${s.key}`} d={columnPath(mid(i) - groupW / 2 + j * (barW + 2), y(0), y(v * staggered(grow, i, data.rows.length)), barW)} fill={seriesColor(j)} />;
               }),
             )}
 
@@ -316,6 +320,8 @@ function BarChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
   const band = height / data.rows.length;
   const barH = Math.max(Math.min(24, (band * 0.7 - (n - 1) * 2) / n), 2);
   const groupH = n * barH + (n - 1) * 2;
+  // Bars grow out from the axis one after another.
+  const grow = useProgress(data);
 
   return (
     <Frame chartRef={ref} label={describe(data)} legend={<Legend series={data.series} />}>
@@ -336,7 +342,7 @@ function BarChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
                   const yy = top + j * (barH + 2);
                   return (
                     <g key={s.key}>
-                      <path d={barPath(x(0), x(v), yy, barH)} fill={seriesColor(j)} />
+                      <path d={barPath(x(0), x(v * staggered(grow, i, data.rows.length)), yy, barH)} fill={seriesColor(j)} />
                       {(n === 1 || band >= 28) && (
                         <text x={x(Math.max(v, 0)) + 6} y={yy + barH / 2} dy="0.32em" fontSize={11} fill="var(--color-text-tertiary)" className="tabular-nums">
                           {formatValue(v, data.format, true)}
@@ -387,11 +393,13 @@ function PieChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
   const r = size / 2 - 4;
   const inner = data.type === 'donut' ? r * 0.62 : 0;
 
+  // Sweeps round from the top, the total counting up with it.
+  const sweep = easeOut(useProgress(data));
   let angle = -Math.PI / 2;
   const arcs = rows.map((row) => {
     const v = row.values[key] ?? 0;
     const a0 = angle;
-    angle += (v / (total || 1)) * Math.PI * 2;
+    angle += (v / (total || 1)) * Math.PI * 2 * sweep;
     return { row, v, a0, a1: angle };
   });
   const pt = (a: number, rad: number) => [size / 2 + rad * Math.cos(a), size / 2 + rad * Math.sin(a)];
@@ -429,7 +437,7 @@ function PieChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
             ))}
             {inner > 0 && (
               <text x={size / 2} y={size / 2} textAnchor="middle" dy="0.32em" fontSize={Math.max(Math.min(inner / 3, 22), 12)} fontWeight={600} fill="var(--color-text-primary)">
-                {formatValue(hover !== null ? arcs[hover]?.v : total, data.format, true)}
+                {formatValue(hover !== null ? arcs[hover]?.v : sweep < 1 && Number.isInteger(total) ? Math.round(total * sweep) : total * sweep, data.format, true)}
               </text>
             )}
           </svg>
@@ -456,9 +464,10 @@ function PieChart({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) 
 
 /** One big number, and how it moved against the period before when there is one. */
 function KpiFigure({ data, onSelect }: { data: ChartData; onSelect?: OnSelect }) {
-  const value = data.kpi?.value ?? null;
+  // No value (nothing matched) reads as 0, not a dash.
+  const value = data.kpi?.value ?? 0;
   const previous = data.kpi?.previous;
-  const change = previous && value !== null ? ((value - previous) / Math.abs(previous)) * 100 : null;
+  const change = previous ? ((value - previous) / Math.abs(previous)) * 100 : null;
   const up = (change ?? 0) >= 0;
 
   return (
@@ -469,11 +478,11 @@ function KpiFigure({ data, onSelect }: { data: ChartData; onSelect?: OnSelect })
           onClick={() => onSelect(null)}
           className="self-start rounded-md text-left text-display-sm font-semibold text-primary underline-offset-4 outline-focus-ring hover:underline focus-visible:outline-2"
         >
-          {formatValue(value, data.format)}
+          <CountUp value={value} format={(v) => formatValue(v, data.format)} />
           <span className="sr-only">{t(": open the records")}</span>
         </button>
       ) : (
-        <p className="text-display-sm font-semibold text-primary">{formatValue(value, data.format)}</p>
+        <p className="text-display-sm font-semibold text-primary"><CountUp value={value} format={(v) => formatValue(v, data.format)} /></p>
       )}
       {change !== null && (
         <p className={cx('mt-1 flex items-center gap-1 text-sm font-medium', up ? 'text-success-primary' : 'text-error-primary')}>

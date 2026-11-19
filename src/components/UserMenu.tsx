@@ -1,11 +1,13 @@
 import type { Key } from 'react-aria-components';
 import { Button as AriaButton } from 'react-aria-components';
 import { useNavigate } from 'react-router-dom';
-import { Building07, Check, ChevronSelectorVertical, Grid01, HomeLine, LayersThree01, LogOut01, Plus, Server01, User01, Users01 } from '@untitledui/icons';
+import { Building07, Check, ChevronSelectorVertical, Download01, Grid01, HomeLine, LayersThree01, LogOut01, Plus, Server01, User01, Users01 } from '@untitledui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { customerApi } from '../lib/customerApi';
+import { installApp, useCanInstall } from '../lib/pwa';
 import { clearRenderCache } from '../render/definitions';
 import { initials } from '../lib/initials';
+import { avatarUrl } from '../lib/avatarApi';
 import { Avatar } from '@/components/base/avatar/avatar';
 import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { cx } from '@/utils/cx';
@@ -20,9 +22,11 @@ const pages: Record<string, string> = { profile: '/profile', home: '/', apps: '/
 export function UserMenu({ collapsed = false, below = false }: { collapsed?: boolean; /** In a top bar: opens downwards. */ below?: boolean }) {
   const { user, logout, isAdmin, customer, customers, openCustomer } = useAuth();
   const navigate = useNavigate();
+  const canInstall = useCanInstall();
 
   async function onAction(key: Key) {
     const other = String(key).match(/^customer-(\d+)$/);
+    if (key === 'install') return void (await installApp());
     if (other) {
       if (Number(other[1]) === customer?.id) return;
       await openCustomer(await customerApi.open(Number(other[1])));
@@ -37,7 +41,7 @@ export function UserMenu({ collapsed = false, below = false }: { collapsed?: boo
     }
   }
 
-  const avatar = <Avatar size="sm" initials={initials(user?.name)} alt={user?.name} />;
+  const avatar = <Avatar size="sm" src={avatarUrl(user)} initials={initials(user?.name)} alt={user?.name} />;
 
   return (
     <Dropdown.Root>
@@ -98,6 +102,8 @@ export function UserMenu({ collapsed = false, below = false }: { collapsed?: boo
           )}
           <Dropdown.Separator />
           <Dropdown.Section>
+            {/* Only where the browser offers it: Chrome and Edge, until installed. */}
+            {canInstall && <Dropdown.Item id="install" icon={Download01} label={t('Install app')} />}
             <Dropdown.Item id="logout" icon={LogOut01} label={t('Log out')} />
           </Dropdown.Section>
         </Dropdown.Menu>

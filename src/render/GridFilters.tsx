@@ -49,11 +49,14 @@ export function GridFilters({
       aria-label={t('Filters')}
     >
       <div className={cx('grid gap-x-3 gap-y-2.5', dropdown ? params.length > 1 && 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
-        {params.map((p) => (
-          <FilterField key={p.field_path} param={p} statuses={p.field_path === 'status_id' ? statuses : undefined} value={draft[p.field_path] ?? ''} onChange={(v) => setDraft((d) => ({ ...d, [p.field_path]: v }))} />
+        {/* Fields arrive one after another, then the buttons (.blur-in, --i). */}
+        {params.map((p, i) => (
+          <div key={p.field_path} className="blur-in min-w-0" style={{ '--i': i } as React.CSSProperties}>
+            <FilterField param={p} statuses={p.field_path === 'status_id' ? statuses : undefined} value={draft[p.field_path] ?? ''} onChange={(v) => setDraft((d) => ({ ...d, [p.field_path]: v }))} />
+          </div>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-end gap-2">
+      <div className="blur-in mt-3 flex items-center justify-end gap-2" style={{ '--i': params.length } as React.CSSProperties}>
         <Button
           size="sm"
           color="link-gray"

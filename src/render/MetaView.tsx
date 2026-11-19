@@ -18,6 +18,7 @@ import { StatementView } from './StatementView';
 import { WorkspaceView } from './WorkspaceView';
 import { presetOf, useMetaDef, type MetaDef, type Preset } from './definitions';
 import { ThemeView } from './ThemeView';
+import { MenuStylePreview, menuSettingsOf } from '../pages/metas/MenuStyleDesigner';
 import { useAuth } from '../auth/AuthContext';
 import { t } from '@/i18n';
 
@@ -41,7 +42,7 @@ export function MetaView({ metaId, depth = 0, preset: given, fill }: { metaId: n
   const linked = pathname === `/run/${metaId}` ? search.get('record') : null;
 
   if (error) return <Alert>{error}</Alert>;
-  if (!def) return <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
+  if (!def) return <div className="h-64" aria-busy="true" />;
   if (depth > MAX_DEPTH) return <Alert>{t('These screens are nested too deeply to show.')}</Alert>;
 
   switch (def.meta.type?.code) {
@@ -82,6 +83,12 @@ export function MetaView({ metaId, depth = 0, preset: given, fill }: { metaId: n
       return <StageQueryView def={def} defaults={preset?.defaults} />;
     case 'theme':
       return <ThemeView def={def} />;
+    case 'menu_style':
+      return (
+        <div className="max-w-xl">
+          <MenuStylePreview menu={menuSettingsOf(def.meta)} />
+        </div>
+      );
     case 'app':
       return <Alert>{t("An app can't be opened inside another screen. Open it on its own instead.")}</Alert>;
     case 'screen': {

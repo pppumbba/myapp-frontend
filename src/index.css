@@ -4,6 +4,7 @@
  * axes: light/grotesk-sans/chromatic-indigo · posture: dense, flat, hairline-edged · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P3 H3 E4 S4 R3 V3 · weakest: R, the layouts are kept by request, so the restyle works through flat hairline surfaces, tighter radii and sentence-case labels */
 @import "./styles/globals.css";
+@import "./styles/menu-style.css";
 
 /*
  * Slate & Indigo light theme.
@@ -100,6 +101,10 @@ html {
 *::-webkit-scrollbar-thumb:hover {
   background: var(--color-fg-quaternary);
 }
+/* No scrollbar at all, still scrolls (the compact rail). Plain CSS: the rule above beats utilities. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
 
 /*
  * A modal's footer (Save / Cancel row) sticks to the bottom of the scrolling body. The negative
@@ -168,14 +173,65 @@ html {
  * A screen fades in when it opens. The animation runs whenever a top-level piece of the screen
  * is mounted, so content replacing its loading skeleton fades in too, rather than popping.
  */
-@keyframes page-enter {
+/*
+ * Things arriving: they rise a little and come into focus. Backwards fill only, so nothing
+ * (no filter, no transform) stays on them afterwards. --i staggers a set (cards, rows).
+ */
+@keyframes blur-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    filter: blur(8px);
+    transform: translateY(10px);
   }
 }
+.blur-in,
+.cards-in > * {
+  animation: blur-in 520ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
 .page-enter > * {
-  animation: page-enter 180ms ease-out;
+  animation: blur-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+/* A grid's rows cascade in: the first dozen one after another, the rest with the last. */
+.rows-in > tr {
+  animation: blur-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: 300ms;
+}
+.rows-in > tr:nth-child(1) {
+  animation-delay: 0ms;
+}
+.rows-in > tr:nth-child(2) {
+  animation-delay: 25ms;
+}
+.rows-in > tr:nth-child(3) {
+  animation-delay: 50ms;
+}
+.rows-in > tr:nth-child(4) {
+  animation-delay: 75ms;
+}
+.rows-in > tr:nth-child(5) {
+  animation-delay: 100ms;
+}
+.rows-in > tr:nth-child(6) {
+  animation-delay: 125ms;
+}
+.rows-in > tr:nth-child(7) {
+  animation-delay: 150ms;
+}
+.rows-in > tr:nth-child(8) {
+  animation-delay: 175ms;
+}
+.rows-in > tr:nth-child(9) {
+  animation-delay: 200ms;
+}
+.rows-in > tr:nth-child(10) {
+  animation-delay: 225ms;
+}
+.rows-in > tr:nth-child(11) {
+  animation-delay: 250ms;
+}
+.rows-in > tr:nth-child(12) {
+  animation-delay: 275ms;
 }
 
 /* A toast (components/Notices) rises in at the corner. */
@@ -187,35 +243,78 @@ html {
 }
 
 /*
- * Folding the sidebar (a view transition, see AppSidebar). Each side keeps its natural size,
- * pinned to the top left, so nothing stretches: the sidebar grows or shrinks over it while
- * the old and new pictures cross-fade. The names are set only while folding.
+ * Folding the sidebar (see AppSidebar's toggle). The menu and the space it takes slide between
+ * their full and rail widths; while they do, the menu's content keeps its full layout (clipped,
+ * never squeezed) and fades out, or in once there is room. The rail fades in when it takes over.
  */
-.sidebar-folding .sidebar-fixed {
-  view-transition-name: sidebar;
+.menu-motion {
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.sidebar-folding .sidebar-main {
-  view-transition-name: main;
+.menu-folding > * {
+  min-width: var(--width);
+  opacity: 0;
+  transition: opacity 110ms ease-out;
 }
-::view-transition-group(sidebar),
-::view-transition-group(main) {
-  animation-duration: 200ms;
-  animation-timing-function: ease-out;
-  overflow: clip;
+.menu-folding-in > * {
+  opacity: 1;
+  transition: opacity 140ms ease-out 80ms;
 }
-::view-transition-old(sidebar),
-::view-transition-new(sidebar),
-::view-transition-old(main),
-::view-transition-new(main) {
-  width: auto;
-  height: 100%;
-  object-fit: none;
-  object-position: left top;
-  animation-duration: 200ms;
+.menu-rail-in {
+  animation: menu-rail-in 140ms ease-out;
+}
+@keyframes menu-rail-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A title or description arriving word by word, each one coming into focus (BlurWords). */
+.blur-word {
+  display: inline-block;
+  white-space: pre;
+  animation: blur-word 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--word, 0) * 55ms);
+}
+@keyframes blur-word {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(3px);
+  }
+}
+
+/*
+ * Modals grow in from small. It animates `scale`, not `transform`, so the drag offset
+ * (`translate`) still applies.
+ */
+@keyframes modal-grow {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+.modal-grow[data-entering] {
+  animation: modal-grow 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter > * {
+  .page-enter > *,
+  .blur-in,
+  .cards-in > *,
+  .rows-in > tr {
+    animation: none;
+  }
+  .blur-word {
+    animation: none;
+  }
+  .menu-motion,
+  .menu-folding > * {
+    transition: none;
+  }
+  .menu-rail-in {
+    animation: none;
+  }
+  .modal-grow[data-entering] {
     animation: none;
   }
 }

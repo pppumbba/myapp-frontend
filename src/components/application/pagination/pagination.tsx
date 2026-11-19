@@ -55,13 +55,16 @@ interface MobilePaginationProps {
     onPageChange?: (page: number) => void;
     /** A refresh button shown before the page. */
     refresh?: ReactNode;
+    /** The number of records on every page together, shown after the page. */
+    records?: number;
 }
 
-const MobilePagination = ({ page = 1, total = 10, className, onPageChange, refresh }: MobilePaginationProps) => {
+const MobilePagination = ({ page = 1, total = 10, className, onPageChange, refresh, records }: MobilePaginationProps) => {
     return (
         <nav aria-label={t("Pagination")} className={cx("flex items-center gap-2 md:hidden", className)}>
             <span className="mr-auto text-sm text-fg-secondary">
                 {t("Page {page} of {pages}", { page, pages: total })}
+                {records !== undefined && <span className="text-tertiary"> · {t("{count} records", { count: records.toLocaleString() })}</span>}
             </span>
             <Button
                 aria-label={t("Go to previous page")}
@@ -265,6 +268,8 @@ interface PaginationCardMinimalProps {
     onRefresh?: () => void;
     /** Spins the refresh icon while a load is on its way. */
     refreshing?: boolean;
+    /** The number of records on every page together: shows which of them this page holds. */
+    records?: number;
 }
 
 const RefreshSpinning = ({ className }: { className?: string }) => <RefreshCw01 className={cx(className, "animate-spin motion-reduce:animate-none")} />;
@@ -322,6 +327,7 @@ export const PaginationCardMinimal = ({
     onPageSizeChange,
     onRefresh,
     refreshing,
+    records,
 }: PaginationCardMinimalProps) => {
     const refresh = onRefresh && (
         <Button
@@ -334,9 +340,20 @@ export const PaginationCardMinimal = ({
     );
     return (
         <div className={cx("border-t border-secondary px-4 py-2 md:px-6", className)}>
-            <MobilePagination page={page} total={total} onPageChange={onPageChange} refresh={refresh} />
+            <MobilePagination page={page} total={total} onPageChange={onPageChange} refresh={refresh} records={records} />
 
             <nav aria-label={t("Pagination")} className="hidden items-center gap-2 md:flex">
+                {records !== undefined && (
+                    <p className="text-sm whitespace-nowrap text-tertiary tabular-nums">
+                        {records
+                            ? t("{from}–{to} of {count} records", {
+                                  from: ((page - 1) * pageSize + 1).toLocaleString(),
+                                  to: Math.min(page * pageSize, records).toLocaleString(),
+                                  count: records.toLocaleString(),
+                              })
+                            : t("{count} records", { count: 0 })}
+                    </p>
+                )}
                 <div className="ml-auto flex items-center gap-2">
                     <PageJump page={page} total={total} onPageChange={onPageChange} />
                     {/* Only where the page size can change. */}

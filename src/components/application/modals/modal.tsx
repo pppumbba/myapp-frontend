@@ -32,8 +32,8 @@ export const Modal = (props: AriaModalOverlayProps & { ref?: Ref<HTMLDivElement>
                 "w-full rounded-xl bg-primary align-middle shadow-xl outline-hidden max-sm:overflow-y-auto sm:rounded-2xl",
                 // Max height based on parent's vertical padding
                 "max-h-[calc(var(--visual-viewport-height)-var(--modal-pt)-var(--modal-pb))]",
-                // Animations
-                state.isEntering && "duration-300 ease-out animate-in zoom-in-95",
+                // Animations: grows in from small (index.css)
+                "modal-grow",
                 state.isExiting && "duration-200 ease-in animate-out zoom-out-95",
                 typeof props.className === "function" ? props.className(state) : props.className,
             )

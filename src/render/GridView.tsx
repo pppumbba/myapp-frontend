@@ -7,18 +7,23 @@ import {
   useState,
   type CSSProperties,
   type FC,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import type { Selection, SortDescriptor } from "react-aria-components";
 import {
   ArrowUpRight,
   Check,
   ChevronRight,
+  Columns03,
   Copy01,
+  DotsGrid,
   DotsHorizontal,
   Download01,
   Edit01,
   Eye,
   File06,
+  FlipBackward,
   FilterLines,
   GitBranch01,
   Grid01,
@@ -31,8 +36,10 @@ import {
   Trash01,
   Upload01,
   Zap,
+  GitMerge,
 } from "@untitledui/icons";
 import { Button as AriaButton, Dialog, DialogTrigger, Popover } from "react-aria-components";
+import { createPortal } from "react-dom";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import type { Ability } from "../lib/accessApi";
@@ -48,17 +55,18 @@ import type { SharedRecord } from "../lib/chatApi";
 import { FILE_TYPES } from "../lib/contentApi";
 import { Table, TableCard } from "@/components/application/table/table";
 import { PaginationCardMinimal } from "@/components/application/pagination/pagination";
-import { Badge } from "@/components/base/badges/badges";
 import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import { Button } from "@/components/base/buttons/button";
+import { Checkbox } from "@/components/base/checkbox/checkbox";
+import { ColumnsList } from "./ColumnsList";
 import { Tooltip } from "@/components/base/tooltip/tooltip";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { useDebounced } from "@/hooks/use-debounced";
 import { Input } from "@/components/base/input/input";
 import { ColumnValue, formatNumber } from "./Cell";
 import { cx } from "@/utils/cx";
-import { FormView } from "./FormView";
-import { GridCards } from "./GridCards";
+import { FormView, type Consolidating } from "./FormView";
+import { CardSort, GridCards } from "./GridCards";
 import { GridFilters, type Filters } from "./GridFilters";
 import { GridSidebar } from "./GridSidebar";
 import { ImportView } from "./ImportView";
@@ -102,6 +110,7 @@ const kindIcons: Record<MetaAction["action"], FC<{ className?: string }>> = {
   custom: File06,
   import: Upload01,
   stage_query: Zap,
+  consolidate: GitMerge,
 };
 const iconOf = (a: MetaAction) =>
   (a.icon_cls && actionIcons[a.icon_cls]) || kindIcons[a.action];
@@ -200,10 +209,12 @@ function useFrozenOffsets(count: number, deps: unknown[]) {
     if (!table || !count) return setLefts((prev) => (prev.length ? [] : prev));
     const measure = () => {
       const heads = [...(table.tHead?.rows[0]?.cells ?? [])].slice(0, count);
+      // Undo any scale on the way (a modal growing in), keeping sub-pixel widths.
+      const scale = table.getBoundingClientRect().width / table.offsetWidth || 1;
       let left = 0;
       const next = heads.map((th) => {
         const at = left;
-        left += th.getBoundingClientRect().width;
+        left += th.getBoundingClientRect().width / scale;
         return at;
       });
       setLefts((prev) =>
@@ -248,8 +259,298 @@ function saveGridView(metaId: number, view: GridViewName) {
   }
 }
 
+const foldKey = (metaId: number) => `grid_filters_folded_${metaId}`;
+
+/** Whether this person folded the filter sidebar away on this grid, in this browser. */
+function readFiltersFolded(metaId: number): boolean {
+  try {
+    return localStorage.getItem(foldKey(metaId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveFiltersFolded(metaId: number, folded: boolean) {
+  try {
+    if (folded) localStorage.setItem(foldKey(metaId), "1");
+    else localStorage.removeItem(foldKey(metaId));
+  } catch {
+    // Storage can be blocked; the fold still works for this visit.
+  }
+}
+
+const widthsKey = (metaId: number) => `grid_widths_${metaId}`;
+/** The narrowest a column can be dragged to, in px. */
+const MIN_COLUMN_WIDTH = 60;
+
+/** The column widths this person dragged on this grid, in this browser, by field. */
+function readColumnWidths(metaId: number): Record<string, number> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(widthsKey(metaId)) ?? "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveColumnWidths(metaId: number, widths: Record<string, number>) {
+  try {
+    if (Object.keys(widths).length) localStorage.setItem(widthsKey(metaId), JSON.stringify(widths));
+    else localStorage.removeItem(widthsKey(metaId));
+  } catch {
+    // Storage can be blocked; the widths still hold for this visit.
+  }
+}
+
+/**
+ * The handle on a column heading's right edge: drag it to change the column's width (onResize
+ * while dragging, onDone at the end), double-click it to go back to the builder's width. Pointer
+ * only; the builder sets widths for everyone in the column's settings.
+ */
+function ColumnResizer({ onResize, onDone, onReset }: { onResize: (width: number) => void; onDone: (width: number) => void; onReset: () => void }) {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Keep the heading from taking it as a press to sort.
+    e.stopPropagation();
+    e.preventDefault();
+    const handle = e.currentTarget;
+    const start = handle.closest("th")!.getBoundingClientRect().width;
+    const x = e.clientX;
+    const widthAt = (ev: PointerEvent) => Math.round(Math.max(MIN_COLUMN_WIDTH, start + ev.clientX - x));
+    const move = (ev: PointerEvent) => onResize(widthAt(ev));
+    const up = (ev: PointerEvent) => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      onDone(widthAt(ev));
+    };
+    handle.setPointerCapture(e.pointerId);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+  };
+  return (
+    <div
+      aria-hidden="true"
+      onPointerDown={onPointerDown}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onReset();
+      }}
+      className="absolute inset-y-0 right-0 z-[1] w-2 cursor-col-resize touch-none after:absolute after:inset-y-2 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:rounded-full after:bg-transparent after:transition-colors hover:after:bg-brand-solid"
+    />
+  );
+}
+
+const hiddenKey = (metaId: number) => `grid_hidden_${metaId}`;
+
+/** The columns this person switched off on this grid, in this browser, by field. */
+function readHiddenColumns(metaId: number): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(hiddenKey(metaId)) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((f): f is string => typeof f === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenColumns(metaId: number, hidden: string[]) {
+  try {
+    if (hidden.length) localStorage.setItem(hiddenKey(metaId), JSON.stringify(hidden));
+    else localStorage.removeItem(hiddenKey(metaId));
+  } catch {
+    // Storage can be blocked; the columns still hide for this visit.
+  }
+}
+
+const sortKey = (metaId: number) => `grid_sort_${metaId}`;
+
+/** The column and direction this person last sorted this grid by, in this browser. */
+function readGridSort(metaId: number): SortDescriptor | undefined {
+  try {
+    const saved = JSON.parse(localStorage.getItem(sortKey(metaId)) ?? "null");
+    return saved && typeof saved.column === "string" && (saved.direction === "ascending" || saved.direction === "descending")
+      ? { column: saved.column, direction: saved.direction }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveGridSort(metaId: number, sort: SortDescriptor | undefined) {
+  try {
+    if (sort?.column) localStorage.setItem(sortKey(metaId), JSON.stringify({ column: String(sort.column), direction: sort.direction }));
+    else localStorage.removeItem(sortKey(metaId));
+  } catch {
+    // Storage can be blocked; the sort still holds for this visit.
+  }
+}
+
+const pinnedKey = (metaId: number) => `grid_pinned_${metaId}`;
+
+/**
+ * The columns this person froze on this grid, in this browser, by field; null when they haven't
+ * changed it, so the builder's frozen_columns holds ([] means none frozen).
+ */
+function readPinnedColumns(metaId: number): string[] | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(pinnedKey(metaId)) ?? "null");
+    return Array.isArray(saved) ? saved.filter((f): f is string => typeof f === "string") : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePinnedColumns(metaId: number, pinned: string[] | null) {
+  try {
+    if (pinned) localStorage.setItem(pinnedKey(metaId), JSON.stringify(pinned));
+    else localStorage.removeItem(pinnedKey(metaId));
+  } catch {
+    // Storage can be blocked; the columns still freeze for this visit.
+  }
+}
+
+const orderKey = (metaId: number) => `grid_order_${metaId}`;
+
+/** The column order this person dragged to on this grid, in this browser: fields, first to last. */
+function readColumnOrder(metaId: number): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(orderKey(metaId)) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((f): f is string => typeof f === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveColumnOrder(metaId: number, order: string[]) {
+  try {
+    if (order.length) localStorage.setItem(orderKey(metaId), JSON.stringify(order));
+    else localStorage.removeItem(orderKey(metaId));
+  } catch {
+    // Storage can be blocked; the order still holds for this visit.
+  }
+}
+
+/** The line on a heading's left or right edge where a dragged column would land. */
+const DROP_LINE = "before:absolute before:inset-y-1.5 before:z-[3] before:w-0.5 before:rounded-full before:bg-brand-solid";
+const DROP_BEFORE = `${DROP_LINE} before:left-0`;
+const DROP_AFTER = `${DROP_LINE} before:right-0`;
+
+/** A heading being dragged: where the pointer is, and where the column would land if dropped there. */
+interface ColumnDrag {
+  field: string;
+  label: string;
+  x: number;
+  y: number;
+  /** The column it would go next to; null where dropping changes nothing. */
+  target: string | null;
+  side: "before" | "after";
+}
+
+/**
+ * The grip at a column heading's left, shown on hover: drag it to another heading and drop it
+ * there. While dragging, onDrag tells where the pointer is and where the column would land (the
+ * grid shows a line at that edge and the column's name by the pointer); on drop, onDrop gets
+ * every shown field in the new order. Escape cancels. Pointer only, like the width handle; the
+ * Columns list moves columns from the keyboard.
+ */
+function ColumnGrip({ field, label, onDrag, onDrop }: { field: string; label: string; onDrag: (drag: ColumnDrag | null) => void; onDrop: (order: string[]) => void }) {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Keep the heading from taking it as a press to sort.
+    e.stopPropagation();
+    e.preventDefault();
+    const handle = e.currentTarget;
+    let drag: ColumnDrag = { field, label, x: e.clientX, y: e.clientY, target: null, side: "before" };
+    // The shown fields in the headings' order, and where field would go with this drag.
+    const order = () => [...(handle.closest("tr")?.querySelectorAll<HTMLElement>("[data-grip]") ?? [])];
+    const move = (ev: PointerEvent) => {
+      const grips = order();
+      const fields = grips.map((g) => g.dataset.grip!);
+      const from = fields.indexOf(field);
+      const over = grips.findIndex((g) => {
+        const r = g.closest("th")!.getBoundingClientRect();
+        return ev.clientX >= r.left && ev.clientX < r.right;
+      });
+      let target: string | null = null;
+      let side: ColumnDrag["side"] = "before";
+      if (over >= 0) {
+        const r = grips[over].closest("th")!.getBoundingClientRect();
+        side = ev.clientX < r.left + r.width / 2 ? "before" : "after";
+        const at = over + (side === "after" ? 1 : 0);
+        // Its own edges, and its neighbours' edges next to it, leave it where it is.
+        if (at !== from && at !== from + 1) target = fields[over];
+      }
+      drag = { ...drag, x: ev.clientX, y: ev.clientY, target, side };
+      onDrag(drag);
+    };
+    const stop = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", stop);
+      window.removeEventListener("keydown", onKey, true);
+      onDrag(null);
+    };
+    const up = () => {
+      stop();
+      if (!drag.target) return;
+      const fields = order().map((g) => g.dataset.grip!);
+      const next = fields.filter((f) => f !== field);
+      next.splice(next.indexOf(drag.target) + (drag.side === "after" ? 1 : 0), 0, field);
+      onDrop(next);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.stopPropagation();
+      stop();
+    };
+    handle.setPointerCapture(e.pointerId);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", stop);
+    window.addEventListener("keydown", onKey, true);
+    onDrag(drag);
+  };
+  return (
+    <div
+      aria-hidden="true"
+      data-grip={field}
+      onPointerDown={onPointerDown}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute inset-y-0 left-0 z-[1] flex w-5 cursor-grab touch-none items-center justify-center text-fg-quaternary opacity-0 transition-opacity group-hover/head:opacity-100 active:cursor-grabbing"
+    >
+      <DotsGrid className="size-3.5" />
+    </div>
+  );
+}
+
+/** The dragged column's name by the pointer, above everything (a portal, so no transformed box moves it). */
+function ColumnDragLabel({ drag }: { drag: ColumnDrag }) {
+  return createPortal(
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-[100] rounded-md bg-primary px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-secondary shadow-lg ring-1 ring-secondary"
+      style={{ left: drag.x + 12, top: drag.y + 12 }}
+    >
+      {drag.label}
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * A cell's content held to its column's width (px, padding included), cut short with "…".
+ * The width goes on the content because an auto table never makes a cell narrower than what
+ * is in it. The grid's cells are px-5, 40px.
+ */
+function CellWidth({ width, children }: { width?: number; children: ReactNode }) {
+  if (!width) return <>{children}</>;
+  return (
+    <div className="overflow-hidden text-ellipsis" style={{ width: Math.max(width - 40, 0) }}>
+      {children}
+    </div>
+  );
+}
+
 /** What a toolbar button is doing right now. */
-type Running = { action: MetaAction; row?: DataRow };
+type Running = { action: MetaAction; row?: DataRow; /** A consolidate button's picked rows, by key. */ ids?: string[] };
 
 /** What the user must be allowed to do with an action's form to see the button. */
 // Running a stage query needs edit access to it, as the run endpoint does.
@@ -260,6 +561,7 @@ const abilityOf: Record<MetaAction["action"], Ability> = {
   delete: "delete",
   import: "create",
   stage_query: "edit",
+  consolidate: "create",
 };
 
 /**
@@ -298,15 +600,39 @@ export function GridView({
 }) {
   const { meta, params } = def;
   const workflow = useGridWorkflow(meta);
-  const columns = useMemo(() => {
+  // The column order this person dragged to, by field; columns it doesn't name keep to the end.
+  const [order, setOrder] = useState(() => readColumnOrder(meta.id));
+  // The columns this person switched off, by field.
+  const [hidden, setHidden] = useState(() => readHiddenColumns(meta.id));
+  const allColumns = useMemo(() => {
     // A scoped column holds the same value on every row, so it isn't shown.
     const visible = visibleParams(params).filter(
       (p) => !(scope && p.field_path in scope),
     );
-    return workflow && !visible.some((p) => p.field_path === "status_id")
+    const all = workflow && !visible.some((p) => p.field_path === "status_id")
       ? [...visible, statusColumn]
       : visible;
-  }, [params, workflow, scope]);
+    const at = (p: MetaParam) => (order.includes(p.field_path) ? order.indexOf(p.field_path) : order.length);
+    return order.length ? [...all].sort((a, b) => at(a) - at(b)) : all;
+  }, [params, workflow, scope, order]);
+  const shownColumns = useMemo(() => {
+    const shown = allColumns.filter((c) => !hidden.includes(c.field_path));
+    // Never none: with every column off, they all come back.
+    return shown.length ? shown : allColumns;
+  }, [allColumns, hidden]);
+  // The columns this person froze, in order; null: the builder's frozen_columns (that many from the left).
+  const [pinned, setPinned] = useState(() => readPinnedColumns(meta.id));
+  const builderFrozen = Math.max(0, Math.floor(Number(meta.json_config?.frozen_columns) || 0));
+  const frozenFields = useMemo(
+    () => pinned ?? shownColumns.slice(0, builderFrozen).map((c) => c.field_path),
+    [pinned, shownColumns, builderFrozen],
+  );
+  // Frozen columns come first, in the order they were frozen.
+  const columns = useMemo(() => {
+    if (!pinned) return shownColumns;
+    const first = pinned.flatMap((f) => shownColumns.filter((c) => c.field_path === f));
+    return [...first, ...shownColumns.filter((c) => !first.includes(c))];
+  }, [shownColumns, pinned]);
   const statuses = useMemo(
     () => new Map((workflow?.statuses ?? []).map((s) => [s.id, s])),
     [workflow],
@@ -334,15 +660,77 @@ export function GridView({
   const tableOnly = !!parentParam || nested.length > 0;
   const viewButtons = tableOnly ? [] : gridViewButtons(meta.json_config);
   const [pickedView, setPickedView] = useState(() => readGridView(meta.id));
+  // Widths this person dragged, over the builder's column_width; neither: the column fits its content.
+  const [dragged, setDragged] = useState(() => readColumnWidths(meta.id));
+  const widthOf = (c: MetaParam) => dragged[c.field_path] ?? (Number.parseInt(c.column_width ?? "", 10) > 0 ? Number.parseInt(c.column_width!, 10) : undefined);
+  // The heading being dragged to a new place: shaded, with a line where it would land and its name by the pointer.
+  const [columnDrag, setColumnDrag] = useState<ColumnDrag | null>(null);
+  const resetColumns = () => {
+    setOrder([]);
+    setDragged({});
+    setHidden([]);
+    setPinned(null);
+    setSort(undefined);
+    saveColumnOrder(meta.id, []);
+    saveColumnWidths(meta.id, {});
+    saveHiddenColumns(meta.id, []);
+    savePinnedColumns(meta.id, null);
+  };
+  // The Columns list in the grid's order (frozen ones first), hidden columns where they would be.
+  const listColumns = useMemo(() => {
+    if (!pinned) return allColumns;
+    const first = pinned.flatMap((f) => allColumns.filter((c) => c.field_path === f));
+    return [...first, ...allColumns.filter((c) => !first.includes(c))];
+  }, [allColumns, pinned]);
+  /**
+   * Puts the columns in this order of fields; frozen ones keep to it among themselves. fields
+   * may leave some out (the headings don't show hidden columns): those keep their places.
+   */
+  const reorderColumns = (fields: string[]) => {
+    let k = 0;
+    const full = listColumns.map((c) => (fields.includes(c.field_path) ? fields[k++] : c.field_path));
+    setOrder(full);
+    saveColumnOrder(meta.id, full);
+    if (pinned) {
+      const next = full.filter((f) => pinned.includes(f));
+      setPinned(next);
+      savePinnedColumns(meta.id, next);
+    }
+  };
+  /** Freezes a column (it goes last among the frozen ones) or lets it go; starts from the builder's frozen columns. */
+  const freezeColumn = (field: string, on: boolean) => {
+    const next = on ? [...frozenFields.filter((f) => f !== field), field] : frozenFields.filter((f) => f !== field);
+    setPinned(next);
+    savePinnedColumns(meta.id, next);
+  };
+  const showColumn = (field: string, on: boolean) => {
+    const next = on ? hidden.filter((f) => f !== field) : [...hidden, field];
+    setHidden(next);
+    saveHiddenColumns(meta.id, next);
+  };
+  const resizerFor = (c: MetaParam) => (
+    <ColumnResizer
+      onResize={(w) => setDragged((d) => ({ ...d, [c.field_path]: w }))}
+      onDone={(w) => saveColumnWidths(meta.id, { ...dragged, [c.field_path]: w })}
+      onReset={() => {
+        const { [c.field_path]: _, ...rest } = dragged;
+        setDragged(rest);
+        saveColumnWidths(meta.id, rest);
+      }}
+    />
+  );
   const view = tableOnly ? "table" : pickedView && viewButtons.includes(pickedView) ? pickedView : gridViewOf(meta.json_config);
   const cards = view === "table" ? undefined : view;
   const rowNumbers = meta.json_config?.row_numbers === true;
-  // The arrow and # columns come first and freeze with the frozen data columns.
-  const lead = (nested.length ? 1 : 0) + (rowNumbers ? 1 : 0);
-  const frozenData = Math.min(
-    Math.max(0, Math.floor(Number(meta.json_config?.frozen_columns) || 0)),
-    columns.length,
-  );
+  const actions = useActions(meta.id);
+  // A grid with a consolidate button picks several rows, by checkboxes in their own first column.
+  const multi = view === "table" && !!actions?.some((a) => a.action === "consolidate");
+  const picks = multi ? 1 : 0;
+  // The checkbox, arrow and # columns come first and freeze with the frozen data columns.
+  const lead = picks + (nested.length ? 1 : 0) + (rowNumbers ? 1 : 0);
+  const frozenData = pinned
+    ? columns.filter((c) => pinned.includes(c.field_path)).length
+    : Math.min(builderFrozen, columns.length);
   const frozen = frozenData ? lead + frozenData : 0;
   // json_config.height / width (px): a fixed-size grid; its rows scroll both ways under a header that stays on top.
   const fixedHeight =
@@ -373,7 +761,6 @@ export function GridView({
     [fixedWidth, fillHeight],
   );
   const key = primaryKey(params);
-  const actions = useActions(meta.id);
   const { can, user } = useAuth();
   const toolbar = useMemo(
     () =>
@@ -398,8 +785,15 @@ export function GridView({
   // json_config.filter_layout "sidebar": the filters sit beside the grid, always open. Too narrow
   // for that (a phone), they'd come before the records, so they work as "dropdown" instead.
   const roomy = useBreakpoint("lg");
-  const sidebar =
+  const sidebarLayout =
     meta.json_config?.filter_layout === "sidebar" && filterParams.length > 0 && roomy;
+  // Folded away, the toolbar's Filters button brings the sidebar back.
+  const [folded, setFolded] = useState(() => readFiltersFolded(meta.id));
+  const fold = (next: boolean) => {
+    setFolded(next);
+    saveFiltersFolded(meta.id, next);
+  };
+  const sidebar = sidebarLayout && !folded;
   // "dropdown": the Filters button opens them over the grid, closing once they are applied.
   const dropdown = meta.json_config?.filter_layout === "dropdown" || (meta.json_config?.filter_layout === "sidebar" && !roomy);
   const searchable = filterParams.some(
@@ -418,7 +812,15 @@ export function GridView({
   const [showFilters, setShowFilters] = useState(
     () => filterParams.some((p) => p.is_mandatory_criteria) || (!!initialFilters && !dropdown),
   );
-  const [sort, setSort] = useState<SortDescriptor | undefined>();
+  // The sort this person last picked on this grid, kept while its column is still on it.
+  const [sort, setSortState] = useState<SortDescriptor | undefined>(() => {
+    const saved = readGridSort(meta.id);
+    return saved && params.some((p) => p.field_path === saved.column) ? saved : undefined;
+  });
+  const setSort = (next: SortDescriptor | undefined) => {
+    setSortState(next);
+    saveGridSort(meta.id, next);
+  };
   const [result, setResult] = useState<Page<DataRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -427,6 +829,8 @@ export function GridView({
   const [fetching, setFetching] = useState(true);
   const slow = useDebounced(fetching, 150) && fetching;
   const [selected, setSelected] = useState<string | null>(null);
+  // With a consolidate button: the picked rows, by key, kept across pages.
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   // A tree: the opened records, and the records under each, loaded when it opens.
   const [openNodes, setOpenNodes] = useState<ReadonlySet<string>>(new Set());
@@ -446,6 +850,8 @@ export function GridView({
   const [menu, setMenu] = useState<{ at: MenuPoint; row?: DataRow; field?: string; more?: boolean; texts?: Record<string, string> } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const moreRef = useRef<HTMLSpanElement>(null);
+  // The Columns popover, opened from the ⋯ menu.
+  const [showColumns, setShowColumns] = useState(false);
   const [sharing, setSharing] = useState<SharedRecord | null>(null);
 
   // A notification links to /run/{grid}?record={id}: open that record's status straight away.
@@ -643,7 +1049,16 @@ export function GridView({
         : "shadow-[inset_0_1px_0_var(--color-border-secondary)]",
     );
 
+  /** What a consolidate button merges: the picked rows, or the one row it was opened on when that isn't among them. */
+  const pickedFor = (row?: DataRow): string[] =>
+    row && !picked.has(String(row[key])) ? [String(row[key])] : picked.size ? [...picked] : row ? [String(row[key])] : [];
+
   function run(action: MetaAction, row = selectedRow) {
+    if (action.action === "consolidate") {
+      const ids = pickedFor(row);
+      if (ids.length) setRunning({ action, ids });
+      return;
+    }
     if (action.needs_row && !row) return;
     if (row) setSelected(String(row[key]));
     if (action.action === "delete") setDeleting({ action, row });
@@ -707,14 +1122,14 @@ export function GridView({
       label: a.label,
       icon: iconOf(a),
       danger: a.action === "delete",
-      disabled: !a.form_meta_id || (a.needs_row && !row),
+      disabled: !a.form_meta_id || (a.action === "consolidate" ? !pickedFor(row).length : a.needs_row && !row),
       onSelect: () => run(a, row),
     });
     const column = field ? columns.find((c) => c.field_path === field) : undefined;
     const value = row && column ? row[column.field_path] : undefined;
     return [
       ...(row && rowDrill
-        ? [{ key: "drill", label: rowDrill.label || t("Open"), icon: ArrowUpRight, onSelect: () => drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), drawer: rowDrill.open_in === "drawer", label: rowName(row) || title(meta) }) }]
+        ? [{ key: "drill", label: rowDrill.label || t("Open"), icon: ArrowUpRight, onSelect: () => drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), open: rowDrill.open_in, label: rowName(row) || title(meta) }) }]
         : []),
       ...usable.filter((a) => a.action !== "delete").map(entry),
       ...((row || more) && workflow ? [{ key: "status", label: t("Change status"), icon: GitBranch01, disabled: !row, onSelect: () => row && setChangingStatus(row) }] : []),
@@ -726,6 +1141,14 @@ export function GridView({
         ? [{ key: "share", label: t("Share to chat"), icon: Send01, onSelect: () => setSharing(shareOf(row, texts)) }]
         : []),
       { key: "export", label: t("Export"), icon: Download01, disabled: !result?.total, onSelect: () => void exportExcel() },
+      // Under the ⋯ button only: the popover opens there.
+      ...(more && allColumns.length > 1
+        ? [{ key: "columns", label: t("Columns"), icon: Columns03, onSelect: () => setShowColumns(true) }]
+        : []),
+      // Only once this person has moved, sized, hidden, frozen or sorted a column.
+      ...(order.length || hidden.length || pinned || sort?.column || Object.keys(dragged).length
+        ? [{ key: "reset_columns", label: t("Reset columns"), icon: FlipBackward, onSelect: resetColumns }]
+        : []),
       { key: "s2", separator: true as const },
       ...usable.filter((a) => a.action === "delete").map(entry),
     ];
@@ -761,7 +1184,7 @@ export function GridView({
     if (!sharedRow || !result) return;
     const open = (row: DataRow) => {
       setSelected(sharedRow);
-      if (rowDrill) drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), drawer: rowDrill.open_in === "drawer", label: rowName(row) || title(meta) });
+      if (rowDrill) drill!({ metaId: rowDrill.meta_id, params: drillParams(rowDrill, row), open: rowDrill.open_in, label: rowName(row) || title(meta) });
       else if (editAction) run(editAction, row);
     };
     const onPage = result.data.find((r) => String(r[key]) === sharedRow);
@@ -822,7 +1245,7 @@ export function GridView({
           drill({
             metaId: d.meta_id,
             params: drillParams(d, row),
-            drawer: d.open_in === "drawer",
+            open: d.open_in,
             label: rowName(row) || title(meta),
           });
         }}
@@ -845,7 +1268,7 @@ export function GridView({
             drill!({
               metaId: rowDrill.meta_id,
               params: drillParams(rowDrill, row),
-              drawer: rowDrill.open_in === "drawer",
+              open: rowDrill.open_in,
               label: rowName(row) || title(meta),
             })
           }
@@ -861,6 +1284,19 @@ export function GridView({
         />
       ))}
     </div>
+  );
+
+  // An icon beside the search; a dot on it says filters are applied, the tooltip how many.
+  const filterHint = activeFilters ? t('Filters ({count})', { count: activeFilters }) : t('Filters');
+  const filterButton = ({ onPress, expanded }: { onPress?: () => void; expanded?: boolean }) => (
+    <span className="relative inline-flex">
+      <Tooltip title={filterHint}>
+        <Button size="sm" color="secondary" iconLeading={FilterLines} aria-label={filterHint} onPress={onPress} aria-expanded={expanded} />
+      </Tooltip>
+      {activeFilters > 0 && (
+        <span aria-hidden="true" className="pointer-events-none absolute -top-0.5 -right-0.5 size-2 rounded-full bg-brand-solid ring-2 ring-bg-primary" />
+      )}
+    </span>
   );
 
   /** A column's footer value: only the value, no label, whatever the total is. */
@@ -896,6 +1332,7 @@ export function GridView({
               search={search}
               scope={scope}
               fixed={fixed}
+              onCollapse={() => fold(true)}
             />
           </div>
         )}
@@ -903,64 +1340,45 @@ export function GridView({
           ref={cardRef}
           size="sm"
           style={cardStyle}
+          // Blurs in a moment after its filters (.blur-in); its rows follow (.rows-in).
           className={cx(
+            "blur-in [--i:1]",
             sidebar && `min-w-0 ${fixedWidth ? "shrink" : "flex-1"}`,
             fillHeight !== undefined && "flex flex-col",
           )}
         >
           <TableCard.Header
-            title={label ?? title(meta)}
-            badge={
-              result && !missing.length ? (
-                <Badge type="pill-color" size="sm" color="brand">
-                  {t(result.total === 1 ? "{count} record" : "{count} records", { count: result.total })}
-                </Badge>
-              ) : undefined
-            }
-            description={meta.description ?? undefined}
-            contentTrailing={
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                {searchable && (
-                  <Input
-                    aria-label={t('Search {name}', { name: title(meta) })}
-                    type="search"
-                    size="sm"
-                    icon={SearchLg}
-                    placeholder={t("Search")}
-                    value={query}
-                    onChange={setQuery}
-                    className="sm:w-56"
-                  />
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {viewButtons.length > 0 && (
-                    <ButtonGroup
+            className="md:items-center"
+            contentLeading={
+              searchable || cards || (filterParams.length > 0 && !sidebar) ? (
+                <>
+                  {searchable && (
+                    <Input
+                      aria-label={t('Search {name}', { name: title(meta) })}
+                      type="search"
                       size="sm"
-                      aria-label={t("View")}
-                      selectionMode="single"
-                      disallowEmptySelection
-                      selectedKeys={[view]}
-                      onSelectionChange={(keys) => {
-                        const next = viewButtons.find((v) => keys.has(v));
-                        if (!next) return;
-                        setPickedView(next);
-                        saveGridView(meta.id, next);
-                      }}
-                    >
-                      {viewButtons.map((v) => (
-                        <Tooltip key={v} title={t(GRID_VIEW_LABELS[v])}>
-                          <ButtonGroupItem id={v} aria-label={t(GRID_VIEW_LABELS[v])} iconLeading={VIEW_ICONS[v]} />
-                        </Tooltip>
-                      ))}
-                    </ButtonGroup>
+                      icon={SearchLg}
+                      placeholder={t("Search")}
+                      value={query}
+                      onChange={setQuery}
+                      className="min-w-0 flex-1 sm:w-56 sm:flex-none"
+                    />
                   )}
-                  {filterParams.length > 0 && !sidebar && (dropdown ? (
+                  {cards && (
+                    <CardSort
+                      columns={columns}
+                      labelOf={(c) => (c === statusColumn ? t("Status") : c.label_name || c.param_name)}
+                      sort={sort}
+                      onSort={setSort}
+                    />
+                  )}
+                  {sidebarLayout && folded ? (
+                    filterButton({ onPress: () => fold(false) })
+                  ) : filterParams.length > 0 && !sidebar && (dropdown ? (
                     <DialogTrigger isOpen={showFilters} onOpenChange={setShowFilters}>
-                      <Button size="sm" color="secondary" iconLeading={FilterLines}>
-                        {activeFilters ? t('Filters ({count})', { count: activeFilters }) : t('Filters')}
-                      </Button>
+                      {filterButton({})}
                       <Popover
-                        placement="bottom end"
+                        placement="bottom start"
                         offset={6}
                         className={({ isEntering, isExiting }) =>
                           cx(
@@ -986,16 +1404,35 @@ export function GridView({
                       </Popover>
                     </DialogTrigger>
                   ) : (
-                    <Button
-                      size="sm"
-                      color="secondary"
-                      iconLeading={FilterLines}
-                      onPress={() => setShowFilters((s) => !s)}
-                      aria-expanded={showFilters}
-                    >
-                      {activeFilters ? t('Filters ({count})', { count: activeFilters }) : t('Filters')}
-                    </Button>
+                    filterButton({ onPress: () => setShowFilters((s) => !s), expanded: showFilters })
                   ))}
+                </>
+              ) : undefined
+            }
+            contentTrailing={
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:ml-auto">
+                <div className="flex flex-wrap gap-2">
+                  {viewButtons.length > 0 && (
+                    <ButtonGroup
+                      size="sm"
+                      aria-label={t("View")}
+                      selectionMode="single"
+                      disallowEmptySelection
+                      selectedKeys={[view]}
+                      onSelectionChange={(keys) => {
+                        const next = viewButtons.find((v) => keys.has(v));
+                        if (!next) return;
+                        setPickedView(next);
+                        saveGridView(meta.id, next);
+                      }}
+                    >
+                      {viewButtons.map((v) => (
+                        <Tooltip key={v} title={t(GRID_VIEW_LABELS[v])}>
+                          <ButtonGroupItem id={v} aria-label={t(GRID_VIEW_LABELS[v])} iconLeading={VIEW_ICONS[v]} />
+                        </Tooltip>
+                      ))}
+                    </ButtonGroup>
+                  )}
                   {toolbarButtons.map((a) => (
                     <Button
                       key={a.id}
@@ -1009,13 +1446,42 @@ export function GridView({
                       }
                       iconLeading={iconOf(a)}
                       isDisabled={
-                        (a.needs_row && !selectedRow) || !a.form_meta_id
+                        (a.action === "consolidate" ? !pickedFor(selectedRow).length : a.needs_row && !selectedRow) || !a.form_meta_id
                       }
                       onPress={() => run(a)}
                     >
-                      {a.label}
+                      {a.label}{a.action === "consolidate" && picked.size > 1 ? ` (${picked.size})` : ""}
                     </Button>
                   ))}
+                  {/* Opened from the ⋯ menu's Columns, under the ⋯ button. */}
+                  <Popover
+                    triggerRef={moreRef}
+                    isOpen={showColumns}
+                    onOpenChange={setShowColumns}
+                    placement="bottom end"
+                    offset={6}
+                    className={({ isEntering, isExiting }) =>
+                      cx(
+                        "max-h-[min(28rem,calc(100vh-4rem))] w-64 overflow-y-auto rounded-xl bg-primary shadow-lg ring-1 ring-secondary_alt outline-hidden will-change-transform",
+                        isEntering && "duration-150 ease-out animate-in fade-in placement-bottom:slide-in-from-top-0.5",
+                        isExiting && "duration-100 ease-in animate-out fade-out",
+                      )
+                    }
+                  >
+                    <Dialog aria-label={t("Columns")} className="outline-hidden">
+                      <p className="border-b border-secondary px-4 py-2.5 text-xs font-semibold text-tertiary">{t("Show, order and freeze columns")}</p>
+                      <ColumnsList
+                        columns={listColumns}
+                        nameOf={(c) => (c === statusColumn ? t("Status") : c.label_name || c.param_name)}
+                        isShown={(c) => columns.includes(c)}
+                        isFrozen={(c) => frozenFields.includes(c.field_path)}
+                        canHide={columns.length > 1}
+                        onShow={showColumn}
+                        onFreeze={freezeColumn}
+                        onReorder={reorderColumns}
+                      />
+                    </Dialog>
+                  </Popover>
                   <span ref={moreRef} className="inline-flex">
                     <Button
                       size="sm"
@@ -1063,7 +1529,7 @@ export function GridView({
             {cards ? (
             <GridCards
               look={cards}
-              label={title(meta)}
+              label={label ?? title(meta)}
               columns={columns}
               records={records}
               rowKey={key}
@@ -1099,29 +1565,29 @@ export function GridView({
                   </dl>
                 ) : undefined
               }
-              sort={sort}
-              onSort={setSort}
               style={scrollStyle}
             />
             ) : (
             <Table
-              aria-label={title(meta)}
+              aria-label={label ?? title(meta)}
               scrollStyle={scrollStyle}
               className={filler ? "h-full" : undefined}
               sortDescriptor={sort}
               onSortChange={setSort}
-              selectionMode="single"
+              selectionMode={multi ? "multiple" : "single"}
               selectionBehavior="replace"
-              selectedKeys={selected ? [selected] : []}
-              onSelectionChange={(keys: Selection) =>
-                setSelected(
-                  keys === "all"
-                    ? null
-                    : [...keys][0] != null
-                      ? String([...keys][0])
-                      : null,
-                )
-              }
+              selectedKeys={multi ? picked : selected ? [selected] : []}
+              onSelectionChange={(keys: Selection) => {
+                if (!multi) {
+                  setSelected(keys === "all" ? null : [...keys][0] != null ? String([...keys][0]) : null);
+                  return;
+                }
+                // Clicking a row picks only it; its checkbox, Ctrl or Shift add to the picked.
+                const next = new Set(keys === "all" ? records.map((r) => String(r[key])) : [...keys].map(String));
+                const added = [...next].find((k) => !picked.has(k));
+                setPicked(next);
+                setSelected(added ?? (selected && next.has(selected) ? selected : ([...next].pop() ?? null)));
+              }}
               // The row holding nested grids takes no selection or row action; the grids inside work as usual.
               disabledKeys={items
                 .filter((r) => r._nestedOf || r._footer || r._filler || r._skeleton)
@@ -1145,14 +1611,27 @@ export function GridView({
                 className={scrolls ? "sticky top-0 z-[3]" : undefined}
               >
                 {[
+                  ...(multi
+                    ? [
+                        <Table.Head
+                          key="_pick"
+                          id="_pick"
+                          aria-label={t("Pick rows")}
+                          style={freeze(0, true).style}
+                          className={`w-px pr-0 pl-4 ${freeze(0, true).className}`}
+                        >
+                          <Checkbox slot="selection" size="sm" />
+                        </Table.Head>,
+                      ]
+                    : []),
                   ...(nested.length
                     ? [
                         <Table.Head
                           key="_expand"
                           id="_expand"
                           aria-label={t("Expand")}
-                          style={freeze(0, true).style}
-                          className={`w-px px-2 ${freeze(0, true).className}`}
+                          style={freeze(picks, true).style}
+                          className={`w-px px-2 ${freeze(picks, true).className}`}
                         />,
                       ]
                     : []),
@@ -1176,8 +1655,20 @@ export function GridView({
                         label={c === statusColumn ? t("Status") : c.label_name || c.param_name}
                         allowsSorting={c !== statusColumn}
                         isRowHeader={i === 0}
+                        width={widthOf(c)}
+                        handles={
+                          <>
+                            <ColumnGrip
+                              field={c.field_path}
+                              label={c === statusColumn ? t("Status") : c.label_name || c.param_name}
+                              onDrag={setColumnDrag}
+                              onDrop={reorderColumns}
+                            />
+                            {resizerFor(c)}
+                          </>
+                        }
                         style={f.style}
-                        className={`${isNumber(c) && !(workflow && c.field_path === "status_id") ? "[&>div]:justify-end" : ""} ${f.className}`}
+                        className={`${isNumber(c) && !(workflow && c.field_path === "status_id") ? "[&>div]:justify-end" : ""} ${columnDrag?.field === c.field_path ? "bg-tertiary" : ""} ${columnDrag?.target === c.field_path ? (columnDrag.side === "before" ? DROP_BEFORE : DROP_AFTER) : ""} ${f.className}`}
                       />
                     );
                   }),
@@ -1187,8 +1678,10 @@ export function GridView({
                 ]}
               </Table.Header>
               <Table.Body
+                className="rows-in"
                 items={items}
                 dependencies={[
+                  multi,
                   columns,
                   rowActions,
                   rowDrill,
@@ -1198,6 +1691,7 @@ export function GridView({
                   nested,
                   viewWidth,
                   result?.footer,
+                  dragged,
                 ]}
                 renderEmptyState={() => emptyState}
               >
@@ -1285,6 +1779,8 @@ export function GridView({
                         if ((e.target as HTMLElement).closest("input,textarea")) return;
                         e.preventDefault();
                         setSelected(row._key);
+                        // Right-clicking one of the picked rows keeps them all picked, for consolidate.
+                        if (multi && !picked.has(row._key)) setPicked(new Set([row._key]));
                         setMenu({
                           at: pointOf(e),
                           row: records.find((r) => String(r[key]) === row._key),
@@ -1294,12 +1790,23 @@ export function GridView({
                       }}
                     >
                       {[
+                        ...(multi
+                          ? [
+                              <Table.Cell
+                                key="_pick"
+                                style={freeze(0).style}
+                                className={`w-px pr-0 pl-4 ${freeze(0).className}`}
+                              >
+                                <Checkbox slot="selection" size="sm" />
+                              </Table.Cell>,
+                            ]
+                          : []),
                         ...(nested.length
                           ? [
                               <Table.Cell
                                 key="_expand"
-                                style={freeze(0).style}
-                                className={`w-px px-2 ${freeze(0).className}`}
+                                style={freeze(picks).style}
+                                className={`w-px px-2 ${freeze(picks).className}`}
                               >
                                 <AriaButton
                                   aria-label={t(expanded.has(row._key) ? "Hide {name}" : "Show {name}", { name: nested.map((s) => s.label_name || s.param_name).join(", ") })}
@@ -1333,17 +1840,19 @@ export function GridView({
                             style={freeze(lead + i).style}
                             className={`${i === 0 ? "font-medium text-primary" : "whitespace-nowrap"} ${isNumber(c) && !(workflow && c.field_path === "status_id") ? "text-right" : ""} ${freeze(lead + i).className}`}
                           >
-                            {i === 0 && tree && (
-                              <TreeToggle
-                                depth={row._depth ?? 0}
-                                count={Number(row._children) || 0}
-                                open={openNodes.has(row._key)}
-                                loading={openNodes.has(row._key) && !branches.has(row._key)}
-                                name={rowName(row) || row._key}
-                                onToggle={() => toggleNode(row._key)}
-                              />
-                            )}
-                            {cellValue(c, row)}
+                            <CellWidth width={widthOf(c)}>
+                              {i === 0 && tree && (
+                                <TreeToggle
+                                  depth={row._depth ?? 0}
+                                  count={Number(row._children) || 0}
+                                  open={openNodes.has(row._key)}
+                                  loading={openNodes.has(row._key) && !branches.has(row._key)}
+                                  name={rowName(row) || row._key}
+                                  onToggle={() => toggleNode(row._key)}
+                                />
+                              )}
+                              {cellValue(c, row)}
+                            </CellWidth>
                           </Table.Cell>
                         )),
                         ...(rowActions.length || rowDrill
@@ -1372,11 +1881,14 @@ export function GridView({
               onPageSizeChange={setPerPage}
               onRefresh={() => setReload((n) => n + 1)}
               refreshing={slow}
+              records={result.total}
             />
           )}
         </TableCard.Root>
       </div>
 
+
+      {columnDrag && <ColumnDragLabel drag={columnDrag} />}
 
       {menu && (
         <ContextMenu
@@ -1441,9 +1953,16 @@ export function GridView({
             fillParams={actionParams(running.action, running.row, key)}
             rowName={rowName(running.row)}
             scope={scope}
+            consolidate={
+              running.ids
+                ? { gridId: meta.id, actionId: running.action.id, ids: running.ids, filter: { ...filters, ...fixed }, scope }
+                : undefined
+            }
             onClose={() => setRunning(null)}
             onSaved={(next) => {
               if (next !== "new") setRunning(null);
+              // The picked records are done with once they are merged.
+              if (running.ids) setPicked(new Set());
               setReload((n) => n + 1);
             }}
           />
@@ -1501,6 +2020,7 @@ function ActionDialog({
   fillParams,
   rowName,
   scope,
+  consolidate,
   onClose,
   onSaved,
 }: {
@@ -1510,6 +2030,8 @@ function ActionDialog({
   fillParams: Record<string, string>;
   rowName: string;
   scope?: Filters;
+  /** A consolidate button: the form opens with these picked rows merged. */
+  consolidate?: Consolidating;
   onClose: () => void;
   /** next "new": the form stays open for another record. */
   onSaved: (next?: "new") => void;
@@ -1522,9 +2044,11 @@ function ActionDialog({
   return (
     <Modal
       title={
-        rowName && action.needs_row
-          ? `${action.label} · ${rowName}`
-          : action.label
+        consolidate && consolidate.ids.length > 1
+          ? t("{label} · {n} records", { label: action.label, n: consolidate.ids.length })
+          : rowName && action.needs_row
+            ? `${action.label} · ${rowName}`
+            : action.label
       }
       onClose={onClose}
       size={wide ? "xl" : "lg"}
@@ -1533,10 +2057,11 @@ function ActionDialog({
         metaId={formId}
         recordId={recordId}
         fill={
-          action.get_meta_id
+          action.get_meta_id && !consolidate
             ? { metaId: action.get_meta_id, params: fillParams }
             : undefined
         }
+        consolidate={consolidate}
         fixed={scope}
         embedded
         onCancel={onClose}
@@ -1711,7 +2236,7 @@ function SubGrid({
   }
   if (!def)
     return (
-      <div className="h-40 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+      <div className="h-40" aria-busy="true" />
     );
 
   return <GridView def={def} fixed={fixed} label={label} />;

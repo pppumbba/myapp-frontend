@@ -11,6 +11,7 @@ import { api, ApiError } from '../../lib/api';
 import { Link } from 'react-router-dom';
 import { chatApi, SHOW_CHAT, type ChatMessage, type ChatSummary, type Person, type SharedRecord } from '../../lib/chatApi';
 import { initials } from '../../lib/initials';
+import { avatarUrl } from '../../lib/avatarApi';
 import { useMessenger, type OpenState } from './useMessenger';
 import { panelPlace, useChatPosition } from './useChatPosition';
 import { t } from '@/i18n';
@@ -38,8 +39,18 @@ function dayLabel(iso: string) {
   return new Date(iso).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
+/** Who wrote a message in a group: their photo (or initials) and name, above the bubble. */
+function Sender({ msg }: { msg: ChatMessage }) {
+  return (
+    <span className="mb-0.5 flex items-center gap-1.5 px-1 text-xs font-medium text-tertiary">
+      <Avatar size="xs" src={avatarUrl({ avatar: msg.user_avatar })} initials={initials(msg.user_name ?? undefined)} alt="" />
+      {msg.user_name}
+    </span>
+  );
+}
+
 function ChatAvatar({ chat, size = 'sm' }: { chat: ChatSummary; size?: 'xs' | 'sm' | 'md' }) {
-  return chat.type === 'group' ? <Avatar size={size} placeholderIcon={Users01} alt={chat.name} /> : <Avatar size={size} initials={initials(chat.name)} alt={chat.name} />;
+  return chat.type === 'group' ? <Avatar size={size} placeholderIcon={Users01} alt={chat.name} /> : <Avatar size={size} src={avatarUrl(chat)} initials={initials(chat.name)} alt={chat.name} />;
 }
 
 function typingLine(names: string[]) {
@@ -326,7 +337,7 @@ function ChatList({
                   {people.map((p) => (
                     <li key={p.id}>
                       <AriaButton onPress={() => void start(p)} className={rowLook}>
-                        <Avatar size="sm" initials={initials(p.name)} alt={p.name} />
+                        <Avatar size="sm" src={avatarUrl(p)} initials={initials(p.name)} alt={p.name} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-primary">{p.name}</span>
                           <span className="block truncate text-xs text-tertiary">{p.email}</span>
@@ -652,7 +663,7 @@ function Messages({ messages, userId, group, seenId, seenText }: { messages: Cha
           return (
             <FragmentLi key={msg.id} day={day}>
               <li className={cx('mt-2 flex flex-col', mine ? 'items-end' : 'items-start')}>
-                {group && !mine && <span className="mb-0.5 px-1 text-xs font-medium text-tertiary">{msg.user_name}</span>}
+                {group && !mine && <Sender msg={msg} />}
                 <RecordCard record={msg.data} />
                 {msg.body && <p className={cx('mt-0.5 max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap', mine ? 'bg-brand-solid text-white' : 'bg-secondary text-primary')}>{msg.body}</p>}
                 <span className="mt-0.5 px-1 text-xs text-quaternary">
@@ -671,7 +682,7 @@ function Messages({ messages, userId, group, seenId, seenText }: { messages: Cha
         return (
           <FragmentLi key={msg.id} day={day}>
             <li className={cx('flex flex-col', mine ? 'items-end' : 'items-start', first ? 'mt-2' : 'mt-0.5')}>
-              {group && !mine && first && <span className="mb-0.5 px-1 text-xs font-medium text-tertiary">{msg.user_name}</span>}
+              {group && !mine && first && <Sender msg={msg} />}
               <p
                 title={new Date(msg.created_at).toLocaleString()}
                 className={cx(
@@ -797,7 +808,7 @@ function GroupForm({ addTo, onBack, onDone }: { addTo?: ChatSummary; onBack: () 
           return (
             <li key={p.id}>
               <AriaButton onPress={() => !already && toggle(p)} isDisabled={already} aria-pressed={on} className={cx(rowLook, already && 'opacity-60')}>
-                <Avatar size="sm" initials={initials(p.name)} alt={p.name} />
+                <Avatar size="sm" src={avatarUrl(p)} initials={initials(p.name)} alt={p.name} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-primary">{p.name}</span>
                   <span className="block truncate text-xs text-tertiary">{already ? t('Already in the group') : p.email}</span>

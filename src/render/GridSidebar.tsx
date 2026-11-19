@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FilterLines } from '@untitledui/icons';
+import { ChevronLeftDouble, FilterLines } from '@untitledui/icons';
 import { dataApi, type Facet } from '../lib/dataApi';
 import type { MetaParam } from '../lib/metaApi';
 import type { WfmStatus } from '../lib/workflowApi';
 import { DatePicker } from '../components/DatePicker';
 import { Button } from '@/components/base/buttons/button';
+import { ButtonUtility } from '@/components/base/buttons/button-utility';
 import { Input } from '@/components/base/input/input';
 import { useDebounced } from '@/hooks/use-debounced';
 import { cx } from '@/utils/cx';
@@ -40,6 +41,7 @@ export function GridSidebar({
   search,
   scope,
   fixed,
+  onCollapse,
 }: {
   metaId: number;
   params: MetaParam[];
@@ -49,6 +51,8 @@ export function GridSidebar({
   search: string;
   scope?: Filters;
   fixed?: Filters;
+  /** Folds the sidebar away; the grid's toolbar then offers a Filters button to bring it back. */
+  onCollapse?: () => void;
 }) {
   const shown = useMemo(() => params.map(asFilter), [params]);
   const statusesOf = (p: MetaParam) => (p.field_path === 'status_id' ? statuses : undefined);
@@ -79,25 +83,39 @@ export function GridSidebar({
   const active = Object.keys(filters).length;
 
   return (
-    <aside aria-label={t('Filters')} className="rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary lg:absolute lg:inset-0 lg:overflow-y-auto">
-      <div className="mb-4 flex items-center justify-between gap-2">
+    // It blurs in, then its sections and their values one after another (.blur-in, --i).
+    <aside aria-label={t('Filters')} className="blur-in rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary lg:absolute lg:inset-0 lg:flex lg:flex-col">
+      {/* The title stays put; only the list scrolls, inside the card's padding so the scrollbar is shorter. */}
+      <div className="mb-4 flex shrink-0 items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-primary">
           <FilterLines className="size-4 text-fg-quaternary" aria-hidden="true" />
           {t('Filters')}
         </h2>
-        {active > 0 && (
-          <Button size="sm" color="link-gray" onPress={() => onChange({})}>
-            {t('Clear all')}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {active > 0 && (
+            <Button size="sm" color="link-gray" onPress={() => onChange({})}>
+              {t('Clear all')}
+            </Button>
+          )}
+          {onCollapse && (
+            <ButtonUtility
+              size="xs"
+              color="tertiary"
+              icon={ChevronLeftDouble}
+              tooltip={t('Hide filters')}
+              aria-label={t('Hide filters')}
+              onPress={onCollapse}
+            />
+          )}
+        </div>
       </div>
-      <div className="space-y-5">
-        {shown.map((p) => {
+      <div className="space-y-5 lg:-mx-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-3">
+        {shown.map((p, n) => {
           const kind = kindOf(p, statusesOf(p));
           const label = `${p.label_name || p.param_name}${p.is_mandatory_criteria ? ' *' : ''}`;
           const value = filters[p.field_path] ?? '';
           return (
-            <section key={p.field_path} aria-label={label}>
+            <section key={p.field_path} aria-label={label} className="blur-in" style={{ '--i': n + 1 } as React.CSSProperties}>
               {kind === 'list' ? (
                 <FacetList
                   label={label}
@@ -163,10 +181,10 @@ function FacetList({ label, choices, value, onPick }: { label: string; choices: 
         <p className="text-sm text-quaternary">{t('Nothing to pick.')}</p>
       ) : (
         <ul className="-mx-2 space-y-0.5">
-          {visible.map((c) => {
+          {visible.map((c, i) => {
             const picked = c.value === value;
             return (
-              <li key={c.value}>
+              <li key={c.value} className="blur-in" style={{ '--i': i + 2 } as React.CSSProperties}>
                 <button
                   type="button"
                   aria-pressed={picked}

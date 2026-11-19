@@ -5,7 +5,7 @@ import { screenFor, useScreens } from '../lib/screenApi';
 import { AppView } from './AppView';
 import { useMetaDef } from './definitions';
 
-const Loading = () => <div className="min-h-screen animate-pulse bg-primary motion-reduce:animate-none" />;
+const Loading = () => <div className="min-h-screen" aria-busy="true" />;
 
 /**
  * Layout route for built-in pages (screen metas): the page shows inside the app whose menu

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Image01 } from "@untitledui/icons";
+import { ArrowDown, ArrowUp, Image01, SwitchVertical01 } from "@untitledui/icons";
 import { GridList, GridListItem, type Selection, type SortDescriptor } from "react-aria-components";
 import { contentApi } from "../lib/contentApi";
 import type { DataRow } from "../lib/dataApi";
@@ -7,7 +7,8 @@ import type { MetaParam, RecordLook, RecordSlot } from "../lib/metaApi";
 import { filesOf, isPicture } from "./FileField";
 import { Badge } from "@/components/base/badges/badges";
 import { Button } from "@/components/base/buttons/button";
-import { NativeSelect } from "@/components/base/select/select-native";
+import { Dropdown } from "@/components/base/dropdown/dropdown";
+import { Tooltip } from "@/components/base/tooltip/tooltip";
 import { cx } from "@/utils/cx";
 import { t } from "@/i18n";
 
@@ -209,6 +210,75 @@ const WIDGETS: Record<RecordLook, (props: WidgetProps) => ReactNode> = { cards: 
  * Picking and opening work as in the table: click picks a record, double-click or Enter opens
  * it, right-click opens its menu. The table's headers sort, so here a control above them does.
  */
+/** Cards have no column headers to click, so the grid's toolbar shows this beside the search. */
+export function CardSort({
+  columns,
+  labelOf,
+  sort,
+  onSort,
+}: {
+  columns: MetaParam[];
+  labelOf: (c: MetaParam) => string;
+  sort?: SortDescriptor;
+  onSort: (sort: SortDescriptor | undefined) => void;
+}) {
+  const column = sort?.column ? String(sort.column) : "";
+  const direction = sort?.direction ?? "ascending";
+  // The added status column has no field to sort on.
+  const sortable = columns.filter((c) => c.id > 0);
+  const picked = sortable.find((c) => c.field_path === column);
+  const hint = picked ? t("Sorted by {name}", { name: labelOf(picked) }) : t("Sort by");
+  const only = (keys: Selection) => (keys === "all" ? undefined : [...keys][0]);
+
+  return (
+    <Dropdown.Root>
+      <Tooltip title={hint}>
+        <Button
+          size="sm"
+          color="secondary"
+          iconLeading={picked ? (direction === "descending" ? ArrowDown : ArrowUp) : SwitchVertical01}
+          aria-label={hint}
+        />
+      </Tooltip>
+      <Dropdown.Popover placement="bottom end" className="w-56">
+        <Dropdown.Menu aria-label={t("Sort by")} className="max-h-80">
+          <Dropdown.Section
+            aria-label={t("Sort by")}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[column]}
+            onSelectionChange={(keys) => {
+              const next = only(keys);
+              onSort(next ? { column: String(next), direction } : undefined);
+            }}
+          >
+            <Dropdown.Item id="" label={t("As listed")} />
+            {sortable.map((c) => (
+              <Dropdown.Item key={c.field_path} id={c.field_path} label={labelOf(c)} />
+            ))}
+          </Dropdown.Section>
+          {picked && <Dropdown.Separator />}
+          {picked && (
+            <Dropdown.Section
+              aria-label={t("Order")}
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={[direction]}
+              onSelectionChange={(keys) => {
+                const next = only(keys);
+                if (next) onSort({ column, direction: next as SortDescriptor["direction"] });
+              }}
+            >
+              <Dropdown.Item id="ascending" icon={ArrowUp} label={t("Ascending")} />
+              <Dropdown.Item id="descending" icon={ArrowDown} label={t("Descending")} />
+            </Dropdown.Section>
+          )}
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown.Root>
+  );
+}
+
 export function GridCards({
   look,
   label,
@@ -226,8 +296,6 @@ export function GridCards({
   renderActions,
   empty,
   footer,
-  sort,
-  onSort,
   style,
 }: {
   look: RecordLook;
@@ -246,39 +314,14 @@ export function GridCards({
   renderActions: (row: DataRow) => ReactNode;
   empty: ReactNode;
   footer?: ReactNode;
-  sort?: SortDescriptor;
-  onSort: (sort: SortDescriptor | undefined) => void;
   style?: CSSProperties;
 }) {
   const slots = useMemo(() => slotsOf(columns), [columns]);
   const heading = slots.title[0];
-  const descending = sort?.direction === "descending";
-  // The added status column has no field to sort on.
-  const sortable = columns.filter((c) => c.id > 0);
   const Widget = WIDGETS[look];
 
   return (
     <div style={style} className="flex flex-col">
-      <div className="flex items-end gap-2 border-b border-secondary px-4 py-3">
-        <NativeSelect
-          label={t("Sort by")}
-          size="sm"
-          className="sm:w-56"
-          value={sort?.column ? String(sort.column) : ""}
-          onChange={(e) => onSort(e.target.value ? { column: e.target.value, direction: sort?.direction ?? "ascending" } : undefined)}
-          options={[{ value: "", label: t("As listed") }, ...sortable.map((c) => ({ value: c.field_path, label: labelOf(c) }))]}
-        />
-        {sort?.column && (
-          <Button
-            size="sm"
-            color="secondary"
-            iconLeading={descending ? ArrowDown : ArrowUp}
-            aria-label={descending ? t("Descending") : t("Ascending")}
-            onPress={() => onSort({ column: sort.column, direction: descending ? "ascending" : "descending" })}
-          />
-        )}
-      </div>
-
       {loading ? (
         <div aria-hidden="true" className={LAYOUTS[look]}>
           {Array.from({ length: SKELETON_CARDS }, (_, i) => (

@@ -73,7 +73,7 @@ export function ReportView({ def, recordId: given, autoPrint }: { def: MetaDef; 
           <p className="mt-1 text-sm text-tertiary">{t('{name} shows here once you choose which one.', { name: heading })}</p>
         </div>
       ) : !url ? (
-        !error && <div className="mx-auto h-[28rem] max-w-[52rem] animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+        !error && <div className="mx-auto h-[28rem] max-w-[52rem]" aria-busy="true" />
       ) : (
         <iframe
           ref={frame}

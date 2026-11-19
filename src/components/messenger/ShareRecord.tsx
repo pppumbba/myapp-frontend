@@ -12,6 +12,7 @@ import { Alert } from '../ui';
 import { ApiError } from '../../lib/api';
 import { chatApi, type ChatSummary, type Person, type SharedRecord } from '../../lib/chatApi';
 import { initials } from '../../lib/initials';
+import { avatarUrl } from '../../lib/avatarApi';
 import { t } from '@/i18n';
 
 type Target = { chat: ChatSummary } | { person: Person };
@@ -94,13 +95,13 @@ export function ShareRecord({ record, onClose }: { record: SharedRecord; onClose
               {shownChats.map((c) =>
                 option(
                   `c${c.id}`,
-                  c.type === 'group' ? <Avatar size="sm" placeholderIcon={Users01} alt={c.name} /> : <Avatar size="sm" initials={initials(c.name)} alt={c.name} />,
+                  c.type === 'group' ? <Avatar size="sm" placeholderIcon={Users01} alt={c.name} /> : <Avatar size="sm" src={avatarUrl(c)} initials={initials(c.name)} alt={c.name} />,
                   c.name,
                   c.type === 'group' ? t('{count} people', { count: c.members.length }) : undefined,
                   { chat: c },
                 ),
               )}
-              {shownPeople.map((p) => option(`p${p.id}`, <Avatar size="sm" initials={initials(p.name)} alt={p.name} />, p.name, p.email, { person: p }))}
+              {shownPeople.map((p) => option(`p${p.id}`, <Avatar size="sm" src={avatarUrl(p)} initials={initials(p.name)} alt={p.name} />, p.name, p.email, { person: p }))}
               {!shownChats.length && !shownPeople.length && (
                 <li className="px-2 py-6 text-center text-sm text-tertiary">{q ? t('No chats or people match') : t('No chats yet. Search for a person.')}</li>
               )}

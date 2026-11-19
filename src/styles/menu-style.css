@@ -1,0 +1,76 @@
+/*
+ * Menu style metas (lib/menuStyle.ts): AppSidebar puts data-menu-item on the layout. Items let
+ * the menu's own colour show through, and the current one is marked as a pill, a bar on its
+ * edge, or bold text. Unlayered, so these win over the nav item's utilities.
+ */
+[data-menu-item] aside nav a,
+[data-menu-item] aside nav summary {
+  background-color: transparent;
+}
+
+[data-menu-item] aside nav a:hover,
+[data-menu-item] aside nav summary:hover {
+  background-color: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+[data-menu-item="pill"] aside nav a[aria-current="page"] {
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+[data-menu-item="bar"] aside nav a[aria-current="page"] {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  box-shadow: inset 3px 0 0 var(--color-fg-brand-primary);
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+[data-menu-item="plain"] aside nav a[aria-current="page"] {
+  font-weight: 600;
+}
+
+/* Glass: the see-through fill comes from --menu-fill; this blurs what is behind it and edges it in light. */
+.menu-glass {
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-color: rgb(255 255 255 / 0.15);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+/*
+ * A backdrop reaches the screens (large screens only; phones keep solid pages). The framed
+ * screen is a light glass pane; the outermost panels inside (cards, grids, forms) turn frosted,
+ * and panels nested in them let the frost through, except sticky headers and hovered rows.
+ */
+@media (min-width: 1024px) {
+  [data-menu-backdrop] .menu-glass-pane {
+    background-color: color-mix(in srgb, var(--color-bg-secondary) 35%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  [data-menu-backdrop] main .bg-primary:not(.bg-primary .bg-primary) {
+    background-color: color-mix(in srgb, var(--color-bg-primary) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  [data-menu-backdrop] main .bg-primary .bg-primary:not(.sticky, :hover) {
+    background-color: transparent;
+  }
+
+  [data-menu-backdrop] main .bg-primary .sticky.bg-primary {
+    background-color: color-mix(in srgb, var(--color-bg-primary) 88%, transparent);
+  }
+}
+
+/* Browsers without blur get the menu's colour solid, and solid panels. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .menu-glass {
+    background: var(--menu-solid);
+  }
+
+  [data-menu-backdrop] main .bg-primary:not(.bg-primary .bg-primary) {
+    background-color: var(--color-bg-primary);
+  }
+}

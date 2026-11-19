@@ -2,6 +2,7 @@ import { useId, useRef, useState, type DragEvent } from 'react';
 import { File06, Image01, Paperclip, Trash01, UploadCloud02 } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
 import { contentApi, fileSize, type FileInfo } from '../lib/contentApi';
+import { viewFiles } from './FileViewer';
 import type { MetaParam } from '../lib/metaApi';
 import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
@@ -109,7 +110,7 @@ export function FileField({ param: f, value, error, required, onChange }: { para
               <li key={file.id} className="flex items-center gap-3 px-3 py-2">
                 <Icon className="size-5 shrink-0 text-fg-quaternary" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <button type="button" className="block max-w-full truncate text-left text-sm font-medium text-primary hover:underline" onClick={() => contentApi.open(file).catch(() => {})}>
+                  <button type="button" className="block max-w-full truncate text-left text-sm font-medium text-primary hover:underline" onClick={() => viewFiles(files, i)}>
                     {file.file_name}
                   </button>
                   {multi ? (
@@ -221,7 +222,7 @@ export function FileNames({ value }: { value: unknown }) {
         title={files.map((x) => x.file_name).join('\n')}
         onClick={(e) => {
           e.stopPropagation();
-          contentApi.open(files[0]).catch(() => {});
+          viewFiles(files);
         }}
       >
         {files[0].file_name}

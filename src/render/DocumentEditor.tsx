@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Edit05, File06, Printer } from '@untitledui/icons';
 import { ApiError } from '../lib/api';
-import { contentApi } from '../lib/contentApi';
+import { viewFiles } from './FileViewer';
 import type { DataRow } from '../lib/dataApi';
 import { documentApi, PAPER, type Band, type DocElement, type FilledDocument, type PageSettings, type Section, type Shown } from '../lib/documentApi';
 import type { MetaParam } from '../lib/metaApi';
@@ -34,7 +34,7 @@ export function DocumentCard({ param, value, onOpen }: { param: MetaParam; value
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary">{param.label_name || param.param_name}</p>
         {file ? (
-          <button type="button" className="max-w-full truncate text-left text-xs text-tertiary hover:underline" onClick={() => contentApi.open(file).catch(() => {})}>
+          <button type="button" className="max-w-full truncate text-left text-xs text-tertiary hover:underline" onClick={() => viewFiles([file])}>
             {t('Saved copy: {name}', { name: file.file_name })}
           </button>
         ) : (
@@ -170,7 +170,7 @@ export function DocumentEditor({
                 </div>
               </div>
             ) : (
-              !loadError && <div className="mx-auto h-[60vh] max-w-xl animate-pulse rounded bg-primary motion-reduce:animate-none" />
+              !loadError && <div className="mx-auto h-[60vh] max-w-xl" aria-busy="true" />
             )}
           </div>
 

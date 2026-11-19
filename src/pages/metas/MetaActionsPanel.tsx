@@ -20,6 +20,7 @@ const KINDS: { value: ActionKind; label: string; hint: string }[] = [
   { value: 'custom', label: 'Custom', hint: 'Opens the form to add a record, filled from the picked row by the get.' },
   { value: 'import', label: 'Import', hint: 'Loads an Excel file into a table through an Excel import meta.' },
   { value: 'stage_query', label: 'Stage query', hint: 'Runs a stage query; the get (or the picked row) fills its parameters first.' },
+  { value: 'consolidate', label: 'Consolidate', hint: "Merges the picked rows into one new record of the form, lines included: each field by its Group (sum, avg, concat…). With a get, its rows for each picked record are merged." },
 ];
 
 /** The kind of meta a button points at: a form, an Excel import or a stage query. */
@@ -137,7 +138,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
       icon_cls: form.icon_cls || null,
       form_meta_id: form.form_meta_id ? Number(form.form_meta_id) : null,
       get_meta_id: form.get_meta_id ? Number(form.get_meta_id) : null,
-      needs_row: form.needs_row,
+      needs_row: form.action === 'consolidate' || form.needs_row,
       show_in_toolbar: form.show_in_toolbar,
       show_in_row: form.show_in_row,
       order_number: Number(form.order_number) || 1,
@@ -303,11 +304,13 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
                         ? t('No get metas yet. Create one on the Metas page.')
                         : form.action === 'stage_query'
                           ? t('Its first row fills the parameters with the same names.')
-                          : t('Decides the values the form opens with.'))
+                          : form.action === 'consolidate'
+                            ? t('Run once for each picked record; all its rows are merged (a get joining the lines gives a row per line).')
+                            : t('Decides the values the form opens with.'))
                     }
                     options={[
                       {
-                        label: form.action === 'edit' ? t('The row from the form’s table') : form.action === 'stage_query' ? t('The picked row (by Parameters)') : t('Nothing (empty form)'),
+                        label: form.action === 'edit' ? t('The row from the form’s table') : form.action === 'stage_query' ? t('The picked row (by Parameters)') : form.action === 'consolidate' ? t('The picked rows themselves') : t('Nothing (empty form)'),
                         value: '',
                       },
                       ...gets.map((o) => ({ label: o.name, value: String(o.id) })),
@@ -337,7 +340,7 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
 
             <Section title={t('Placement')}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Toggle label={t('Needs a picked row')} hint={t('Disabled until a row is picked.')} isSelected={form.needs_row} onChange={(v) => set('needs_row', v)} />
+                <Toggle label={t('Needs a picked row')} hint={form.action === 'consolidate' ? t('Always: it merges the picked rows. Its grid gets checkboxes to pick them.') : t('Disabled until a row is picked.')} isSelected={form.action === 'consolidate' || form.needs_row} isDisabled={form.action === 'consolidate'} onChange={(v) => set('needs_row', v)} />
                 <Toggle label={t('Show in the toolbar')} hint={t('A button above the grid.')} isSelected={form.show_in_toolbar} onChange={(v) => set('show_in_toolbar', v)} />
                 <Toggle label={t('Show on each row')} hint={t('An icon at the end of every row.')} isSelected={form.show_in_row} onChange={(v) => set('show_in_row', v)} />
               </div>

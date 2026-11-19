@@ -7,8 +7,10 @@ import { AuthProvider } from './auth/AuthContext';
 import { ThemeProvider } from './components/ThemeProvider';
 import { bootLocale, useLocale } from './i18n';
 import { siteHost } from './lib/siteApi';
+import { registerPwa } from './lib/pwa';
 import { SiteHostApp } from './pages/sites/SiteView';
 import { Notices } from './components/Notices';
+import { FileViewerHost } from './render/FileViewer';
 import './index.css';
 
 /** Lets Untitled UI (React Aria) links navigate inside the app instead of reloading the page. */
@@ -29,6 +31,7 @@ function LocaleRoot({ children }: { children: ReactNode }) {
 
 // On a website's own domain the browser shows that site, not the app (see siteHost).
 const host = siteHost();
+if (!host) registerPwa();
 
 bootLocale().finally(() =>
   createRoot(document.getElementById('root')!).render(
@@ -44,6 +47,7 @@ bootLocale().finally(() =>
                   <>
                     <App />
                     <Notices />
+                    <FileViewerHost />
                   </>
                 )}
               </LocaleRoot>

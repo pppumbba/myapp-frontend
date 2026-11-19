@@ -5,6 +5,8 @@ export interface ChatMessage {
   chat_id: number;
   user_id: number | null;
   user_name: string | null;
+  /** The sender's photo file (avatarUrl()); null: initials. */
+  user_avatar?: string | null;
   /** system: a line the messenger wrote (joined, left, renamed); record: a shared grid row (data), the body its note. */
   kind: 'text' | 'system' | 'record';
   body: string;
@@ -25,7 +27,9 @@ export interface ChatSummary {
   type: 'direct' | 'group';
   /** A direct chat is named after the other person. */
   name: string;
-  members: { id: number; name: string }[];
+  /** A direct chat: the other person's photo file; a group has none. */
+  avatar?: string | null;
+  members: { id: number; name: string; avatar?: string | null }[];
   last: ChatMessage | null;
   unread: number;
   /** Names of the others typing now. */
@@ -52,6 +56,7 @@ export interface Person {
   id: number;
   name: string;
   email: string;
+  avatar?: string | null;
 }
 
 export const SHOW_CHAT = 'messenger:show';

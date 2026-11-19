@@ -23,6 +23,7 @@ import { NotificationDesigner } from './NotificationDesigner';
 import { PageDesigner } from './PageDesigner';
 import { QueryDesigner } from './QueryDesigner';
 import { ThemeDesigner } from './ThemeDesigner';
+import { MenuStyleDesigner } from './MenuStyleDesigner';
 import { TranslationsPanel } from './TranslationsPanel';
 import { MetaPermissionsPanel, StatusPermissionsPanel } from './PermissionsPanel';
 import { WidgetDesigner } from './WidgetDesigner';
@@ -232,7 +233,7 @@ const SETTINGS_FIRST: Record<string, string> = {
 };
 
 /** Designer types: one big editor instead of the rows list. */
-const DESIGNERS = ['chart', 'dashboard', 'notification', 'page', 'widget_template', 'theme', 'query', 'matrix', 'widget'];
+const DESIGNERS = ['chart', 'dashboard', 'notification', 'page', 'widget_template', 'theme', 'menu_style', 'query', 'matrix', 'widget'];
 
 /** "Columns", "Menu items", "Statuses": what the rows list holds for this type. */
 function rowsLabel(code?: string | null): string {
@@ -292,6 +293,8 @@ function sectionsFor(
         <PageDesigner meta={meta} options={options} />
       ) : code === 'theme' ? (
         <ThemeDesigner meta={meta} options={options} />
+      ) : code === 'menu_style' ? (
+        <MenuStyleDesigner meta={meta} />
       ) : code === 'query' ? (
         <QueryDesigner meta={meta} />
       ) : code === 'matrix' ? (
@@ -319,7 +322,7 @@ function sectionsFor(
   if (isAdmin && code === 'structure') add('table', 'Table', <StructurePanel key={meta.table_name ?? ''} meta={meta} />);
 
   if (isAdmin && code !== 'workflow') add('permissions', 'Permissions', <MetaPermissionsPanel meta={meta} />);
-  if (isAdmin && code !== 'theme') add('translations', 'Translations', <TranslationsPanel key={paramsVersion} meta={meta} />);
+  if (isAdmin && code !== 'theme' && code !== 'menu_style') add('translations', 'Translations', <TranslationsPanel key={paramsVersion} meta={meta} />);
   if (isAdmin) add('versions', 'Versions', <VersionsPanel meta={meta} onRestored={onRestored} />);
   return list;
 }

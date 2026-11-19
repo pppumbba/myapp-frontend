@@ -20,6 +20,24 @@ export const isFileParam = (p: { data_type: string }) => FILE_TYPES.includes(p.d
 /** Files a browser shows itself; the rest download. */
 const VIEWABLE = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'];
 
+/** Types for the files the viewer shows (see render/FileViewer). */
+const MIME: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+};
+
 export function fileSize(bytes: number): string {
   if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -79,6 +97,14 @@ export const contentApi = {
     const res = await fetch(`${BASE_URL}/contents/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!res.ok) throw new ApiError(res.status, t('The file could not be opened.'));
     return URL.createObjectURL(await res.blob());
+  },
+
+  /** A file's bytes, typed by its extension so the browser can show it (the server sends most as octet-stream). */
+  blob: async (file: FileInfo) => {
+    const token = tokenStore.get();
+    const res = await fetch(`${BASE_URL}/contents/${file.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, res.status === 404 ? t('This file is not there, or not yours to open.') : t('The file could not be opened.'));
+    return new Blob([await res.arrayBuffer()], { type: MIME[(file.file_extension ?? '').toLowerCase()] ?? 'application/octet-stream' });
   },
 
   download: (file: FileInfo) => downloadFile(`/contents/${file.id}?download=1`, file.file_name),

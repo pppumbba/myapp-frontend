@@ -9,9 +9,11 @@ import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { formatNumber } from './Cell';
+import { formulaOf } from './formula';
 import { filledFrom, isOneToOne, lookupFields, optionsOf, primaryKey, title, visibleParams, type DetailNode } from './definitions';
 import { startValues, toPayload } from './formValues';
 import { LookupDialog, LookupField } from './LookupField';
+import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
 
 /** Where a line keeps its own lines, by sub-detail field. A symbol, so it never mixes with field values. */
@@ -40,6 +42,14 @@ export function blankLine(node: DetailNode): Line {
     _key: `new-${++lineSeq}`,
     [SUBLINES]: Object.fromEntries(node.children.map((c) => [c.detail.field_path, isOneToOne(c.detail) ? [blankLine(c)] : []])),
   };
+}
+
+/** Values for lines not saved yet (e.g. a consolidate's merged lines): new lines, defaults under the values. */
+export function newLines(node: DetailNode, rows: DataRow[]): Line[] {
+  return rows.map((r) => {
+    const blank = blankLine(node);
+    return { ...blank, ...startValues(visibleParams(node.def.params), null, r), _key: blank._key, [SUBLINES]: blank[SUBLINES] } as Line;
+  });
 }
 
 /**
@@ -380,6 +390,16 @@ function LineField({
 }) {
   const options = optionsOf(f);
   const common = { 'aria-label': label, size: 'sm' as const, isRequired: f.is_required, isInvalid: !!error, hint: error };
+
+  // A calculated field: shown like a line's sum, worked out from the line (see formula.ts).
+  const formula = formulaOf(f);
+  if (formula) {
+    return (
+      <p aria-label={label} className={cx('px-1 py-2 font-medium text-primary', numeric(f) && 'text-right tabular-nums')} title={t('Worked out: {formula}', { formula })}>
+        {numeric(f) && value !== '' && value !== undefined ? formatNumber(Number(value)) : typeof value === 'boolean' ? (value ? t('Yes') : t('No')) : String(value ?? '')}
+      </p>
+    );
+  }
 
   if (f.data_type === 'boolean') {
     return <Toggle aria-label={label} size="sm" isSelected={value === true} onChange={onChange} className="py-2" />;

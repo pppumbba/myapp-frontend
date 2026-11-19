@@ -147,6 +147,12 @@ export const dataApi = {
   log: (metaId: number, id: number | string, page = 1) => api<Page<RecordLogEntry>>(`/metas/${metaId}/data/${id}/log?page=${page}`),
   /** A get meta's first row for these named parameters: the values a form opens with. */
   fill: (getMetaId: number, params: Record<string, string>) => api<DataRow>(`/metas/${getMetaId}/fill${queryString({ params })}`),
+  /**
+   * A consolidate button's record: these picked rows of the grid (or its get's rows for each),
+   * merged by the form's group_type fields, lines included. Nothing is saved.
+   */
+  consolidate: (gridId: number, actionId: number, ids: string[], q: Pick<ListQuery, 'filter' | 'scope'> = {}) =>
+    api<DataRow>(`/metas/${gridId}/consolidate/${actionId}${queryString({ ...q })}`, { method: 'POST', body: JSON.stringify({ ids }) }),
   /** The numbers a new record would get now, by field (json_config.autonumber), without taking them. */
   autonumber: (formId: number, values: Record<string, string>) => api<Record<string, string>>(`/metas/${formId}/autonumber${queryString({ values })}`),
   create: async (metaId: number, values: DataRow) =>

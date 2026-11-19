@@ -323,6 +323,7 @@ const KINDS: { value: ActionKind; label: string }[] = [
   { value: 'custom', label: 'Custom' },
   { value: 'import', label: 'Import' },
   { value: 'stage_query', label: 'Stage query' },
+  { value: 'consolidate', label: 'Consolidate' },
 ];
 const ICONS = ['', 'plus', 'edit', 'trash', 'copy', 'eye', 'check', 'file', 'upload'];
 const targetType = (kind: ActionKind) => (kind === 'import' ? 'excel_import' : kind === 'stage_query' ? 'stage_query' : 'form');

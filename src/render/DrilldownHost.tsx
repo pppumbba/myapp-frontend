@@ -1,10 +1,11 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight } from '@untitledui/icons';
 import { Dialog, Heading, Modal as AriaModal, ModalOverlay } from 'react-aria-components';
 import { Modal } from '../components/Modal';
 import { CloseButton } from '@/components/base/buttons/close-button';
 import { cx } from '@/utils/cx';
 import { Alert } from '../components/ui';
+import { BlurWords, wordCount } from '../components/motion';
 import { FormView } from './FormView';
 import { GridView } from './GridView';
 import { MetaView } from './MetaView';
@@ -16,28 +17,85 @@ import { DrilldownContextProvider, useDrilldown, type DrillTarget } from './dril
 import { t } from '@/i18n';
 
 /**
- * Lets everything inside open drilldowns. They open in one modal, or a drawer from the right
- * when the first one asks for it (open_in "drawer"); drilling further from there stacks up in
- * it, with a breadcrumb to step back. Inside another host it adds nothing, so there is only
- * ever one.
+ * Lets everything inside open drilldowns. They open in one modal, a drawer from the right
+ * (open_in "drawer") or full screen in place of the children (open_in "page"), as the first one
+ * asks; drilling further from there stacks up in it, with a breadcrumb to step back. trail is
+ * the page's own breadcrumb (an app's name and menu path): given one, the host draws it, and
+ * full-screen drilldowns add to it. Inside another host it adds nothing, so there is only ever one.
  */
-export function DrilldownHost({ children }: { children: ReactNode }) {
+export function DrilldownHost({ children, trail, heading }: { children: ReactNode; trail?: string[]; /** Shown instead of the trail (the header menu style): the screen's name and description. */ heading?: { title: string; description?: string | null } }) {
   const parent = useDrilldown();
   const [stack, setStack] = useState<DrillTarget[]>([]);
   const open = useCallback((target: DrillTarget) => setStack((s) => [...s, target]), []);
+  const onBack = (depth: number) => setStack((s) => s.slice(0, depth + 1));
+  const onClose = () => setStack([]);
+  const mode = stack[0]?.open ?? 'modal';
+  const page = stack.length > 0 && mode === 'page';
 
   if (parent) return <>{children}</>;
 
   return (
     <DrilldownContextProvider value={open}>
-      {children}
-      {stack.length > 0 &&
-        (stack[0].drawer ? (
-          <DrillDrawer stack={stack} onBack={(depth) => setStack((s) => s.slice(0, depth + 1))} onClose={() => setStack([])} />
-        ) : (
-          <DrillModal stack={stack} onBack={(depth) => setStack((s) => s.slice(0, depth + 1))} onClose={() => setStack([])} />
-        ))}
+      {/* A drilldown filling the page still needs the path back. */}
+      {heading && !page ? (
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-primary">
+            <BlurWords text={heading.title} />
+          </h1>
+          {heading.description && (
+            <p className="mt-0.5 text-sm text-tertiary">
+              <BlurWords text={heading.description} delay={wordCount(heading.title)} />
+            </p>
+          )}
+        </div>
+      ) : (
+        (trail || heading || page) && <PagePath trail={trail ?? (heading ? [heading.title] : [t('Back')])} stack={page ? stack : []} onBack={onBack} onClose={onClose} />
+      )}
+      {/* Kept while a drilldown fills the page, so coming back finds the screen as it was. */}
+      <div className={page ? 'hidden' : 'contents'}>{children}</div>
+      {page && <DrillTargetView key={stack.length} target={stack[stack.length - 1]} />}
+      {stack.length > 0 && mode === 'drawer' && <DrillDrawer stack={stack} onBack={onBack} onClose={onClose} />}
+      {stack.length > 0 && mode === 'modal' && <DrillModal stack={stack} onBack={onBack} onClose={onClose} />}
     </DrilldownContextProvider>
+  );
+}
+
+/**
+ * The page's breadcrumb: its own trail, then what was drilled into full screen. The trail's
+ * last step leads back to the screen, and each drilldown but the last back to itself.
+ */
+function PagePath({ trail, stack, onBack, onClose }: { trail: string[]; stack: DrillTarget[]; onBack: (depth: number) => void; onClose: () => void }) {
+  const ref = useRef<HTMLElement>(null);
+  // A drilldown opened from far down a long grid starts at its top.
+  useEffect(() => {
+    if (stack.length) ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [stack.length]);
+
+  const steps = [
+    ...trail.map((label, i) => ({ label, onPress: stack.length && i === trail.length - 1 ? onClose : undefined })),
+    ...stack.map((item, i) => ({ label: item.label, onPress: i < stack.length - 1 ? () => onBack(i) : undefined })),
+  ];
+  return (
+    <nav ref={ref} aria-label={t('Breadcrumb')} className="mb-5 scroll-mt-4">
+      <ol className="flex flex-wrap items-center gap-1.5 text-sm">
+        {steps.map((step, i) => (
+          <li key={i} className="flex items-center gap-1.5">
+            {i > 0 && <ChevronRight className="size-4 text-fg-quaternary" aria-hidden="true" />}
+            {i === steps.length - 1 ? (
+              <span aria-current="page" className="rounded-md bg-primary_hover px-2 py-0.5 font-semibold text-secondary">
+                {step.label}
+              </span>
+            ) : step.onPress ? (
+              <button type="button" onClick={step.onPress} className="rounded font-medium text-tertiary outline-focus-ring hover:text-tertiary_hover focus-visible:outline-2">
+                {step.label}
+              </button>
+            ) : (
+              <span className="font-medium text-tertiary">{step.label}</span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }
 
@@ -52,10 +110,11 @@ function DrillModal({ stack, onBack, onClose }: DrillProps) {
   const { def } = useMetaDef(top.metaId);
 
   return (
-    <Modal title={def ? title(def.meta) : t('Loading…')} description={top.label} onClose={onClose} size="xl">
+    // A datagrid gets the whole width and fills the height: only its rows scroll.
+    <Modal title={def ? title(def.meta) : t('Loading…')} description={top.label} onClose={onClose} size={def?.meta.type?.code === 'datagrid' ? 'full' : 'xl'}>
       <DrillPath stack={stack} onBack={onBack} className="-mt-3 mb-4" />
       {/* Keyed on the depth so stepping back starts the view fresh. */}
-      <DrillTargetView key={stack.length} target={top} />
+      <DrillTargetView key={stack.length} target={top} fill />
     </Modal>
   );
 }
@@ -132,14 +191,14 @@ function DrillPath({ stack, onBack, className }: { stack: DrillTarget[]; onBack:
 }
 
 /** The target meta, given the drilldown's values as filters, parameters or the record to open. */
-function DrillTargetView({ target }: { target: DrillTarget }) {
+function DrillTargetView({ target, fill = false }: { target: DrillTarget; /** A grid fills the height it's given (in the modal). */ fill?: boolean }) {
   const { def, error } = useMetaDef(target.metaId);
   if (error) return <Alert>{error}</Alert>;
   if (!def) return <div className="h-64 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
 
   switch (def.meta.type?.code) {
     case 'datagrid':
-      return <GridView def={def} fixed={target.params} />;
+      return <GridView def={def} fixed={target.params} fill={fill} />;
     case 'statement':
       return <StatementView def={def} fixed={target.params} />;
     case 'report':

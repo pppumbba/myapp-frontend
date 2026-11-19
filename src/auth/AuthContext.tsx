@@ -8,6 +8,8 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  /** The profile picture's file name (avatarUrl() makes its address); null: initials. */
+  avatar?: string | null;
   created_at?: string;
   /** light or dark; null follows the system. */
   theme_mode?: "light" | "dark" | null;

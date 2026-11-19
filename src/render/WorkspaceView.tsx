@@ -64,7 +64,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
 
   if (!def.meta.ref_meta_id) return <Alert>{t('This workspace needs a form for its record (Refers to).')}</Alert>;
   if (mainError) return <Alert>{mainError}</Alert>;
-  if (!mainDef) return <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
+  if (!mainDef) return <div className="h-64" aria-busy="true" />;
 
   const noun = title(mainDef.meta).replace(/ form$/i, '');
   const current = record && picked && String(record[primaryKey(mainDef.params)]) === picked ? record : null;
@@ -87,7 +87,7 @@ export function WorkspaceView({ def, recordId: given }: { def: MetaDef; recordId
           <p className="mt-1 text-sm text-tertiary">{def.meta.description}</p>
         </div>
       ) : !current ? (
-        !error && <div className="h-64 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
+        !error && <div className="h-64" aria-busy="true" />
       ) : (
         <>
           <header className="rounded-xl bg-primary p-5 shadow-xs ring-1 ring-secondary">
@@ -154,7 +154,7 @@ function WorkspaceSection({ section, record, recordKey }: { section: Section; re
   );
 
   if (error) return <Alert>{error}</Alert>;
-  if (!def) return <div className="h-48 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />;
+  if (!def) return <div className="h-48" aria-busy="true" />;
 
   return <SectionBody def={def} scope={scope} record={record} recordKey={recordKey} label={section.label_name || section.param_name} />;
 }

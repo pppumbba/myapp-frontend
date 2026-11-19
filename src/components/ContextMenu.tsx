@@ -95,7 +95,8 @@ export function ContextMenu({ at, title, entries, onClose, anchor }: { at: MenuP
               e.onSelect();
             }}
             className={cx(
-              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm outline-none focus-visible:bg-primary_hover disabled:cursor-default disabled:opacity-50',
+              // Inset with rounded corners like the dropdown menus, so a highlight never meets the menu's edge.
+              'mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm outline-none focus-visible:bg-primary_hover disabled:cursor-default disabled:opacity-50',
               e.danger ? 'text-error-primary hover:bg-error-primary' : 'text-secondary hover:bg-primary_hover',
             )}
           >
