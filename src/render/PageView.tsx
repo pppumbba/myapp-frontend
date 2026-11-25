@@ -46,7 +46,7 @@ export function WidgetMetaView({ def }: { def: MetaDef }) {
   const widget = widgets?.find((w) => w.id === widgetId);
 
   if (!widgetId) return <Alert>{t("This widget has no library entry yet. Pick one in the builder.")}</Alert>;
-  if (!widgets) return <div className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!widgets) return <div aria-busy="true" className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
   if (!widget) return <Alert>{t("This widget's library entry is inactive or was removed.")}</Alert>;
   return <WidgetBlock widget={widget} config={def.meta.json_config} />;
 }

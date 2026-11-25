@@ -262,7 +262,7 @@ export function StatementView({ def, fixed, scope, initialFilters }: { def: Meta
         {error ? (
           <Alert>{error}</Alert>
         ) : !result ? (
-          <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+          <div aria-busy="true" className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
         ) : missing.length ? (
           <p className="py-10 text-center text-sm text-tertiary">{t('Fill in {fields} to see this statement.', { fields: missing.join(', ') })}</p>
         ) : !result.rows.length ? (

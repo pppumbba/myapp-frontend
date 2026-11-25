@@ -12,11 +12,11 @@ export interface User {
   avatar?: string | null;
   created_at?: string;
   /** light or dark; null follows the system. */
-  theme_mode?: "light" | "dark" | null;
+  theme_mode?: 'light' | 'dark' | null;
   /** The theme meta picked; null is the default theme. */
   theme_meta_id?: number | null;
   /** How big the app is: sm, md or lg; null is md. */
-  ui_size?: "sm" | "md" | "lg" | null;
+  ui_size?: 'sm' | 'md' | 'lg' | null;
   /** Small choices; a missing key takes its default. form_saved_notice: "Saved" shows inside a form after saving (off by default; a toast says it anyway). */
   preferences?: { form_saved_notice?: boolean; chat_sound?: boolean } | null;
   /** The language picked; null follows the browser. */
@@ -141,15 +141,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // With one customer the token comes bound to it; with several, the person picks one next.
-  const signIn = useCallback(async (res: AuthResponse) => {
-    tokenStore.set(res.token);
-    await loadMe();
-  }, [loadMe]);
+  const signIn = useCallback(
+    async (res: AuthResponse) => {
+      tokenStore.set(res.token);
+      await loadMe();
+    },
+    [loadMe],
+  );
 
-  const openCustomer = useCallback(async (opened: OpenedCustomer) => {
-    tokenStore.set(opened.token);
-    await loadMe();
-  }, [loadMe]);
+  const openCustomer = useCallback(
+    async (opened: OpenedCustomer) => {
+      tokenStore.set(opened.token);
+      await loadMe();
+    },
+    [loadMe],
+  );
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -197,8 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasFeature = useCallback((feature: Feature) => isAdmin || !!access?.features?.includes(feature), [access, isAdmin]);
   const isBuilder = isAdmin || !!access?.features?.length;
   const designs = useCallback(
-    (meta: { created_by?: number | null } | null | undefined) => isAdmin || (isBuilder && !!meta && meta.created_by === user?.id),
-    [isAdmin, isBuilder, user],
+    (meta: { id?: number; created_by?: number | null } | null | undefined) =>
+      isAdmin || (isBuilder && !!meta && (meta.created_by === user?.id || (!!meta.id && !!access?.shared_meta_ids?.includes(meta.id)))),
+    [isAdmin, isBuilder, user, access],
   );
   const can = useCallback(
     (metaId: number | null | undefined, ability: Ability) => {
@@ -209,7 +216,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, access, loading, customer, customers, openCustomer, setCustomers, login, loginWithGoogle, register, logout, updateUser: setUser, refreshAccess, isAdmin, hasFeature, isBuilder, designs, can, session, refreshSession }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        access,
+        loading,
+        customer,
+        customers,
+        openCustomer,
+        setCustomers,
+        login,
+        loginWithGoogle,
+        register,
+        logout,
+        updateUser: setUser,
+        refreshAccess,
+        isAdmin,
+        hasFeature,
+        isBuilder,
+        designs,
+        can,
+        session,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight } from '@untitledui/icons';
 import { Dialog, Heading, Modal as AriaModal, ModalOverlay } from 'react-aria-components';
-import { Modal } from '../components/Modal';
+import { Modal, useModalLoaded } from '../components/Modal';
 import { CloseButton } from '@/components/base/buttons/close-button';
 import { cx } from '@/utils/cx';
 import { Alert } from '../components/ui';
@@ -124,6 +124,9 @@ function DrillDrawer({ stack, onBack, onClose }: DrillProps) {
   const top = stack[stack.length - 1];
   const { def } = useMetaDef(top.metaId);
   const name = def ? title(def.meta) : t('Loading…');
+  // Hidden until what it shows has loaded, then it slides in with it (like the modal).
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  const { loaded, waited } = useModalLoaded(body);
 
   return (
     <ModalOverlay
@@ -135,13 +138,14 @@ function DrillDrawer({ stack, onBack, onClose }: DrillProps) {
           'fixed inset-0 z-50 flex justify-end bg-overlay/70 outline-hidden backdrop-blur-[6px]',
           isEntering && 'duration-300 ease-out animate-in fade-in',
           isExiting && 'duration-200 ease-in animate-out fade-out',
+          !loaded ? 'modal-waiting' : waited && 'modal-reveal',
         )
       }
     >
       <AriaModal
         className={({ isEntering, isExiting }) =>
           cx(
-            'h-dvh w-full max-w-4xl bg-primary shadow-xl outline-hidden',
+            'drawer-in h-dvh w-full max-w-4xl bg-primary shadow-xl outline-hidden',
             isEntering && 'duration-300 ease-out animate-in slide-in-from-right',
             isExiting && 'duration-200 ease-in animate-out slide-out-to-right',
           )
@@ -156,7 +160,7 @@ function DrillDrawer({ stack, onBack, onClose }: DrillProps) {
             <DrillPath stack={stack} onBack={onBack} className="mt-3" />
             <CloseButton onPress={onClose} slot={null} className="absolute top-3 right-3" />
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          <div ref={setBody} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <DrillTargetView key={stack.length} target={top} />
           </div>
         </Dialog>
@@ -194,7 +198,7 @@ function DrillPath({ stack, onBack, className }: { stack: DrillTarget[]; onBack:
 function DrillTargetView({ target, fill = false }: { target: DrillTarget; /** A grid fills the height it's given (in the modal). */ fill?: boolean }) {
   const { def, error } = useMetaDef(target.metaId);
   if (error) return <Alert>{error}</Alert>;
-  if (!def) return <div className="h-64 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!def) return <div aria-busy="true" className="h-64 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
 
   switch (def.meta.type?.code) {
     case 'datagrid':

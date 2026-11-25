@@ -57,6 +57,8 @@ interface TextFieldProps extends AriaTextFieldProps {
     textAreaRef?: TextAreaBaseProps["ref"];
     /** Whether to hide required indicator from label. */
     hideRequiredIndicator?: boolean;
+    /** Shows "(optional)" after the label. */
+    isOptional?: boolean;
     /** Placeholder text. */
     placeholder?: string;
     /** Visible height of textarea in rows. */
@@ -71,6 +73,7 @@ export const TextArea = ({
     tooltip,
     textAreaRef,
     hideRequiredIndicator,
+    isOptional,
     textAreaClassName,
     placeholder,
     className,
@@ -89,7 +92,7 @@ export const TextArea = ({
             {({ isInvalid, isRequired }) => (
                 <>
                     {label && (
-                        <Label isRequired={hideRequiredIndicator ? !hideRequiredIndicator : isRequired} tooltip={tooltip}>
+                        <Label isRequired={hideRequiredIndicator ? !hideRequiredIndicator : isRequired} tooltip={tooltip} isOptional={isOptional}>
                             {label}
                         </Label>
                     )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { Plus, Trash01, Zap } from '@untitledui/icons';
+import { HelpCircle, Plus, Trash01, Zap } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
 import type { Meta, MetaOption } from '../../lib/metaApi';
 import { processFlowApi, type ConditionOp, type ProcessCondition, type ProcessFlow, type ProcessPort, type ProcessPorts } from '../../lib/processFlowApi';
@@ -7,8 +7,10 @@ import { Alert, IconAction } from '../../components/ui';
 import { Modal } from '../../components/Modal';
 import { TypeIcon } from '../../components/TypeIcon';
 import { Button } from '@/components/base/buttons/button';
+import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
+import { MetaLookupDialog, MetaLookupField, metaChoices } from './MetaLookupField';
 import { t, tLabels } from '@/i18n';
 
 const OPS: { value: ConditionOp; label: string }[] = [
@@ -26,9 +28,9 @@ const OPS: { value: ConditionOp; label: string }[] = [
 /** The kinds of meta a step can be (backend: ProcessFlow::STEP_TYPES). */
 const STEP_TYPES: Record<string, string> = { form: 'Form', stage_query: 'Stage query', get: 'Get' };
 
-const NODE_W = 260;
-const HEAD = 44;
-const ROW = 26;
+const NODE_W = 210;
+const HEAD = 38;
+const ROW = 22;
 /** The main form's node. Step keys never take this name. */
 const MAIN = 'main';
 /** A value's source when it is fixed text rather than another node's output. */
@@ -123,7 +125,8 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const [editingStep, setEditingStep] = useState<StepDraft | 'new' | null>(null);
+  const [editingStep, setEditingStep] = useState<StepDraft | null>(null);
+  const [adding, setAdding] = useState(false);
   const [editingTransition, setEditingTransition] = useState<TransitionDraft | null>(null);
   const [editingValue, setEditingValue] = useState<{ step: string; target: string } | null>(null);
 
@@ -140,13 +143,13 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   }, [meta.id]);
 
   // What each node takes in and passes on, fetched for metas not asked about yet.
-  const missing = useMemo(
-    () => [...new Set([String(meta.id), ...(steps ?? []).map((s) => s.process_id).filter(Boolean)])].filter((id) => !ports[id]).join(','),
-    [meta.id, steps, ports],
-  );
+  const missing = useMemo(() => [...new Set([String(meta.id), ...(steps ?? []).map((s) => s.process_id).filter(Boolean)])].filter((id) => !ports[id]).join(','), [meta.id, steps, ports]);
   useEffect(() => {
     if (!missing) return;
-    processFlowApi.ports(meta.id, missing.split(',').map(Number)).then((p) => setPorts((prev) => ({ ...prev, ...p })), () => undefined);
+    processFlowApi.ports(meta.id, missing.split(',').map(Number)).then(
+      (p) => setPorts((prev) => ({ ...prev, ...p })),
+      () => undefined,
+    );
   }, [meta.id, missing]);
 
   if (error && !steps) return <Alert>{error}</Alert>;
@@ -169,11 +172,33 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   const rowsOf = (node: string) => Math.max(1, node === MAIN ? outputsOf(MAIN).length : Math.max(inputsOf(stepByKey.get(node)!).length, outputsOf(node).length));
   const outAt = (node: string, field: string): Spot => {
     const s = spotOf(node);
-    return { x: s.x + NODE_W, y: s.y + HEAD + Math.max(0, outputsOf(node).findIndex((p) => p.field === field)) * ROW + ROW / 2 };
+    return {
+      x: s.x + NODE_W,
+      y:
+        s.y +
+        HEAD +
+        Math.max(
+          0,
+          outputsOf(node).findIndex((p) => p.field === field),
+        ) *
+          ROW +
+        ROW / 2,
+    };
   };
   const inAt = (node: string, field: string): Spot => {
     const s = spotOf(node);
-    return { x: s.x, y: s.y + HEAD + Math.max(0, inputsOf(stepByKey.get(node)!).findIndex((p) => p.field === field)) * ROW + ROW / 2 };
+    return {
+      x: s.x,
+      y:
+        s.y +
+        HEAD +
+        Math.max(
+          0,
+          inputsOf(stepByKey.get(node)!).findIndex((p) => p.field === field),
+        ) *
+          ROW +
+        ROW / 2,
+    };
   };
   const flowOut = (node: string): Spot => ({ x: spotOf(node).x + NODE_W, y: spotOf(node).y + HEAD / 2 });
   const flowIn = (node: string): Spot => ({ x: spotOf(node).x, y: spotOf(node).y + HEAD / 2 });
@@ -181,7 +206,7 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   const nodes = [MAIN, ...steps.map((s) => s.key)];
   const size = {
     w: Math.max(960, ...nodes.map((n) => spotOf(n).x + NODE_W + 80)),
-    h: Math.max(520, ...nodes.map((n) => spotOf(n).y + HEAD + rowsOf(n) * ROW + 88)),
+    h: Math.max(360, ...nodes.map((n) => spotOf(n).y + HEAD + rowsOf(n) * ROW + 40)),
   };
 
   /** Pointer position inside the canvas, scroll included. */
@@ -267,15 +292,13 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
 
   /** A step now runs another meta: what went into it and what it passed on no longer fit. */
   function changeStep(key: string, processId: string) {
-    setSteps((list) =>
-      list!.map((s) => (s.key === key ? { ...s, process_id: processId, values: [] } : { ...s, values: s.values.filter((v) => v.from !== key) })),
-    );
+    setSteps((list) => list!.map((s) => (s.key === key ? { ...s, process_id: processId, values: [] } : { ...s, values: s.values.filter((v) => v.from !== key) })));
     touch();
   }
 
-  function addStep(processId: string) {
+  function addSteps(processIds: string[]) {
     const right = Math.max(...nodes.map((n) => spotOf(n).x + NODE_W));
-    setSteps((list) => [...list!, { key: newKey(), process_id: processId, at: { x: right + 140, y: main.y }, values: [] }]);
+    setSteps((list) => [...list!, ...processIds.map((processId, i) => ({ key: newKey(), process_id: processId, at: { x: right + 100 + i * (NODE_W + 60), y: main.y }, values: [] }))]);
     touch();
   }
 
@@ -312,7 +335,13 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   const lines = steps.flatMap((s) =>
     s.values
       .filter((v) => v.from === MAIN || stepByKey.has(v.from))
-      .map((v) => ({ id: `${s.key}|${v.target}`, step: s.key, target: v.target, title: `${nodeName(v.from)} · ${v.field} → ${nodeName(s.key)} · ${v.target}`, ...curve(outAt(v.from, v.field), inAt(s.key, v.target)) })),
+      .map((v) => ({
+        id: `${s.key}|${v.target}`,
+        step: s.key,
+        target: v.target,
+        title: `${nodeName(v.from)} · ${v.field} → ${nodeName(s.key)} · ${v.target}`,
+        ...curve(outAt(v.from, v.field), inAt(s.key, v.target)),
+      })),
   );
   const criteriaText = (item: TransitionDraft) =>
     item.criteria
@@ -335,11 +364,11 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
       <div
         key={node}
         data-node={node}
-        className={`absolute rounded-xl bg-primary pb-2 shadow-sm ring-1 ${flowTarget ? 'ring-2 ring-brand' : 'ring-secondary'}`}
+        className={`absolute rounded-lg bg-primary pb-1 shadow-xs ring-1 ${flowTarget ? 'ring-2 ring-brand' : 'ring-secondary'}`}
         style={{ left: at.x, top: at.y, width: NODE_W }}
       >
         <div
-          className="relative flex cursor-grab items-center gap-2 border-b border-secondary px-3 active:cursor-grabbing"
+          className="relative flex cursor-grab items-center gap-2 border-b border-secondary px-2.5 active:cursor-grabbing"
           style={{ height: HEAD, touchAction: 'none' }}
           onPointerDown={(e) => startMove(e, node)}
           onPointerMove={onMove}
@@ -350,9 +379,7 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
           <TypeIcon code={isMain ? 'form' : option?.type} size="sm" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold text-primary">{nodeName(node)}</span>
-            <span className="block truncate text-[11px] text-quaternary">
-              {isMain ? t('Saved by people') : option?.type ? t(STEP_TYPES[option.type] ?? option.type) : t('Double-click to pick')}
-            </span>
+            <span className="block truncate text-[11px] text-quaternary">{isMain ? t('Saved by people') : option?.type ? t(STEP_TYPES[option.type] ?? option.type) : t('Double-click to pick')}</span>
           </span>
           {!isMain && <span className="absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rounded-full bg-fg-quaternary ring-2 ring-bg-primary" aria-hidden="true" />}
           <span
@@ -384,7 +411,10 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
                   onDoubleClick={() => setEditingValue({ step: node, target: input.field })}
                   title={`${input.field}${value ? ` ← ${value.from === FIXED ? `=${value.field}` : `${nodeName(value.from)} · ${value.field}`}` : ''}\n${t('Double-click to set a fixed value or clear it')}`}
                 >
-                  <span className={`absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rounded-full ring-2 ${value ? 'bg-brand-solid ring-bg-primary' : 'bg-primary ring-fg-quaternary'}`} aria-hidden="true" />
+                  <span
+                    className={`absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rounded-full ring-2 ${value ? 'bg-brand-solid ring-bg-primary' : 'bg-primary ring-fg-quaternary'}`}
+                    aria-hidden="true"
+                  />
                   <span className="truncate text-secondary">{input.label}</span>
                   {value?.from === FIXED && <span className="max-w-20 shrink-0 truncate rounded bg-secondary px-1 font-mono text-[10px] text-tertiary">={value.field}</span>}
                 </div>
@@ -423,14 +453,30 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
           <h2 id="process-flow-title" className="flex items-center gap-2 text-md font-semibold text-primary">
             <Zap className="size-5 text-fg-brand-primary" aria-hidden="true" />
             {t('Process flow')}
+            {/* How to use the canvas, on hover or focus instead of a paragraph above it. */}
+            <Tooltip
+              title={t(
+                'Drag a node by its title. Drag from the blue dot on its title onto another node to run that one after it. Drag from a value on the right of a node onto a value on the left of another to pass it on. Double-click a node, an arrow, an input or a value line to change it.',
+              )}
+              placement="bottom"
+            >
+              <TooltipTrigger
+                aria-label={t('How to use the canvas')}
+                className="cursor-pointer text-fg-quaternary transition duration-200 hover:text-fg-quaternary_hover focus:text-fg-quaternary_hover"
+              >
+                <HelpCircle className="size-4" />
+              </TooltipTrigger>
+            </Tooltip>
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-tertiary">
-            {t('When {name} saves a new record, these forms save one too, these stage queries run and these gets read a record, in the same go. If any of them refuses, nothing is saved.', { name: meta.name })}
+            {t('When {name} saves a new record, these forms save one too, these stage queries run and these gets read a record, in the same go. If any of them refuses, nothing is saved.', {
+              name: meta.name,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {savedNote && <span className="text-sm text-success-primary">{t('Saved.')}</span>}
-          <Button size="sm" color="secondary" iconLeading={Plus} onPress={() => setEditingStep('new')}>
+          <Button size="sm" color="secondary" iconLeading={Plus} onPress={() => setAdding(true)}>
             {t('Add a step')}
           </Button>
           <Button size="sm" isDisabled={!dirty || steps.some((s) => !s.process_id)} isLoading={saving} showTextWhileLoading onPress={save}>
@@ -441,13 +487,9 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
 
       <div className="space-y-3 px-4 py-4 sm:px-5">
         {error && <Alert>{error}</Alert>}
-        <p className="text-xs text-tertiary">
-          {t('Drag a node by its title. Drag from the blue dot on its title onto another node to run that one after it. Drag from a value on the right of a node onto a value on the left of another to pass it on. Double-click a node, an arrow, an input or a value line to change it.')}
-        </p>
-
         <div
           ref={canvas}
-          className="relative h-[36rem] overflow-auto rounded-xl bg-secondary_alt ring-1 ring-secondary select-none"
+          className="relative h-[24rem] overflow-auto rounded-xl bg-secondary_alt ring-1 ring-secondary select-none"
           style={{ backgroundImage: 'radial-gradient(var(--color-border-secondary) 1px, transparent 1px)', backgroundSize: '20px 20px' }}
         >
           <div className="relative" style={{ width: size.w, height: size.h }}>
@@ -463,7 +505,15 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
 
               {/* Steps nothing leads to run right after the form saves. */}
               {starters.map((s) => (
-                <path key={`start-${s.key}`} d={curve(flowOut(MAIN), flowIn(s.key)).d} fill="none" strokeWidth={1.5} strokeDasharray="5 5" markerEnd="url(#pf-arrow)" className="stroke-fg-quaternary/60" />
+                <path
+                  key={`start-${s.key}`}
+                  d={curve(flowOut(MAIN), flowIn(s.key)).d}
+                  fill="none"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 5"
+                  markerEnd="url(#pf-arrow)"
+                  className="stroke-fg-quaternary/60"
+                />
               ))}
 
               {lines.map((line) => (
@@ -487,7 +537,13 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
 
               {flows.map(({ item, d }) => (
                 <g key={item.key}>
-                  <path d={d} fill="none" strokeWidth={hovered === item.key ? 2.75 : 2.25} markerEnd={`url(#${hovered === item.key ? 'pf-arrow-on' : 'pf-arrow'})`} className={hovered === item.key ? 'stroke-fg-brand-primary' : 'stroke-fg-quaternary'} />
+                  <path
+                    d={d}
+                    fill="none"
+                    strokeWidth={hovered === item.key ? 2.75 : 2.25}
+                    markerEnd={`url(#${hovered === item.key ? 'pf-arrow-on' : 'pf-arrow'})`}
+                    className={hovered === item.key ? 'stroke-fg-brand-primary' : 'stroke-fg-quaternary'}
+                  />
                   <path
                     d={d}
                     fill="none"
@@ -505,7 +561,14 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
               ))}
 
               {drawing && (
-                <path d={curve(drawing.start, drawing.to).d} fill="none" strokeWidth={2} strokeDasharray="4 4" markerEnd={drawing.kind === 'flow' ? 'url(#pf-arrow-on)' : undefined} className="stroke-fg-brand-primary" />
+                <path
+                  d={curve(drawing.start, drawing.to).d}
+                  fill="none"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  markerEnd={drawing.kind === 'flow' ? 'url(#pf-arrow-on)' : undefined}
+                  className="stroke-fg-brand-primary"
+                />
               )}
             </svg>
 
@@ -528,25 +591,36 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
 
             {nodes.map(renderNode)}
 
-            {!steps.length && (
-              <p className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm text-tertiary">{t('Add a step to start building the flow.')}</p>
-            )}
+            {!steps.length && <p className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm text-tertiary">{t('Add a step to start building the flow.')}</p>}
           </div>
         </div>
       </div>
 
+      {adding && (
+        <MetaLookupDialog
+          title={t('Add steps')}
+          heading={t('Add steps')}
+          items={metaChoices(choices)}
+          pickManyLabel={(count) => (count === 0 ? t('Add steps') : count === 1 ? t('Add 1 step') : t('Add {count} steps', { count }))}
+          onPickMany={(ids) => {
+            addSteps(ids);
+            setAdding(false);
+          }}
+          onClose={() => setAdding(false)}
+        />
+      )}
+
       {editingStep && (
         <StepEditor
-          step={editingStep === 'new' ? null : editingStep}
+          step={editingStep}
           choices={choices}
           onClose={() => setEditingStep(null)}
           onSave={(processId) => {
-            if (editingStep === 'new') addStep(processId);
-            else if (processId !== editingStep.process_id) changeStep(editingStep.key, processId);
+            if (processId !== editingStep.process_id) changeStep(editingStep.key, processId);
             setEditingStep(null);
           }}
           onDelete={() => {
-            if (editingStep !== 'new') removeStep(editingStep.key);
+            removeStep(editingStep.key);
             setEditingStep(null);
           }}
         />
@@ -587,8 +661,8 @@ export function ProcessFlowPanel({ meta, options }: { meta: Meta; options: MetaO
   );
 }
 
-function StepEditor({ step, choices, onClose, onSave, onDelete }: { step: StepDraft | null; choices: MetaOption[]; onClose: () => void; onSave: (processId: string) => void; onDelete: () => void }) {
-  const [processId, setProcessId] = useState(step?.process_id ?? '');
+function StepEditor({ step, choices, onClose, onSave, onDelete }: { step: StepDraft; choices: MetaOption[]; onClose: () => void; onSave: (processId: string) => void; onDelete: () => void }) {
+  const [processId, setProcessId] = useState(step.process_id);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -596,32 +670,26 @@ function StepEditor({ step, choices, onClose, onSave, onDelete }: { step: StepDr
   }
 
   return (
-    <Modal title={step ? t('Change step') : t('Add a step')} onClose={onClose} size="md">
+    <Modal title={t('Change step')} onClose={onClose} size="md">
       <form onSubmit={onSubmit} className="space-y-5">
-        <NativeSelect
+        <MetaLookupField
           label={t('Form, stage query or get')}
+          placeholder={t('Pick one…')}
           value={processId}
-          onChange={(e) => setProcessId(e.target.value)}
-          hint={step ? t('Picking another one clears the values going into it and coming out of it.') : t('A form saves a record, a stage query runs, a get reads a record whose values later steps can use.')}
-          options={[
-            { value: '', label: t('Pick one…') },
-            ...choices.map((c) => ({ value: String(c.id), label: `${c.name} (${t(STEP_TYPES[c.type ?? ''] ?? c.type ?? '')})` })),
-          ]}
+          onChange={setProcessId}
+          hint={t('Picking another one clears the values going into it and coming out of it.')}
+          items={metaChoices(choices)}
         />
         <div className="flex items-center justify-between gap-3 border-t border-secondary pt-4">
-          {step ? (
-            <Button size="sm" color="tertiary-destructive" onPress={onDelete}>
-              {t('Remove step')}
-            </Button>
-          ) : (
-            <span />
-          )}
+          <Button size="sm" color="tertiary-destructive" onPress={onDelete}>
+            {t('Remove step')}
+          </Button>
           <div className="flex gap-2">
             <Button size="sm" color="secondary" onPress={onClose}>
               {t('Cancel')}
             </Button>
             <Button size="sm" type="submit" isDisabled={!processId}>
-              {step ? t('Done') : t('Add step')}
+              {t('Done')}
             </Button>
           </div>
         </div>
@@ -665,7 +733,10 @@ function TransitionEditor({
                 aria-label={t('Field')}
                 value={c.field}
                 onChange={(e) => update(j, { field: e.target.value })}
-                options={[{ value: '', label: t('Field…') }, ...[...fields, ...(c.field && !fields.some((f) => f.field === c.field) ? [{ field: c.field, label: c.field }] : [])].map((f) => ({ value: f.field, label: f.label }))]}
+                options={[
+                  { value: '', label: t('Field…') },
+                  ...[...fields, ...(c.field && !fields.some((f) => f.field === c.field) ? [{ field: c.field, label: c.field }] : [])].map((f) => ({ value: f.field, label: f.label })),
+                ]}
               />
               <NativeSelect aria-label={t('Condition')} value={c.op} onChange={(e) => update(j, { op: e.target.value as ConditionOp })} options={tLabels(OPS)} />
               {c.op === 'empty' || c.op === 'not_empty' ? <span /> : <Input aria-label={t('Value')} value={c.value} onChange={(v) => update(j, { value: v })} />}
@@ -721,7 +792,12 @@ function ValueEditor({
         <p className="text-sm text-tertiary">
           {!value ? t('Nothing goes in yet: it starts empty (or at its default).') : value.from === FIXED ? t('It gets a fixed value.') : t('It gets {source}.', { source: describe(value) })}
         </p>
-        <Input label={t('Fixed value')} value={text} onChange={setText} hint={t('Saving a fixed value replaces a line coming into it. To take a value from another node instead, drag a line onto it.')} />
+        <Input
+          label={t('Fixed value')}
+          value={text}
+          onChange={setText}
+          hint={t('Saving a fixed value replaces a line coming into it. To take a value from another node instead, drag a line onto it.')}
+        />
         <div className="flex items-center justify-between gap-3 border-t border-secondary pt-4">
           {value ? (
             <Button size="sm" color="tertiary-destructive" onPress={() => onSave(null)}>

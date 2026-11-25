@@ -445,12 +445,20 @@ export function QueryDesigner({ meta, tall = false }: { meta: Meta; tall?: boole
   return (
     <StoredQueries.Provider value={stored}>
     <Inlines.Provider value={inlines}>
-    <section className="rounded-xl bg-primary shadow-xs ring-1 ring-secondary" aria-label={t('Query builder')}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-secondary px-4 py-4 sm:px-5">
+    {/* Tall: full screen under the query builder's title bar, its buttons a toolbar as in the studio. */}
+    <section className={tall ? 'bg-primary' : 'rounded-xl bg-primary shadow-xs ring-1 ring-secondary'} aria-label={t('Query builder')}>
+      <div
+        className={cx(
+          'flex flex-wrap items-center justify-between gap-3 border-b border-secondary',
+          tall ? 'sticky top-0 z-10 min-h-11 bg-secondary_alt px-3 py-1.5' : 'px-4 py-4 sm:px-5',
+        )}
+      >
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-primary">{t('Query builder')}</h2>
-          <p className="mt-0.5 text-sm text-tertiary">
-            {t("Drag tables, views or other queries onto the canvas. They join on their foreign keys; drag a column onto another table's column to join them yourself. Tick the columns to select.")}
+          {!tall && <h2 className="text-lg font-semibold text-primary">{t('Query builder')}</h2>}
+          <p className={tall ? 'truncate text-sm text-tertiary' : 'mt-0.5 text-sm text-tertiary'}>
+            {tall
+              ? t('Drag tables onto the canvas; drag a column onto another to join them. Tick the columns to select.')
+              : t("Drag tables, views or other queries onto the canvas. They join on their foreign keys; drag a column onto another table's column to join them yourself. Tick the columns to select.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -466,7 +474,7 @@ export function QueryDesigner({ meta, tall = false }: { meta: Meta; tall?: boole
         </div>
       </div>
 
-      <div className="space-y-4 px-4 py-5 sm:px-5">
+      <div className={tall ? 'space-y-4 p-4' : 'space-y-4 px-4 py-5 sm:px-5'}>
         {error && <Alert>{error}</Alert>}
         {notice && !error && <p role="status" className="text-sm font-medium text-success-primary">{notice}</p>}
 
@@ -488,7 +496,7 @@ export function QueryDesigner({ meta, tall = false }: { meta: Meta; tall?: boole
           <div className="h-96 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
         ) : (
           <div className="flex flex-col gap-4 lg:flex-row">
-            <aside className={cx('flex w-full shrink-0 flex-col rounded-lg ring-1 ring-secondary lg:w-56', tall ? 'max-h-[calc(100vh-20rem)] min-h-[480px]' : 'max-h-[480px]')}>
+            <aside className={cx('flex w-full shrink-0 flex-col rounded-lg ring-1 ring-secondary lg:w-56', tall ? 'max-h-[calc(100dvh-10rem)] min-h-[480px]' : 'max-h-[480px]')}>
               <label className="flex items-center gap-2 border-b border-secondary px-2.5 py-2">
                 <SearchLg className="size-4 text-fg-quaternary" aria-hidden="true" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Find a table')} aria-label={t('Find a table')} className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder" />
@@ -806,7 +814,7 @@ function Canvas({
       ref={ref}
       className={cx(
         'relative min-w-0 flex-1 overflow-auto rounded-lg bg-secondary_subtle bg-[radial-gradient(var(--color-border-secondary)_1px,transparent_1px)] [background-size:16px_16px] ring-1 ring-secondary',
-        tall ? 'h-[calc(100vh-20rem)] min-h-[480px]' : 'h-[480px]',
+        tall ? 'h-[calc(100dvh-10rem)] min-h-[480px]' : 'h-[480px]',
       )}
       onDragOver={(e: DragEvent) => {
         if (e.dataTransfer.types.includes('application/x-query-source')) e.preventDefault();

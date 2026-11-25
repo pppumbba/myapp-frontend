@@ -335,7 +335,13 @@ export const PaginationCardMinimal = ({
             iconLeading={refreshing ? RefreshSpinning : RefreshCw01}
             color="secondary"
             size="xs"
-            onClick={onRefresh}
+            onClick={(e) => {
+                // One turn of the icon on every press, so a quick reload still shows it happened.
+                if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                    e.currentTarget.querySelector("svg")?.animate([{ rotate: "0deg" }, { rotate: "360deg" }], { duration: 600, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
+                }
+                onRefresh();
+            }}
         />
     );
     return (

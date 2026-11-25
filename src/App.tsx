@@ -17,6 +17,7 @@ import PortalPage from './pages/PortalPage';
 import PlatformCustomersPage from './pages/PlatformCustomersPage';
 import StartPage from './pages/StartPage';
 import SessionValuesPage from './pages/SessionValuesPage';
+import PageBuilderPage from './pages/PageBuilderPage';
 import QueryBuilderPage from './pages/QueryBuilderPage';
 import WidgetsPage from './pages/WidgetsPage';
 import ApprovePage from './pages/market/ApprovePage';
@@ -36,12 +37,18 @@ import MyTendersPage from './pages/market/tenders/MyTendersPage';
 import NewTenderPage from './pages/market/tenders/NewTenderPage';
 import TenderPage from './pages/market/tenders/TenderPage';
 import TendersPage from './pages/market/tenders/TendersPage';
+import DeletedMetasPage from './pages/metas/DeletedMetasPage';
+import MetasHomePage from './pages/metas/MetasHomePage';
 import MetaDetailPage from './pages/metas/MetaDetailPage';
 import MetasPage from './pages/metas/MetasPage';
-import MetaUsagePage from './pages/metas/MetaUsagePage';
 import StudioPage from './pages/studio/StudioPage';
 import SiteManagerPage from './pages/sites/SiteManagerPage';
 import SitesPage from './pages/sites/SitesPage';
+import SitesOverviewPage from './pages/sites/SitesOverviewPage';
+import SiteReleasesPage from './pages/sites/SiteReleasesPage';
+import SiteDomainsPage from './pages/sites/SiteDomainsPage';
+import SiteMessagesPage from './pages/sites/SiteMessagesPage';
+import SiteVisitsPage from './pages/sites/SiteVisitsPage';
 import { PublicSitePage, SitePreviewPage } from './pages/sites/SiteView';
 
 export default function App() {
@@ -53,18 +60,31 @@ export default function App() {
       <Route path="/start" element={<SignedInRoute><StartPage /></SignedInRoute>} />
       {/* Screens inside the main sidebar. The shell stays mounted while they change, so moving
           between them doesn't rebuild the menu or refetch its notifications. */}
+      {/* Home and Apps: no sidebar, their own top bar (logo, app search, notifications, account). */}
+      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/apps" element={<ProtectedRoute><AppsPage /></ProtectedRoute>} />
       <Route element={<ProtectedRoute><AppShell><Outlet /></AppShell></ProtectedRoute>}>
-        <Route path="/" element={<Dashboard />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/platform/customers" element={<PlatformCustomersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/apps" element={<AppsPage />} />
-        <Route path="/metas" element={<BuilderRoute><MetasPage /></BuilderRoute>} />
-        <Route path="/metas/usage" element={<AdminRoute><MetaUsagePage /></AdminRoute>} />
+      </Route>
+      {/* Built-in pages (screen metas): each shows inside the meta app whose menu holds it (Meta
+          studio, User management, Tender market), or the main shell when none does (a builder on
+          Metas). The frame stays mounted while moving between them. */}
+      <Route element={<ProtectedRoute><ScreenApp /></ProtectedRoute>}>
+        <Route path="/metas" element={<BuilderRoute><MetasPage key="all" /></BuilderRoute>} />
+        <Route path="/metas/home" element={<BuilderRoute><MetasHomePage /></BuilderRoute>} />
+        <Route path="/metas/starred" element={<BuilderRoute><MetasPage key="starred" collection="starred" /></BuilderRoute>} />
+        <Route path="/metas/recent" element={<BuilderRoute><MetasPage key="recent" collection="recent" /></BuilderRoute>} />
+        <Route path="/metas/shared" element={<BuilderRoute><MetasPage key="shared" collection="shared" /></BuilderRoute>} />
+        <Route path="/metas/deleted" element={<AdminRoute><DeletedMetasPage /></AdminRoute>} />
         <Route path="/metas/:id" element={<BuilderRoute><MetaDetailPage /></BuilderRoute>} />
-        <Route path="/query-builder" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
-        <Route path="/query-builder/:id" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
         <Route path="/sites" element={<AdminRoute><SitesPage /></AdminRoute>} />
+        <Route path="/sites/overview" element={<AdminRoute><SitesOverviewPage /></AdminRoute>} />
+        <Route path="/sites/releases" element={<AdminRoute><SiteReleasesPage /></AdminRoute>} />
+        <Route path="/sites/domains" element={<AdminRoute><SiteDomainsPage /></AdminRoute>} />
+        <Route path="/sites/messages" element={<AdminRoute><SiteMessagesPage /></AdminRoute>} />
+        <Route path="/sites/visits" element={<AdminRoute><SiteVisitsPage /></AdminRoute>} />
         <Route path="/sites/:id" element={<AdminRoute><SiteManagerPage /></AdminRoute>} />
         <Route path="/widgets" element={<AdminRoute><WidgetsPage /></AdminRoute>} />
         <Route path="/schedules" element={<AdminRoute><SchedulesPage /></AdminRoute>} />
@@ -72,10 +92,6 @@ export default function App() {
         <Route path="/session-values" element={<AdminRoute><SessionValuesPage /></AdminRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
         <Route path="/admin/roles/:id" element={<AdminRoute><RoleWorkspacePage /></AdminRoute>} />
-      </Route>
-      {/* Built-in pages (screen metas): each shows inside the meta app whose menu holds it, here
-          the Tender market app. The frame stays mounted while moving between them. */}
-      <Route element={<ProtectedRoute><ScreenApp /></ProtectedRoute>}>
         <Route path="/admin/market-reviews" element={<AdminRoute><MarketReviewsPage /></AdminRoute>} />
         <Route path="/admin/market-disputes" element={<AdminRoute><MarketDisputesPage /></AdminRoute>} />
         <Route path="/admin/market-fees" element={<AdminRoute><MarketFeesPage /></AdminRoute>} />
@@ -97,6 +113,10 @@ export default function App() {
       </Route>
       <Route path="/studio" element={<BuilderRoute feature="studio"><StudioPage /></BuilderRoute>} />
       <Route path="/studio/:id" element={<BuilderRoute feature="studio"><StudioPage /></BuilderRoute>} />
+      <Route path="/query-builder" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
+      <Route path="/query-builder/:id" element={<AdminRoute><QueryBuilderPage /></AdminRoute>} />
+      <Route path="/page-builder" element={<BuilderRoute><PageBuilderPage /></BuilderRoute>} />
+      <Route path="/page-builder/:id" element={<BuilderRoute><PageBuilderPage /></BuilderRoute>} />
       <Route path="/site-preview/:id/*" element={<AdminRoute><SitePreviewPage /></AdminRoute>} />
       <Route path="/run/:id" element={<ProtectedRoute><RunPage /></ProtectedRoute>} />
       {/* Public metas, for anyone: no sign-in needed. */}

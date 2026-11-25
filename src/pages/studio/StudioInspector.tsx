@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, LinkExternal01, Plus } from '@untitledui/icons';
 import type { ActionKind } from '../../lib/metaApi';
-import { ComboField } from '../../components/ComboField';
+import { MetaLookupField } from '../metas/MetaLookupField';
 import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
@@ -43,8 +43,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function TargetPicker({ label, targets, types, value, onChange, hint, exclude }: { label: string; targets: Target[]; types?: string[]; value: string; onChange: (v: string) => void; hint?: string; exclude?: string }) {
   const items = targets
     .filter((o) => o.value !== exclude && (!types || types.includes(o.type)))
-    .map((o) => ({ id: o.value, label: types?.length === 1 ? o.label : `${o.label} (${o.type})` }));
-  return <ComboField label={label} size="sm" placeholder={t('Nothing')} items={items} value={value} onChange={onChange} hint={hint} />;
+    .map((o) => ({ value: o.value, name: o.label, type: o.type }));
+  return <MetaLookupField label={label} size="sm" items={items} value={value} onChange={onChange} hint={hint} />;
 }
 
 /** The app or the screen being designed, when nothing on the canvas is picked. */

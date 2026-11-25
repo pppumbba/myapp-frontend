@@ -26,6 +26,8 @@ export interface Access {
   features: Feature[];
   /** The meta types the user may make: null is every type (an admin), empty none. */
   build_types: string[] | null;
+  /** Metas shared with the user (a builder may change them as if they had made them). */
+  shared_meta_ids?: number[];
   metas: Record<string, Record<Ability, boolean>>;
 }
 

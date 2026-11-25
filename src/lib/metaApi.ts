@@ -54,10 +54,16 @@ export interface Meta {
   is_public?: boolean;
   /** Every signed-in user may view it, without a role (e.g. the market app and its screens). */
   is_open?: boolean;
+  /** When it was last changed. */
+  updated_at?: string | null;
   /** Who made it: a builder may change the metas they made (an admin all of them). */
   created_by?: number | null;
   description: string | null;
   table_name: string | null;
+  /** An app's icon (its brand), as a path under the server's storage (app-images/{file}); null: the Wand mark. */
+  image_path?: string | null;
+  /** An app's card cover, the same way. */
+  cover_path?: string | null;
   query_string: string | null;
   json_config: Record<string, unknown> | null;
   type_id: number | null;
@@ -188,8 +194,6 @@ export interface MetaUse {
 
 export const metaApi = {
   types: () => api<MetaType[]>('/meta-types'),
-  /** Every meta (page widgets show as their page) with the places that use it; admins. */
-  usage: () => api<(UsageMeta & { used_by: MetaUse[] })[]>('/meta-usage'),
   /** The places that use one meta; admins. */
   usageOf: (id: number) => api<MetaUse[]>(`/metas/${id}/usage`),
   options: () => api<MetaOption[]>('/metas/options'),

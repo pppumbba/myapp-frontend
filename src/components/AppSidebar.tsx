@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronLeftDouble, ChevronRightDouble, Circle, LogIn01 } from '@untitledui/icons';
 import { Button as AriaButton, Link as AriaLink } from 'react-aria-components';
 import { MobileNavigationHeader } from '@/components/application/app-navigation/base-components/mobile-header';
@@ -76,7 +76,8 @@ const LOOKS: Record<Exclude<MenuStyle, 'topbar' | 'header'>, { aside: string; co
     aside: 'border-secondary bg-primary md:border-r lg:border-r-0 lg:bg-transparent',
     column: '',
     gap: 0,
-    frame: 'lg:bg-tertiary',
+    // menu-inset: menu-style.css lets the items show the frame and raises the current one.
+    frame: 'menu-inset lg:bg-tertiary',
     main: 'lg:my-2 lg:mr-2 lg:rounded-xl lg:bg-secondary lg:ring-1 lg:ring-secondary',
   },
   // The Untitled UI dark tokens, scoped to the menu.
@@ -240,7 +241,9 @@ export function AppSidebar({
       </div>
 
       <nav aria-label={label} className="min-h-0 flex-1 overflow-y-auto">
-        <NavList activeUrl={activeUrl} items={items} className="px-3 py-4" />
+        <SpringList activeUrl={activeUrl} items={items} markClassName="rounded-md">
+          <NavList activeUrl={activeUrl} items={items} className="px-3 py-4" />
+        </SpringList>
       </nav>
 
       <div className="flex shrink-0 flex-col gap-2 border-t border-secondary px-3 py-3">
@@ -285,23 +288,7 @@ export function AppSidebar({
 
       {/* The pill fits its icons: no scrollbar (it showed while they rose in); a long menu still scrolls. */}
       <nav aria-label={label} className={cx('min-h-0 w-full flex-1 overflow-y-auto', bare && 'no-scrollbar')}>
-        {bare ? (
-          <SpringRailList items={items} activeUrl={activeUrl} />
-        ) : (
-          <ul className="flex flex-col items-center gap-1 px-2 py-1">
-            {items.map((item, i) =>
-              item.divider ? (
-                <li key={i} className="w-full py-1.5" aria-hidden="true">
-                  <hr className="h-px border-none bg-border-secondary" />
-                </li>
-              ) : (
-                <li key={item.label}>
-                  <RailItem item={item} activeUrl={activeUrl} onExpand={() => toggle(false)} />
-                </li>
-              ),
-            )}
-          </ul>
-        )}
+        <SpringRailList items={items} activeUrl={activeUrl} onExpand={() => toggle(false)} bare={bare} />
       </nav>
 
       {!bare && (
@@ -399,17 +386,19 @@ function TopBar({ logo, items, footerItems, activeUrl, label, signedIn }: { logo
       <div className="flex h-15 items-center gap-6 px-6">
         <div className="w-56 shrink-0">{logo}</div>
         <nav aria-label={label} className="min-w-0 flex-1 overflow-x-auto">
-          <ul className="flex items-center gap-1 py-1">
-            {items.map((item, i) =>
-              item.divider ? (
-                <li key={i} className="h-5 w-px shrink-0 bg-border-secondary" aria-hidden="true" />
-              ) : (
-                <li key={item.label} className="shrink-0">
-                  <TopItem item={item} activeUrl={activeUrl} />
-                </li>
-              ),
-            )}
-          </ul>
+          <SpringList axis="x" activeUrl={activeUrl} items={items} markClassName="rounded-md">
+            <ul className="flex items-center gap-1 py-1">
+              {items.map((item, i) =>
+                item.divider ? (
+                  <li key={i} className="h-5 w-px shrink-0 bg-border-secondary" aria-hidden="true" />
+                ) : (
+                  <li key={item.label} className="relative shrink-0">
+                    <TopItem item={item} activeUrl={activeUrl} plain />
+                  </li>
+                ),
+              )}
+            </ul>
+          </SpringList>
         </nav>
         <div className="flex shrink-0 items-center gap-1">
           {footerItems.map((item) => (
@@ -429,12 +418,12 @@ function TopBar({ logo, items, footerItems, activeUrl, label, signedIn }: { logo
   );
 }
 
-function TopItem({ item, activeUrl }: { item: NavItemType; activeUrl?: string }) {
+function TopItem({ item, activeUrl, plain = false }: { item: NavItemType; activeUrl?: string; /** The highlight is drawn behind it (SpringList). */ plain?: boolean }) {
   const Icon = item.icon;
   const current = item.href === activeUrl || !!item.items?.some((c) => c.href === activeUrl);
   const look = cx(
     'flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold whitespace-nowrap outline-focus-ring transition duration-100 ease-linear focus-visible:outline-2',
-    current ? 'bg-secondary text-secondary_hover' : 'text-secondary hover:bg-primary_hover hover:text-secondary_hover',
+    current ? cx('text-secondary_hover', !plain && 'bg-secondary') : 'text-secondary hover:bg-primary_hover hover:text-secondary_hover',
   );
   const content = (
     <>
@@ -446,7 +435,7 @@ function TopItem({ item, activeUrl }: { item: NavItemType; activeUrl?: string })
   if (item.items?.length) {
     return (
       <Dropdown.Root>
-        <AriaButton className={look}>
+        <AriaButton data-current={current || undefined} className={look}>
           {content}
           <ChevronDown className="size-4 shrink-0 text-fg-quaternary" aria-hidden="true" />
         </AriaButton>
@@ -470,92 +459,166 @@ function TopItem({ item, activeUrl }: { item: NavItemType; activeUrl?: string })
 
 const isCurrent = (item: Item, activeUrl?: string) => !item.divider && (item.href === activeUrl || !!item.items?.some((c) => c.href === activeUrl));
 
-/** Where the highlight sits: its top and height in px within the list. */
+/** Where the highlight sits: its box in px within the list. */
 interface Mark {
-  top: number;
-  height: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The current item: the page's link, or a group's button holding it (data-current). */
+const CURRENT = 'a[aria-current="page"], [data-current]';
+
+/** An item's box within the list, by offsets (they ignore the items' own blur-in transforms); null when hidden, e.g. in a closed group. */
+function markOf(el: HTMLElement, root: HTMLElement): Mark | null {
+  let x = 0;
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node && node !== root) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  return node === root ? { x, y, w: el.offsetWidth, h: el.offsetHeight } : null;
+}
+
+const sameMark = (a: Mark | null, b: Mark | null) => a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
+
+/**
+ * Springs the highlight from where it was to where it is drawn now, stretching as it goes: the
+ * edge in front races ahead, the one behind catches up, it overshoots a little and settles.
+ * Only transforms move, so a busy page doesn't make it stutter.
+ */
+function spring(el: HTMLElement, axis: 'x' | 'y', before: Mark, next: Mark) {
+  const p0 = axis === 'y' ? before.y : before.x;
+  const s0 = axis === 'y' ? before.h : before.w;
+  const p1 = axis === 'y' ? next.y : next.x;
+  const s1 = axis === 'y' ? next.h : next.w;
+  if (p0 === p1) return;
+  // Drawn at the new place; offsets and sizes are from there.
+  const at = (offset: number, size: number) => (axis === 'y' ? `translateY(${offset}px) scaleY(${size / s1})` : `translateX(${offset}px) scaleX(${size / s1})`);
+  const forward = p1 > p0;
+  // Each phase eases on its own, so the stretch gets its share of the time.
+  el.animate(
+    [
+      { transform: at(p0 - p1, s0), offset: 0, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' },
+      // Stretched between the two: the edge in front is nearly there, the one behind still far back.
+      { transform: forward ? at(0.6 * (p0 - p1), s1 - 0.6 * (p0 - p1)) : at(-2, s1 + 2 + 0.6 * (p0 + s0 - p1 - s1)), offset: 0.4, easing: 'cubic-bezier(0.3, 0, 0.3, 1)' },
+      // Past the item and squashed, then back.
+      { transform: forward ? at(5, s1 - 3) : at(-5, s1 - 3), offset: 0.72, easing: 'ease-out' },
+      { transform: at(0, s1), offset: 1 },
+    ],
+    { duration: 620 },
+  );
 }
 
 /**
- * The header style's rail items with one highlight behind the current item. On a new pick it
- * springs there and stretches as it goes: the edge in front races ahead, the one behind catches
- * up, it overshoots a little and settles. It starts on the click (not when the new screen has
- * rendered) and moves by transform, so a busy page doesn't make it stutter.
+ * A menu list with one highlight behind its current item, which springs to a newly picked one
+ * (down a side menu, across the top bar). It starts on the click, not when the new screen has
+ * rendered. The items stay see-through and the highlight takes each menu style's current look
+ * (spring-marked / spring-mark in menu-style.css). A group's screens open in a dropdown outside
+ * the list, so their group's item takes the highlight once the screen opens.
  */
-function SpringRailList({ items, activeUrl }: { items: Item[]; activeUrl?: string }) {
-  const rows = useRef(new Map<number, HTMLLIElement>());
+function SpringList({
+  axis = 'y',
+  activeUrl,
+  items,
+  markClassName,
+  markStyle,
+  children,
+}: {
+  axis?: 'x' | 'y';
+  activeUrl?: string;
+  items: Item[];
+  markClassName?: string;
+  markStyle?: React.CSSProperties;
+  children: ReactNode;
+}) {
+  const root = useRef<HTMLDivElement>(null);
   const blob = useRef<HTMLSpanElement>(null);
   const last = useRef<Mark | null>(null);
   const [mark, setMark] = useState<Mark | null>(null);
-  // The item just clicked, until the page catches up with it.
-  const [pending, setPending] = useState<number | null>(null);
+  // The link just clicked, until the page catches up with it.
+  const [pending, setPending] = useState<HTMLElement | null>(null);
   useEffect(() => setPending(null), [activeUrl]);
-  const index = pending ?? items.findIndex((item) => isCurrent(item, activeUrl));
+
+  const find = useCallback(() => {
+    const box = root.current;
+    const el = pending?.isConnected ? pending : box?.querySelector<HTMLElement>(CURRENT);
+    return box && el ? markOf(el, box) : null;
+  }, [pending]);
 
   useLayoutEffect(() => {
-    const li = rows.current.get(index);
-    const next = li ? { top: li.offsetTop, height: li.offsetHeight } : null;
+    const next = find();
     const before = last.current;
     last.current = next;
-    setMark(next);
-    const el = blob.current;
-    if (!el || !next || !before || before.top === next.top || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    // Drawn at the new place; the keyframes start it at the old one. T: the top edge, H: the height, both from the new place.
-    const dy = before.top - next.top;
-    const h = next.height;
-    const down = dy < 0;
-    const at = (top: number, height: number) => `translateY(${top}px) scaleY(${height / h})`;
-    // Each phase eases on its own, so the stretch gets its share of the time.
-    el.animate(
-      [
-        { transform: at(dy, h), offset: 0, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' },
-        // Stretched between the two: the edge in front is nearly there, the one behind still far back.
-        { transform: down ? at(dy * 0.6, h - dy * 0.6) : at(-2, dy * 0.6 + h + 2), offset: 0.4, easing: 'cubic-bezier(0.3, 0, 0.3, 1)' },
-        // Past the item and squashed, then back.
-        { transform: down ? at(5, h - 3) : at(-5, h - 3), offset: 0.72, easing: 'ease-out' },
-        { transform: at(0, h), offset: 1 },
-      ],
-      { duration: 620 },
-    );
-  }, [index, items.length]);
+    setMark((m) => (sameMark(m, next) ? m : next));
+    if (blob.current && before && next && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) spring(blob.current, axis, before, next);
+  }, [find, activeUrl, items, axis]);
+
+  // A group opening or the menu changing width moves the items: follow them without springing.
+  useEffect(() => {
+    const box = root.current;
+    if (!box || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const next = find();
+      last.current = next;
+      setMark((m) => (sameMark(m, next) ? m : next));
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [find]);
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const link = (e.target as Element).closest<HTMLElement>('a[href]');
+    if (link && root.current?.contains(link) && link.getAttribute('aria-current') !== 'page' && link.getAttribute('target') !== '_blank') setPending(link);
+  };
 
   return (
-    <ul className="relative flex flex-col items-center gap-1 px-2 py-1">
+    <div ref={root} className="spring-marked relative" onClickCapture={onClickCapture}>
       {mark && (
         <span
           ref={blob}
           aria-hidden="true"
-          className="blur-in pointer-events-none absolute left-1/2 w-10 origin-top -translate-x-1/2 rounded-full bg-secondary will-change-transform"
-          style={{ top: mark.top, height: mark.height, '--i': index + 2 } as React.CSSProperties}
+          className={cx('spring-mark pointer-events-none absolute will-change-transform', axis === 'y' ? 'origin-top' : 'origin-left', markClassName)}
+          style={{ left: mark.x, top: mark.y, width: mark.w, height: mark.h, ...markStyle }}
         />
       )}
-      {items.map((item, i) =>
-        item.divider ? (
-          <li key={i} className="blur-in w-full py-1.5" style={{ '--i': i + 2 } as React.CSSProperties} aria-hidden="true">
-            <hr className="h-px border-none bg-border-secondary" />
-          </li>
-        ) : (
-          <li
-            key={item.label}
-            // Icons arrive one after another, top to bottom.
-            className="blur-in relative"
-            style={{ '--i': i + 2 } as React.CSSProperties}
-            // A link moves the highlight now; a group's icon only opens its dropdown.
-            onClickCapture={() => item.href && item.href !== activeUrl && setPending(i)}
-            ref={(el) => {
-              if (el) rows.current.set(i, el);
-              else rows.current.delete(i);
-            }}
-          >
-            <RailItem item={item} activeUrl={activeUrl} onExpand={() => {}} plain />
-          </li>
-        ),
-      )}
-    </ul>
+      {children}
+    </div>
   );
 }
 
-function RailItem({ item, activeUrl, onExpand, plain = false }: { item: NavItemType; activeUrl?: string; onExpand: () => void; /** The highlight is drawn behind it (SpringRailList). */ plain?: boolean }) {
+/** The rail's items with the springing highlight. Bare (the header style's rail): round, and the icons arrive one after another. */
+function SpringRailList({ items, activeUrl, onExpand, bare = false }: { items: Item[]; activeUrl?: string; onExpand: () => void; bare?: boolean }) {
+  const enter = (i: number) => (bare ? ({ '--i': i + 2 } as React.CSSProperties) : undefined);
+  return (
+    <SpringList
+      activeUrl={activeUrl}
+      items={items}
+      markClassName={bare ? 'blur-in rounded-full' : 'rounded-md'}
+      markStyle={enter(Math.max(0, items.findIndex((item) => isCurrent(item, activeUrl))))}
+    >
+      <ul className="flex flex-col items-center gap-1 px-2 py-1">
+        {items.map((item, i) =>
+          item.divider ? (
+            <li key={i} className={cx('w-full py-1.5', bare && 'blur-in')} style={enter(i)} aria-hidden="true">
+              <hr className="h-px border-none bg-border-secondary" />
+            </li>
+          ) : (
+            <li key={item.label} className={cx('relative', bare && 'blur-in')} style={enter(i)}>
+              <RailItem item={item} activeUrl={activeUrl} onExpand={onExpand} plain />
+            </li>
+          ),
+        )}
+      </ul>
+    </SpringList>
+  );
+}
+
+function RailItem({ item, activeUrl, onExpand, plain = false }: { item: NavItemType; activeUrl?: string; onExpand: () => void; /** The highlight is drawn behind it (SpringList). */ plain?: boolean }) {
   const Icon = item.icon ?? Circle;
   const current = item.href === activeUrl || !!item.items?.some((c) => c.href === activeUrl);
   const look = cx(
@@ -569,7 +632,7 @@ function RailItem({ item, activeUrl, onExpand, plain = false }: { item: NavItemT
   if (item.items?.length) {
     return (
       <Dropdown.Root>
-        <AriaButton aria-label={t('{name} menu', { name: item.label })} className={look}>
+        <AriaButton aria-label={t('{name} menu', { name: item.label })} data-current={current || undefined} className={look}>
           <Icon className="size-5" />
         </AriaButton>
         <Dropdown.Popover placement="right top" offset={8} className="w-56">

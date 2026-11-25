@@ -16,7 +16,7 @@ import {
   Star01,
   Trash01,
 } from '@untitledui/icons';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { publicPath } from '../../lib/customerApi';
@@ -40,6 +40,7 @@ import { themeApi, type ThemeMeta } from '../../lib/theme';
 import { SITE_LOOKS, siteLook } from './looks';
 import { SOCIAL_EXAMPLES, SOCIAL_NAMES } from './SiteSocial';
 import { PageHeader } from '../../components/AppShell';
+import { changeText, DailyBars } from './SiteCharts';
 import { ConfirmDialog } from '../../components/Modal';
 import { Alert, IconAction } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -147,7 +148,8 @@ export default function SiteManagerPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('pages');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (['pages', 'settings', 'domains', 'forms', 'visits'] as Tab[]).find((x) => x === searchParams.get('tab')) ?? 'pages');
   const [selected, setSelected] = useState<string | null>(null);
 
   const apply = useCallback((s: Site) => {
@@ -940,15 +942,12 @@ function VisitsTab({ siteId }: { siteId: number }) {
   const [days, setDays] = useState(30);
   const [stats, setStats] = useState<SiteStats | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
   useEffect(() => {
     siteApi.stats(siteId, days).then(setStats, (err) => setError(message(err, t('The visits could not be loaded.'))));
   }, [siteId, days]);
 
   if (error) return <Alert>{error}</Alert>;
-  const max = Math.max(1, ...(stats?.daily.map((d) => d.views) ?? [1]));
-  const change = stats && stats.previous > 0 ? Math.round(((stats.total - stats.previous) / stats.previous) * 100) : null;
-  const shortDay = (day: string) => new Date(`${day}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const change = stats ? changeText(stats.total, stats.previous, stats.days) : null;
 
   return (
     <div className="max-w-4xl space-y-4">
@@ -965,41 +964,10 @@ function VisitsTab({ siteId }: { siteId: number }) {
             <p className="text-sm font-medium text-tertiary">{t('Page views, last {n} days', { n: stats.days })}</p>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-3 text-display-sm font-semibold text-primary tabular-nums">
               {stats.total.toLocaleString()}
-              {change !== null && (
-                <span className="text-sm font-medium text-tertiary">{t('{change}% on the {n} days before', { change: change > 0 ? `+${change}` : change, n: stats.days })}</span>
-              )}
+              {change && <span className="text-sm font-medium text-tertiary">{change}</span>}
             </p>
-            {/* One series: bars in the brand colour, each with its own hover readout; the numbers are in the table below too. */}
-            <div className="relative mt-5">
-              <div className="flex h-40 items-end gap-0.5" role="img" aria-label={t('Page views per day')}>
-                {stats.daily.map((d, i) => (
-                  <div
-                    key={d.day}
-                    className="flex h-full flex-1 items-end"
-                    onMouseEnter={() => setHover(i)}
-                    onMouseLeave={() => setHover((h) => (h === i ? null : h))}
-                  >
-                    <div
-                      className={cx('w-full rounded-t-[4px] bg-brand-solid transition-opacity motion-reduce:transition-none', hover !== null && hover !== i && 'opacity-50')}
-                      style={{ height: `${d.views ? Math.max(2, (d.views / max) * 100) : 0}%` }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-secondary" />
-              {hover !== null && stats.daily[hover] && (
-                <div
-                  className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-primary px-2.5 py-1.5 text-xs shadow-lg ring-1 ring-secondary"
-                  style={{ left: `${((hover + 0.5) / stats.daily.length) * 100}%` }}
-                >
-                  <span className="font-semibold text-primary tabular-nums">{stats.daily[hover].views.toLocaleString()}</span>
-                  <span className="text-tertiary"> · {shortDay(stats.daily[hover].day)}</span>
-                </div>
-              )}
-              <div className="mt-1 flex justify-between text-xs text-tertiary">
-                <span>{shortDay(stats.daily[0].day)}</span>
-                <span>{shortDay(stats.daily[stats.daily.length - 1].day)}</span>
-              </div>
+            <div className="mt-5">
+              <DailyBars daily={stats.daily} />
             </div>
           </div>
           <div className="rounded-xl bg-primary shadow-xs ring-1 ring-secondary">

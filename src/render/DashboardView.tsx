@@ -264,7 +264,7 @@ export function ChartCard({
         {error ? (
           <Alert>{error}</Alert>
         ) : !data ? (
-          <div className="h-full animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+          <div aria-busy="true" className="h-full animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
         ) : asTable ? (
           <div className="blur-in h-full">
             <ChartTable data={data} onSelect={onSelect} />

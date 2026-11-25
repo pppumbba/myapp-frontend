@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { Trash01 } from '@untitledui/icons';
 import { Dialog, Modal as UModal, ModalOverlay } from '@/components/application/modals/modal';
 import { Button } from '@/components/base/buttons/button';
@@ -13,6 +13,33 @@ type Edge = 'e' | 's' | 'se';
 const MIN_W = 320;
 const MIN_H = 200;
 const KEEP_VISIBLE = 80;
+/** Longest a modal waits, hidden, for its content to load before it shows anyway. */
+const MAX_WAIT = 1500;
+
+/**
+ * Whether a modal's body has loaded: nothing in it is a loading placeholder (aria-busy) any more.
+ * Once loaded it stays so, so a later refetch in a grid never hides the modal again. Until then
+ * the overlay takes .modal-waiting; one that had to wait takes .modal-reveal to appear (index.css).
+ */
+export function useModalLoaded(body: HTMLElement | null) {
+  const [loaded, setLoaded] = useState(false);
+  // It was still loading when first drawn, so it had to wait (and now appears late).
+  const [waited, setWaited] = useState(false);
+  useLayoutEffect(() => {
+    if (!body || loaded) return;
+    const check = () => !body.querySelector('[aria-busy="true"]') && setLoaded(true);
+    if (body.querySelector('[aria-busy="true"]')) setWaited(true);
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] });
+    const timer = setTimeout(() => setLoaded(true), MAX_WAIT);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [body, loaded]);
+  return { loaded, waited };
+}
 
 /**
  * Untitled UI modal. React Aria handles Escape, clicking outside, focus trapping and
@@ -22,10 +49,13 @@ const KEEP_VISIBLE = 80;
  * fixed and only the body scrolls; a footer marked `modal-footer` sticks to the bottom.
  * With `fill`, phones get it at full height from the top, so its edges stay put as the content
  * changes and the on-screen keyboard covers none of it.
+ * While its content is still loading it stays hidden, then grows in with that content drawn,
+ * rather than as an empty box that fills in afterwards.
  */
 export function Modal({
   title,
   description,
+  icon,
   onClose,
   children,
   size = 'md',
@@ -33,6 +63,8 @@ export function Modal({
 }: {
   title: string;
   description?: string;
+  /** Shown before the title, e.g. a meta type's TypeIcon. */
+  icon?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   /** full: as wide as the window allows (a datagrid). */
@@ -44,6 +76,9 @@ export function Modal({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const [active, setActive] = useState(false);
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  // Loaded at once (nothing to fetch), it opens as usual; otherwise it waits hidden, then appears.
+  const { loaded, waited } = useModalLoaded(body);
 
   /** Tracks one pointer gesture on the window until it is released. */
   const track = (e: ReactPointerEvent, onMove: (dx: number, dy: number) => void) => {
@@ -90,7 +125,7 @@ export function Modal({
   };
 
   return (
-    <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()} className={fill ? 'max-sm:items-start' : undefined}>
+    <ModalOverlay isOpen isDismissable onOpenChange={(open) => !open && onClose()} className={cx(fill && 'max-sm:items-start', !loaded ? 'modal-waiting' : waited && 'modal-reveal')}>
       <UModal
         ref={boxRef}
         // Full size is full height too: its top stays put, so a grid filling it measures once.
@@ -106,12 +141,15 @@ export function Modal({
             className="relative shrink-0 cursor-move touch-none border-b border-secondary px-4 pt-4 pb-4 sm:px-6 sm:pt-6"
           >
             <CloseButton onPress={onClose} slot={null} className="absolute top-3 right-3" />
-            <div className="pr-10">
-              <h2 className="text-lg font-semibold text-primary">{title}</h2>
-              {description && <p className="mt-1 text-sm text-tertiary">{description}</p>}
+            <div className="flex items-center gap-3 pr-10">
+              {icon}
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-primary">{title}</h2>
+                {description && <p className="mt-1 text-sm text-tertiary">{description}</p>}
+              </div>
             </div>
           </div>
-          <div className="modal-body min-h-0 flex-1 overflow-y-auto">
+          <div ref={setBody} className="modal-body min-h-0 flex-1 overflow-y-auto">
             <div className="p-4 sm:p-6">{children}</div>
           </div>
         </Dialog>

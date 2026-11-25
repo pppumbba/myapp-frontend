@@ -15,6 +15,22 @@ export interface MetaVersion {
   creator: { id: number; name: string } | null;
 }
 
+/** A deleted meta: its newest version, with the type, description and tags it had. */
+export interface DeletedMeta extends MetaVersion {
+  type_id: number | null;
+  description: string | null;
+  tag_ids: number[];
+}
+
+export interface DeletedPage {
+  data: DeletedMeta[];
+  total: number;
+  has_more: boolean;
+  /** Over every deleted meta, by type id and by tag id. */
+  type_counts: Record<string, number>;
+  tag_counts: Record<string, number>;
+}
+
 export interface FieldChange {
   field: string;
   from: unknown;
@@ -46,5 +62,15 @@ export const versionApi = {
   save: (metaId: number, note: string) => api<MetaVersion>(`/metas/${metaId}/versions`, { method: 'POST', body: JSON.stringify({ note: note || null }) }),
   diff: (versionId: number, against: number | 'current') => api<VersionDiff>(`/meta-versions/${versionId}/diff?against=${against}`),
   restore: (versionId: number) => api<RestoreResult>(`/meta-versions/${versionId}/restore`, { method: 'POST' }),
-  deleted: () => api<MetaVersion[]>('/meta-versions/deleted'),
+  /** A page (20) of deleted metas, newest first, with counts over all of them for the filters. */
+  deleted: (filters: { q?: string; type_id?: number; tag_ids?: number[]; page?: number }) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.type_id) params.set('type_id', String(filters.type_id));
+    if (filters.tag_ids?.length) params.set('tag_ids', filters.tag_ids.join(','));
+    params.set('page', String(filters.page ?? 1));
+    return api<DeletedPage>(`/meta-versions/deleted?${params}`);
+  },
+  /** Forgets a deleted meta for good: every version of it. */
+  purge: (metaId: number) => api<{ deleted_versions: number }>(`/meta-versions/deleted/${metaId}`, { method: 'DELETE' }),
 };

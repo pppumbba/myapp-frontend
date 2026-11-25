@@ -4,6 +4,7 @@ import type { LabelProps as AriaLabelProps } from "react-aria-components";
 import { Label as AriaLabel } from "react-aria-components";
 import { Tooltip, TooltipTrigger } from "@/components/base/tooltip/tooltip";
 import { cx } from "@/utils/cx";
+import { t } from "@/i18n";
 
 interface LabelProps extends AriaLabelProps {
     /** The label text, rendered before the required asterisk and the tooltip trigger. */
@@ -16,11 +17,13 @@ interface LabelProps extends AriaLabelProps {
     tooltip?: string;
     /** Supporting text shown under the tooltip title. Only rendered when `tooltip` is set. */
     tooltipDescription?: string;
+    /** Shows "(optional)" after the label, for forms that mark the optional fields instead of the required ones. */
+    isOptional?: boolean;
     /** Ref to the underlying label element. */
     ref?: Ref<HTMLLabelElement>;
 }
 
-export const Label = ({ isInvalid, isRequired, tooltip, tooltipDescription, className, ...props }: LabelProps) => {
+export const Label = ({ isInvalid, isRequired, isOptional, tooltip, tooltipDescription, className, ...props }: LabelProps) => {
     return (
         <AriaLabel
             // Used for conditionally hiding/showing the label element via CSS:
@@ -32,6 +35,8 @@ export const Label = ({ isInvalid, isRequired, tooltip, tooltipDescription, clas
             className={cx("flex cursor-default items-center gap-0.5 text-sm font-medium text-secondary", className)}
         >
             {props.children}
+
+            {isOptional && <span className="ml-0.5 font-normal text-tertiary">{t("(optional)")}</span>}
 
             <span
                 className={cx(

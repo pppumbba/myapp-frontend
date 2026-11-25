@@ -64,7 +64,7 @@ export function RecordHistory({ metaId, recordId, params, tree, onClose }: { met
     <Modal title={t('History')} description={t('Every save of this record, newest first.')} onClose={onClose} size="lg">
       {error && <Alert>{error}</Alert>}
       {!entries ? (
-        <div className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
+        <div aria-busy="true" className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
       ) : !entries.length ? (
         <p className="py-6 text-center text-sm text-tertiary">{t('No changes have been logged for this record yet. The log starts when it is turned on for the form.')}</p>
       ) : (

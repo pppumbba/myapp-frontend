@@ -659,7 +659,7 @@ function CompositeBlock({ widget, values, depth }: { widget: Widget; values: Rec
   if (!templateId) return <Placeholder icon={LayersThree01} text={t('{name} has no parts yet. Lay them out from the widget library.', { name: widget.name })} />;
   if (depth > MAX_COMPOSITE_DEPTH) return <Alert>{t('These widgets are nested too deeply to show.')}</Alert>;
   if (error) return <Alert>{error}</Alert>;
-  if (!page) return <div className="h-24 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!page) return <div aria-busy="true" className="h-24 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
   if (!page.items.length) return <Placeholder icon={LayersThree01} text={t('{name} has no parts yet. Lay them out from the widget library.', { name: widget.name })} />;
   return <PageItems items={fillItems(page.items, values)} depth={depth + 1} />;
 }
@@ -722,7 +722,7 @@ function RecordsBlock({ values: v }: { values: Record<string, unknown> }) {
 
   if (!metaId) return <Placeholder icon={List} text={t('Pick the grid the records come from.')} />;
   if (error) return <Alert>{error}</Alert>;
-  if (!result) return <div className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!result) return <div aria-busy="true" className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
 
   const lines = (Array.isArray(v.lines) ? (v.lines as Line[]) : []).filter((l) => str(l.template).trim());
   const byField = new Map((def?.params ?? []).map((p) => [p.field_path, p]));
@@ -906,7 +906,7 @@ function ScheduleBlock({ values: v }: { values: Record<string, unknown> }) {
   const { metaId, slots, error, book } = useSchedule(v);
   if (!metaId) return <Placeholder icon={Calendar} text={t('Pick the grid the times come from.')} />;
   if (error) return <Alert>{error}</Alert>;
-  if (!slots) return <div className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!slots) return <div aria-busy="true" className="h-32 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
   return (
     <div>
       {str(v.title) && <h3 className="mb-3 text-md font-semibold text-primary">{str(v.title)}</h3>}
@@ -952,10 +952,12 @@ function Placeholder({ icon: Icon, text }: { icon: FC<{ className?: string }>; t
 
 /** Placed widgets in order, sections holding theirs. */
 export function PageItems({ items, depth = 0 }: { items: PageItem[]; depth?: number }) {
+  // Like a dashboard's cards, the page's widgets arrive top to bottom, one a moment after the
+  // one before (.cards-in, --i); a section's own widgets come in with it.
   return (
-    <PageGrid>
-      {items.map((item) => (
-        <div key={item.param_id} className={widthClass(item.w)}>
+    <PageGrid className={depth === 0 ? 'cards-in' : undefined}>
+      {items.map((item, i) => (
+        <div key={item.param_id} className={widthClass(item.w)} style={{ '--i': i } as React.CSSProperties}>
           <WidgetBlock widget={item.widget} config={item.meta.json_config} depth={depth}>
             {item.children.length ? <PageItems items={item.children} depth={depth + 1} /> : undefined}
           </WidgetBlock>

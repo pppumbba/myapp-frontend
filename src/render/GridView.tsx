@@ -181,6 +181,9 @@ const FILLER = "::filler";
 /** Placeholder rows shown until the first page of records arrives. */
 const SKELETON = "::skeleton";
 const SKELETON_ROWS = 6;
+/** When the card's blur-in (.blur-in, --i:1) has mostly settled, and how long the rows' cascade (.rows-in) takes. */
+const CARD_SETTLED_MS = 300;
+const ROWS_IN_MS = 450;
 const AGGREGATES = ["count", "sum", "avg", "min", "max"];
 const aggregateOf = (p: MetaParam) =>
   AGGREGATES.includes(p.json_config?.aggregate as string)
@@ -794,8 +797,10 @@ export function GridView({
     saveFiltersFolded(meta.id, next);
   };
   const sidebar = sidebarLayout && !folded;
-  // "dropdown": the Filters button opens them over the grid, closing once they are applied.
-  const dropdown = meta.json_config?.filter_layout === "dropdown" || (meta.json_config?.filter_layout === "sidebar" && !roomy);
+  // "dropdown" (the default): the Filters button opens them over the grid, closing once they are
+  // applied. Only "panel" keeps them in a panel above the grid.
+  const filterLayout = meta.json_config?.filter_layout;
+  const dropdown = filterLayout === "sidebar" ? !roomy : filterLayout !== "panel";
   const searchable = filterParams.some(
     (p) =>
       (p.data_type === "string" || p.data_type === "text") &&
@@ -824,10 +829,36 @@ export function GridView({
   const [result, setResult] = useState<Page<DataRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // Refreshed by hand: once its records are back, the rows dip and come back, so the reload shows
+  // even when it is quick and nothing changed.
+  const refreshedByHand = useRef(false);
   // A page, search, sort or reload on its way. The rows only dim when it takes a moment,
   // so a quick answer doesn't flicker.
   const [fetching, setFetching] = useState(true);
   const slow = useDebounced(fetching, 150) && fetching;
+  // The rows cascade in once, when the first records arrive (not the skeleton, not later pages,
+  // sorts or reloads, which swap in place). They wait until the card's own blur-in has mostly
+  // settled, so the two don't animate over each other; cascadeFrom is that wait, null when off.
+  const [mountedAt] = useState(() => performance.now());
+  const [cascadeFrom, setCascadeFrom] = useState<number | null>(null);
+  const cascaded = useRef(false);
+  useLayoutEffect(() => {
+    if (!result || !refreshedByHand.current) return;
+    refreshedByHand.current = false;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // On the body, not the rows, so their own animation (.grid-row) isn't touched.
+    cardRef.current?.querySelector("tbody")?.animate([{ opacity: 0.3 }, { opacity: 1 }], {
+      duration: 300,
+      easing: "ease-out",
+    });
+  }, [result]);
+  useLayoutEffect(() => {
+    if (!result || cascaded.current) return;
+    cascaded.current = true;
+    const from = Math.max(0, CARD_SETTLED_MS - (performance.now() - mountedAt));
+    setCascadeFrom(from);
+    setTimeout(() => setCascadeFrom(null), from + ROWS_IN_MS);
+  }, [result, mountedAt]);
   const [selected, setSelected] = useState<string | null>(null);
   // With a consolidate button: the picked rows, by key, kept across pages.
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -1022,6 +1053,50 @@ export function GridView({
           style: frozenStyles[i],
         }
       : { className: "" };
+
+  // A column that fits its content keeps the widest it has been, so going to another page doesn't
+  // shift the columns about: it can still grow for a longer value, never shrink back. Measured
+  // once the records are drawn; forgotten when the card's width changes (not the scroll box's,
+  // which a vertical scrollbar coming and going with the page's rows changes too).
+  const [held, setHeld] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    let width = card.offsetWidth;
+    const observer = new ResizeObserver(() => {
+      if (card.offsetWidth === width) return;
+      width = card.offsetWidth;
+      setHeld({});
+    });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const head = cardRef.current?.querySelector("thead");
+    if (!result || !head) return;
+    setHeld((prev) => {
+      let next = prev;
+      for (const c of columns) {
+        if (widthOf(c)) continue;
+        const th = head.querySelector<HTMLElement>(`th[data-key="${CSS.escape(c.field_path)}"]`);
+        const w = th?.offsetWidth ?? 0;
+        if (w > (next[c.field_path] ?? 0)) next = { ...next, [c.field_path]: w };
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- measured when new records are drawn
+  }, [result, columns]);
+  // Memoized like the frozen styles: a new style object every render loops React Aria.
+  const headStyles = useMemo(() => {
+    const out: Record<string, CSSProperties | undefined> = {};
+    columns.forEach((c, i) => {
+      const style = lead + i < frozen ? frozenStyles[lead + i] : undefined;
+      const min = widthOf(c) ? undefined : held[c.field_path];
+      out[c.field_path] = min ? { ...style, minWidth: min } : style;
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- widthOf reads dragged
+  }, [columns, frozenStyles, frozen, lead, held, dragged]);
 
   const toggleNode = (rowKey: string) =>
     setOpenNodes((s) => {
@@ -1667,7 +1742,7 @@ export function GridView({
                             {resizerFor(c)}
                           </>
                         }
-                        style={f.style}
+                        style={headStyles[c.field_path]}
                         className={`${isNumber(c) && !(workflow && c.field_path === "status_id") ? "[&>div]:justify-end" : ""} ${columnDrag?.field === c.field_path ? "bg-tertiary" : ""} ${columnDrag?.target === c.field_path ? (columnDrag.side === "before" ? DROP_BEFORE : DROP_AFTER) : ""} ${f.className}`}
                       />
                     );
@@ -1678,7 +1753,8 @@ export function GridView({
                 ]}
               </Table.Header>
               <Table.Body
-                className="rows-in"
+                className={cascadeFrom !== null ? "rows-in" : undefined}
+                style={cascadeFrom !== null ? ({ "--rows-from": `${Math.round(cascadeFrom)}ms` } as React.CSSProperties) : undefined}
                 items={items}
                 dependencies={[
                   multi,
@@ -1774,7 +1850,7 @@ export function GridView({
                   ) : (
                     <Table.Row
                       id={row._key}
-                      className="group cursor-pointer animate-in fade-in duration-200 motion-reduce:animate-none selected:bg-brand-primary_alt selected:hover:bg-brand-primary_alt"
+                      className="grid-row group cursor-pointer selected:bg-brand-primary_alt selected:hover:bg-brand-primary_alt"
                       onContextMenu={(e) => {
                         if ((e.target as HTMLElement).closest("input,textarea")) return;
                         e.preventDefault();
@@ -1879,7 +1955,10 @@ export function GridView({
               pageSize={perPage}
               onPageChange={(p) => setPage(Math.max(1, p))}
               onPageSizeChange={setPerPage}
-              onRefresh={() => setReload((n) => n + 1)}
+              onRefresh={() => {
+                refreshedByHand.current = true;
+                setReload((n) => n + 1);
+              }}
               refreshing={slow}
               records={result.total}
             />
@@ -2153,7 +2232,7 @@ function StageQueryDialog({
           />
         </div>
       ) : (
-        <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+        <div aria-busy="true" className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
       )}
     </Modal>
   );
@@ -2191,7 +2270,7 @@ function ImportDialog({
           onImported={() => setImported(true)}
         />
       ) : (
-        <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+        <div aria-busy="true" className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
       )}
     </Modal>
   );

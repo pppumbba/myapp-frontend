@@ -1,70 +1,123 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption, type MetaType, type Tag } from '../../lib/metaApi';
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { PageHeader } from '../../components/AppShell';
-import { ClockRewind, Download01, Table, Grid01, Link03, List, Plus, SearchLg, Tag01, Upload01 } from '@untitledui/icons';
+import { ChevronDown, ClockRewind, Table, Grid01, List, Plus, SearchLg, Share07, Star01, Tag01, Upload01 } from '@untitledui/icons';
 import { Alert } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { ButtonGroup, ButtonGroupItem } from '@/components/base/button-group/button-group';
+import { Dropdown } from '@/components/base/dropdown/dropdown';
 import { ConfirmDialog } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 import { TypeIcon } from '../../components/TypeIcon';
 import { MetaCard, MetaRow } from './MetaCard';
-import { DeletedMetasModal } from './DeletedMetasModal';
 import { ExcelStructureModal } from './ExcelStructureModal';
 import { MetaContextMenu, ReplaceMetaModal, type MenuAt } from './MetaContextMenu';
 import { MetaFormModal } from './MetaFormModal';
-import { ExportMetasModal, ImportMetasModal } from './MetaTransferModals';
-import { TagsModal, tagColor } from './MetaTags';
+import { ImportMetasModal } from './MetaTransferModals';
+import { TagsModal } from './MetaTags';
+import { ago, LoadMore, TagFilterMenu, TypeFilterMenu, useView } from './MetaFilters';
+import { ShareMetaModal } from './ShareMetaModal';
+import { useMetaLibrary } from './useMetaLibrary';
+import type { LibraryEntry } from '../../lib/libraryApi';
 import { t } from '@/i18n';
 
-type View = 'grid' | 'list';
 const VIEW_KEY = 'metas_view';
 
-function readView(): View {
-  try {
-    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
-  } catch {
-    return 'grid';
-  }
+/** The list as it was when last left: its data, filters, how far it was drawn and scrolled. */
+interface Snapshot {
+  allMetas: Meta[];
+  types: MetaType[];
+  options: MetaOption[];
+  tags: Tag[];
+  query: string;
+  typeFilter: number | 'all';
+  tagFilter: number[];
+  count: number;
+  scrollY: number;
 }
 
-function saveView(view: View) {
-  try {
-    localStorage.setItem(VIEW_KEY, view);
-  } catch {
-    // Storage can be blocked; the toggle still works for this visit.
-  }
-}
+/**
+ * Per list (all metas or a collection), for this visit. Coming back shows the list at once and
+ * refreshes it behind; back from a meta (All metas, or the browser's Back) it is also as you left it.
+ */
+const snapshots = new Map<string, Snapshot>();
 
-export default function MetasPage() {
-  const [showDeleted, setShowDeleted] = useState(false);
+/** The user's own lists, each a page of the Meta studio app shown like Metas. */
+export type MetaCollection = 'starred' | 'recent' | 'shared';
+
+const COLLECTIONS: Record<MetaCollection, { title: string; subtitle: string; icon: typeof Star01; empty: string; emptyHint: string; note: (e: LibraryEntry) => string }> = {
+  starred: {
+    title: 'Starred',
+    subtitle: 'Metas you starred, newest first. Star one from its card or its right-click menu.',
+    icon: Star01,
+    empty: 'Nothing starred yet',
+    emptyHint: 'Star the metas you come back to and they wait for you here.',
+    note: (e) => t('Starred {when}', { when: ago(e.at) }),
+  },
+  recent: {
+    title: 'Recent',
+    subtitle: 'Metas you opened lately, the last one first.',
+    icon: ClockRewind,
+    empty: 'Nothing opened yet',
+    emptyHint: 'Metas you open show here, so you can get back to them.',
+    note: (e) => t('Opened {when}', { when: ago(e.at) }),
+  },
+  shared: {
+    title: 'Shared with me',
+    subtitle: 'Metas others shared with you. You can change them as if you had made them.',
+    icon: Share07,
+    empty: 'Nothing shared with you yet',
+    emptyHint: 'When someone shares a meta with you, it shows here and you get a notification.',
+    note: (e) => (e.by ? t('Shared by {name} {when}', { name: e.by.name, when: ago(e.at) }) : t('Shared {when}', { when: ago(e.at) })),
+  },
+};
+
+/**
+ * Every meta the user may build, or one of their lists (collection): starred, opened lately,
+ * shared with them. The lists keep their own order (newest first) and the same filters.
+ */
+export default function MetasPage({ collection }: { collection?: MetaCollection }) {
+  const snapshotKey = collection ?? 'all';
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  const [saved] = useState(() => snapshots.get(snapshotKey));
+  const [restore] = useState(() => !!saved && (navigationType === 'POP' || !!(location.state as { keepScroll?: boolean } | null)?.keepScroll));
   const [fromExcel, setFromExcel] = useState(false);
-  const [metas, setMetas] = useState<Meta[]>([]);
-  const [types, setTypes] = useState<MetaType[]>([]);
-  const [options, setOptions] = useState<MetaOption[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [allMetas, setAllMetas] = useState<Meta[]>(saved?.allMetas ?? []);
+  const { library, starred, toggleStar } = useMetaLibrary();
+  const [sharing, setSharing] = useState<Meta | null>(null);
+  const [types, setTypes] = useState<MetaType[]>(saved?.types ?? []);
+  const [options, setOptions] = useState<MetaOption[]>(saved?.options ?? []);
+  const [tags, setTags] = useState<Tag[]>(saved?.tags ?? []);
   const [managingTags, setManagingTags] = useState(false);
   const { isAdmin, user, access } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!saved);
   const [error, setError] = useState<string | null>(null);
 
-  const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<number | 'all'>('all');
+  const [query, setQuery] = useState(restore ? saved!.query : '');
+  const [typeFilter, setTypeFilter] = useState<number | 'all'>(restore ? saved!.typeFilter : 'all');
   // A meta shows when it has every one of these tags.
-  const [tagFilter, setTagFilter] = useState<number[]>([]);
-  const [view, setView] = useState<View>(readView);
+  const [tagFilter, setTagFilter] = useState<number[]>(restore ? saved!.tagFilter : []);
+  const [view, changeView] = useView(VIEW_KEY);
 
-  // undefined: closed, null: creating, Meta: editing.
-  const [editing, setEditing] = useState<Meta | null | undefined>(undefined);
+  // The New meta dialog: open, and the type picked from the New meta menu (it opens on it).
+  const [searchParams, setSearchParams] = useSearchParams();
+  // ?new=1 (from Home's New meta) opens the New meta dialog.
+  const [creating, setCreating] = useState(() => !collection && searchParams.get('new') === '1');
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (searchParams.has('new')) setSearchParams({}, { replace: true });
+  }, []);
+  const [newTypeId, setNewTypeId] = useState<number | undefined>(undefined);
   const [deleting, setDeleting] = useState<Meta | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [menu, setMenu] = useState<{ meta: Meta; at: MenuAt } | null>(null);
   const [replacing, setReplacing] = useState<Meta | null>(null);
-  // Metas picked to export (the one right-clicked, or none from the header), and the import dialog.
-  const [exporting, setExporting] = useState<number[] | null>(null);
+  // The import dialog (export is a section of each meta's page).
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const openMenu = useCallback((meta: Meta, at: MenuAt) => setMenu({ meta, at }), []);
@@ -75,14 +128,14 @@ export default function MetasPage() {
     setError(null);
     try {
       const [m, item, o, g] = await Promise.all([metaApi.list(), metaApi.types(), metaApi.options(), metaApi.tags()]);
-      // Apps have their own page; this one is for the screens they link to. A builder sees the
-      // metas they made and makes only the types they may.
-      setMetas(m.filter((x) => x.type?.code !== 'app' && (isAdmin || x.created_by === user?.id)));
-      setTypes(item.filter((x) => x.code !== 'app' && (isAdmin || !!access?.build_types?.includes(x.code))));
+      // Every meta, apps too (the Apps page only opens them). A builder sees the metas they made
+      // or were shared with them (below), and makes only the types they may.
+      setAllMetas(m);
+      setTypes(item.filter((x) => isAdmin || !!access?.build_types?.includes(x.code)));
       setOptions(o);
       setTags(g);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("Metas could not be loaded. Check that the API is running at the address in .env."));
+      setError(err instanceof ApiError ? err.message : t('Metas could not be loaded. Check that the API is running at the address in .env.'));
     } finally {
       setLoading(false);
     }
@@ -92,10 +145,20 @@ export default function MetasPage() {
     loadAll();
   }, []);
 
-  function changeView(v: View) {
-    setView(v);
-    saveView(v);
-  }
+  const sharedIds = useMemo(() => new Set(library?.shared.map((e) => e.meta_id) ?? []), [library]);
+  const entries = useMemo(() => new Map((collection ? (library?.[collection] ?? []) : []).map((e) => [e.meta_id, e])), [collection, library]);
+  const metas = useMemo(() => {
+    const mine = allMetas.filter((x) => isAdmin || x.created_by === user?.id || sharedIds.has(x.id));
+    if (!collection) return mine;
+    const byId = new Map(mine.map((m) => [m.id, m]));
+    return [...entries.keys()].map((id) => byId.get(id)).filter((m): m is Meta => !!m);
+  }, [allMetas, isAdmin, user?.id, sharedIds, collection, entries]);
+  const look = collection ? COLLECTIONS[collection] : null;
+  const noteOf = (m: Meta) => {
+    const e = look && entries.get(m.id);
+    return e ? look.note(e) : undefined;
+  };
+  const onStar = useCallback((m: Meta) => void toggleStar(m.id), [toggleStar]);
 
   const counts = useMemo(() => {
     const byType = new Map<number, number>();
@@ -116,10 +179,20 @@ export default function MetasPage() {
   // Cards are drawn PAGE at a time, PAGE more as the list's end scrolls into view; a new search,
   // filter or view starts again from the top.
   const listKey = `${query}|${typeFilter}|${tagFilter.join(',')}|${view}`;
-  const [page, setPage] = useState({ key: listKey, count: PAGE });
+  const [page, setPage] = useState({ key: listKey, count: restore ? saved!.count : PAGE });
   if (page.key !== listKey) setPage({ key: listKey, count: PAGE });
   const shown = visible.slice(0, page.key === listKey ? page.count : PAGE);
   const showMore = useCallback(() => setPage((p) => ({ ...p, count: p.count + PAGE })), []);
+
+  // Kept up to date so leaving the page can save it; the scroll is read as it goes, before the next page moves it.
+  const current = useRef<Omit<Snapshot, 'scrollY'> | null>(null);
+  current.current = loading ? null : { allMetas, types, options, tags, query, typeFilter, tagFilter, count: page.count };
+  useLayoutEffect(() => {
+    if (restore) window.scrollTo(0, saved!.scrollY);
+    return () => {
+      if (current.current) snapshots.set(snapshotKey, { ...current.current, scrollY: window.scrollY });
+    };
+  }, []);
 
   const tagCounts = useMemo(() => {
     const byTag = new Map<number, number>();
@@ -135,7 +208,7 @@ export default function MetasPage() {
       setDeleting(null);
       await loadAll();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("The meta could not be deleted."));
+      setError(err instanceof ApiError ? err.message : t('The meta could not be deleted.'));
       setDeleting(null);
     } finally {
       setDeleteBusy(false);
@@ -145,49 +218,60 @@ export default function MetasPage() {
   return (
     <>
       <PageHeader
-        title={t("Metas")}
-        subtitle={t("The grids, forms, calendars, Gantt charts and tab sets your apps link to. Open one to edit its columns or fields.")}
+        title={look ? t(look.title) : t('Metas')}
+        subtitle={look ? t(look.subtitle) : t('Your apps and the grids, forms, calendars and other screens they link to. Open one to build it.')}
         actions={
-          <div className="flex gap-2">
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={Tag01} onPress={() => setManagingTags(true)}>
-                {t("Tags")}
-              </Button>
-            )}
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={Link03} href="/metas/usage">
-                {t("Where used")}
-              </Button>
-            )}
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={Download01} onPress={() => setExporting([])}>
-                {t("Export")}
-              </Button>
-            )}
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={Upload01} onPress={() => setImporting(true)}>
-                {t("Import")}
-              </Button>
-            )}
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={Table} onPress={() => setFromExcel(true)}>
-                {t("Create from Excel")}
-              </Button>
-            )}
-            {isAdmin && (
-              <Button size="sm" color="secondary" iconLeading={ClockRewind} onPress={() => setShowDeleted(true)}>
-                {t("Deleted")}
-              </Button>
-            )}
-            <Button size="sm" iconLeading={Plus} onPress={() => setEditing(null)}>
-              {t("New meta")}
-            </Button>
-          </div>
+          !look && (
+            <div className="flex gap-2">
+              {isAdmin && (
+                <Button size="sm" color="secondary" iconLeading={Tag01} onPress={() => setManagingTags(true)}>
+                  {t('Tags')}
+                </Button>
+              )}
+              {/* New meta: pick its type, or bring metas in from a file or an Excel sheet. */}
+              <Dropdown.Root>
+                <Button size="sm" iconLeading={Plus} iconTrailing={ChevronDown}>
+                  {t('New meta')}
+                </Button>
+                <Dropdown.Popover placement="bottom end" className="max-h-[70vh] w-64">
+                  <Dropdown.Menu
+                    onAction={(key) => {
+                      const id = String(key);
+                      if (id === 'import') setImporting(true);
+                      else if (id === 'excel') setFromExcel(true);
+                      else {
+                        setNewTypeId(Number(id.slice(5)));
+                        setCreating(true);
+                      }
+                    }}
+                  >
+                    <Dropdown.Section aria-label={t('Type')}>
+                      {types.map((item) => (
+                        <Dropdown.Item key={item.id} id={`type-${item.id}`} textValue={item.name}>
+                          <span className="flex items-center gap-2">
+                            <TypeIcon code={item.code} size="sm" />
+                            <span className="truncate">{item.name}</span>
+                          </span>
+                        </Dropdown.Item>
+                      ))}
+                    </Dropdown.Section>
+                    {isAdmin && (
+                      <>
+                        <Dropdown.Separator />
+                        <Dropdown.Section>
+                          <Dropdown.Item id="import" icon={Upload01} label={t('Import')} />
+                          <Dropdown.Item id="excel" icon={Table} label={t('Create from Excel')} />
+                        </Dropdown.Section>
+                      </>
+                    )}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown.Root>
+            </div>
+          )
         }
       />
-      {showDeleted && <DeletedMetasModal onClose={() => setShowDeleted(false)} />}
       {fromExcel && <ExcelStructureModal onClose={() => setFromExcel(false)} />}
-      {exporting && <ExportMetasModal metas={metas} initial={exporting} onClose={() => setExporting(null)} />}
       {importing && (
         <ImportMetasModal
           onClose={() => setImporting(false)}
@@ -211,77 +295,68 @@ export default function MetasPage() {
         </p>
       )}
 
-      {/* Toolbar: search, type filters, view toggle */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t("Filter by type")}>
-          <FilterChip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')} count={metas.length}>
-            {t("All")}
-          </FilterChip>
-          {types.map((item) => (
-            <FilterChip
-              key={item.id}
-              active={typeFilter === item.id}
-              onClick={() => setTypeFilter(item.id)}
-              count={counts.get(item.id) ?? 0}
-              color={typeLook(item.code).ink}
+      {/* Toolbar: type and tag filters, search, view toggle. It stays at the top while the list scrolls,
+          on the page colour edge to edge (the negative margins cover the main area's padding). */}
+      <div className="sticky top-0 z-20 -mx-4 mb-4 flex flex-col gap-3 bg-secondary px-4 py-3 sm:-mx-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <TypeFilterMenu types={types} counts={counts} total={metas.length} value={typeFilter} onChange={setTypeFilter} />
+          <TagFilterMenu tags={tags} counts={tagCounts} value={tagFilter} onChange={setTagFilter} />
+          {(typeFilter !== 'all' || tagFilter.length > 0) && (
+            <Button
+              size="sm"
+              color="link-gray"
+              onPress={() => {
+                setTypeFilter('all');
+                setTagFilter([]);
+              }}
             >
-              {item.name}
-            </FilterChip>
-          ))}
+              {t('Clear filters')}
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
           <Input
-            aria-label={t("Search metas")}
+            aria-label={t('Search metas')}
             type="search"
             size="sm"
             icon={SearchLg}
             value={query}
             onChange={setQuery}
-            placeholder={t("Search by name or code")}
+            placeholder={t('Search by name or code')}
             className="flex-1 lg:w-72 lg:flex-none"
           />
           <ButtonGroup
             size="sm"
-            aria-label={t("Layout")}
+            aria-label={t('Layout')}
             selectionMode="single"
             disallowEmptySelection
             selectedKeys={[view]}
             onSelectionChange={(keys) => changeView([...keys][0] === 'list' ? 'list' : 'grid')}
           >
-            <ButtonGroupItem id="grid" iconLeading={Grid01} aria-label={t("Cards")} />
-            <ButtonGroupItem id="list" iconLeading={List} aria-label={t("List")} />
+            <ButtonGroupItem id="grid" iconLeading={Grid01} aria-label={t('Cards')} />
+            <ButtonGroupItem id="list" iconLeading={List} aria-label={t('List')} />
           </ButtonGroup>
         </div>
       </div>
 
-      {tags.some((item) => tagCounts.has(item.id)) && (
-        <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label={t("Filter by tag")}>
-          <span className="text-sm font-medium text-tertiary">{t("Tags")}</span>
-          {tags
-            .filter((item) => tagCounts.has(item.id))
-            .map((item) => (
-              <FilterChip
-                key={item.id}
-                active={tagFilter.includes(item.id)}
-                onClick={() => setTagFilter((f) => (f.includes(item.id) ? f.filter((id) => id !== item.id) : [...f, item.id]))}
-                count={tagCounts.get(item.id) ?? 0}
-                color={`var(--color-utility-${tagColor(item)}-500)`}
-              >
-                {item.name}
-              </FilterChip>
-            ))}
-        </div>
-      )}
-
-      {loading ? (
+      {loading || (look && !library) ? (
         <SkeletonGrid />
+      ) : metas.length === 0 && look ? (
+        <div className="rounded-xl bg-primary px-6 py-14 text-center shadow-xs ring-1 ring-secondary">
+          <look.icon className="mx-auto size-8 text-fg-quaternary" aria-hidden="true" />
+          <p className="mt-3 text-md font-semibold text-primary">{t(look.empty)}</p>
+          <p className="mt-1 text-sm text-tertiary">{t(look.emptyHint)}</p>
+          <Link to="/metas" className="mt-4 inline-block text-sm font-semibold text-brand-secondary hover:text-brand-secondary_hover">
+            {t('Browse metas')}
+          </Link>
+        </div>
       ) : metas.length === 0 ? (
-        <EmptyState types={types} onCreate={() => setEditing(null)} />
+        <EmptyState types={types} onCreate={() => setCreating(true)} />
       ) : visible.length === 0 ? (
         <div className="rounded-xl bg-primary px-6 py-12 text-center shadow-xs ring-1 ring-secondary ring-inset">
-          <p className="text-md font-semibold text-primary">{t("No metas match these filters.")}</p>
-          <p className="mt-1 text-sm text-tertiary">{t("Try another search, type or tag.")}</p>
+          <p className="text-md font-semibold text-primary">{t('No metas match these filters.')}</p>
+          <p className="mt-1 text-sm text-tertiary">{t('Try another search, type or tag.')}</p>
           <Button
             color="secondary"
             className="mt-5"
@@ -291,14 +366,14 @@ export default function MetasPage() {
               setTagFilter([]);
             }}
           >
-            {t("Clear filters")}
+            {t('Clear filters')}
           </Button>
         </div>
       ) : view === 'grid' ? (
         <>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {shown.map((m) => (
-              <MetaCard key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
+              <MetaCard key={m.id} meta={m} onMenu={openMenu} starred={starred.has(m.id)} onStar={onStar} note={noteOf(m)} />
             ))}
           </div>
           <LoadMore shown={shown.length} total={visible.length} onMore={showMore} />
@@ -307,24 +382,25 @@ export default function MetasPage() {
         <>
           <div className="divide-y divide-secondary overflow-hidden rounded-xl bg-primary shadow-xs ring-1 ring-secondary">
             {shown.map((m) => (
-              <MetaRow key={m.id} meta={m} onEdit={setEditing} onDelete={setDeleting} onMenu={isAdmin ? openMenu : undefined} />
+              <MetaRow key={m.id} meta={m} onMenu={openMenu} starred={starred.has(m.id)} onStar={onStar} note={noteOf(m)} />
             ))}
           </div>
           <LoadMore shown={shown.length} total={visible.length} onMore={showMore} />
         </>
       )}
 
-      {editing !== undefined && (
+      {creating && (
         <MetaFormModal
-          meta={editing}
+          meta={null}
           types={types}
           options={options}
-          presetTypeId={typeFilter === 'all' ? undefined : typeFilter}
-          onClose={() => setEditing(undefined)}
-          onSaved={() => {
-            setEditing(undefined);
-            loadAll();
+          presetTypeId={newTypeId}
+          onClose={() => {
+            setCreating(false);
+            setNewTypeId(undefined);
           }}
+          // A new meta opens on its own page, to be built there.
+          onSaved={(saved) => navigate(`/metas/${saved.id}`)}
         />
       )}
 
@@ -335,10 +411,12 @@ export default function MetasPage() {
           at={menu.at}
           tags={tags}
           onClose={closeMenu}
-          onEdit={setEditing}
+          full={isAdmin}
+          starred={starred.has(menu.meta.id)}
+          onStar={onStar}
+          onShare={isAdmin || menu.meta.created_by === user?.id || sharedIds.has(menu.meta.id) ? setSharing : undefined}
           onDelete={setDeleting}
           onReplace={setReplacing}
-          onExport={(m) => setExporting([m.id])}
           onChanged={(n) => {
             setError(null);
             if (n) setNotice(n);
@@ -347,6 +425,8 @@ export default function MetasPage() {
           onError={menuError}
         />
       )}
+
+      {sharing && <ShareMetaModal meta={sharing} onClose={() => setSharing(null)} onShared={(n) => setNotice(n)} />}
 
       {replacing && (
         <ReplaceMetaModal
@@ -364,8 +444,11 @@ export default function MetasPage() {
       {deleting && (
         <ConfirmDialog
           title={t('Delete {name}?', { name: deleting.name })}
-          message={t("This also deletes its {count} {rows}. Other metas that link to it will lose that link. This can't be undone.", { count: deleting.params_count ?? 0, rows: t(`${typeLook(deleting.type?.code).rowNoun}s`) })}
-          confirmLabel={t("Delete meta")}
+          message={t("This also deletes its {count} {rows}. Other metas that link to it will lose that link. This can't be undone.", {
+            count: deleting.params_count ?? 0,
+            rows: t(`${typeLook(deleting.type?.code).rowNoun}s`),
+          })}
+          confirmLabel={t('Delete meta')}
           busy={deleteBusy}
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
@@ -375,39 +458,9 @@ export default function MetasPage() {
   );
 }
 
-function FilterChip({
-  active,
-  onClick,
-  count,
-  color,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count: number;
-  color?: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold shadow-xs ring-1 ring-inset transition duration-100 ease-linear ${
-        active ? 'bg-active text-secondary_hover ring-primary' : 'bg-primary text-secondary ring-primary hover:bg-primary_hover hover:text-secondary_hover'
-      }`}
-    >
-      {color && <span className="size-2 rounded-full" style={{ background: color }} aria-hidden="true" />}
-      {children}
-      <span className="rounded-full bg-secondary px-1.5 text-xs font-medium tabular-nums text-tertiary ring-1 ring-secondary ring-inset">{count}</span>
-    </button>
-  );
-}
-
-
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3" aria-label={t("Loading metas")}>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3" aria-label={t('Loading metas')}>
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="h-36 animate-pulse rounded-xl bg-primary ring-1 ring-secondary motion-reduce:animate-none" />
       ))}
@@ -415,35 +468,11 @@ function SkeletonGrid() {
   );
 }
 
-/** How many metas are drawn at a time. */
-const PAGE = 20;
-
 /**
- * The end of the list: asks for more when it comes within a screen of view (and again while it
- * stays there, since the observer is renewed after each batch), with a button as a fallback.
+ * How many metas are drawn at a time: enough to fill a wide screen at once, or the next pages
+ * follow one after another while it opens. Off-screen cards are cheap (content-visibility).
  */
-function LoadMore({ shown, total, onMore }: { shown: number; total: number; onMore: () => void }) {
-  const end = useRef<HTMLDivElement>(null);
-  const more = shown < total;
-  useEffect(() => {
-    const el = end.current;
-    if (!more || !el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && onMore(), { rootMargin: '0px 0px 600px 0px' });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [more, shown, onMore]);
-
-  return (
-    <div ref={end} className="mt-4 flex flex-col items-center gap-2 text-sm text-tertiary">
-      <span>{t('Showing {shown} of {total}', { shown, total })}</span>
-      {more && (
-        <Button size="sm" color="secondary" onPress={onMore}>
-          {t('Show more')}
-        </Button>
-      )}
-    </div>
-  );
-}
+const PAGE = 100;
 
 function EmptyState({ types, onCreate }: { types: MetaType[]; onCreate: () => void }) {
   const shown = types.length ? types.slice(0, 5).map((item) => item.code) : ['app', 'datagrid', 'form', 'calendar', 'tabs'];
@@ -454,12 +483,10 @@ function EmptyState({ types, onCreate }: { types: MetaType[]; onCreate: () => vo
           <TypeIcon key={code} code={code} size="lg" />
         ))}
       </div>
-      <h2 className="mt-8 text-lg font-semibold text-primary">{t("Start with your first app")}</h2>
-      <p className="mx-auto mt-1 max-w-md text-sm text-tertiary">
-        {t("Create an app meta, then add grids and forms and link them from its menu.")}
-      </p>
+      <h2 className="mt-8 text-lg font-semibold text-primary">{t('Start with your first app')}</h2>
+      <p className="mx-auto mt-1 max-w-md text-sm text-tertiary">{t('Create an app meta, then add grids and forms and link them from its menu.')}</p>
       <Button size="lg" iconLeading={Plus} className="mt-6" onPress={onCreate}>
-        {t("New meta")}
+        {t('New meta')}
       </Button>
     </div>
   );

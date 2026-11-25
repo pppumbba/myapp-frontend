@@ -249,6 +249,8 @@ export interface InputProps
     hint?: ReactNode;
     /** Whether to hide required indicator from label */
     hideRequiredIndicator?: boolean;
+    /** Shows "(optional)" after the label. */
+    isOptional?: boolean;
 }
 
 export const Input = ({
@@ -259,6 +261,7 @@ export const Input = ({
     hint,
     shortcut,
     hideRequiredIndicator,
+    isOptional,
     className,
     ref,
     groupRef,
@@ -275,7 +278,7 @@ export const Input = ({
             {({ isRequired, isInvalid }) => (
                 <>
                     {label && (
-                        <Label isRequired={hideRequiredIndicator ? !hideRequiredIndicator : isRequired} isInvalid={isInvalid}>
+                        <Label isRequired={hideRequiredIndicator ? !hideRequiredIndicator : isRequired} isInvalid={isInvalid} isOptional={isOptional}>
                             {label}
                         </Label>
                     )}

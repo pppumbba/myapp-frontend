@@ -64,7 +64,7 @@ export function QueryView({ def, defaults }: { def: MetaDef; defaults?: Record<s
         </form>
       )}
       {error && <Alert>{error}</Alert>}
-      {!run && busy ? <div className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" /> : <ResultTable run={run} />}
+      {!run && busy ? <div aria-busy="true" className="h-48 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" /> : <ResultTable run={run} />}
     </section>
   );
 }

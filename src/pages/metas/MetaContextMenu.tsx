@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FC, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronRight, Copy01, Download01, Edit01, Eye, LayersTwo01, Link03, LinkExternal01, Plus, SearchLg, SwitchHorizontal01, Tag01, Trash01 } from '@untitledui/icons';
+import { Check, ChevronRight, Copy01, Download01, Eye, LayersTwo01, Link03, LinkExternal01, Plus, SearchLg, SwitchHorizontal01, Tag01, Share07, Star01, Trash01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type Tag } from '../../lib/metaApi';
 import { Modal } from '../../components/Modal';
@@ -27,10 +27,15 @@ interface Props {
   at: MenuAt;
   tags: Tag[];
   onClose: () => void;
-  onEdit: (meta: Meta) => void;
+  /** Admins get every action; builders only open, view and delete (their own metas). */
+  full: boolean;
+  /** Starred by the user, and starring it; no star item without onStar. */
+  starred?: boolean;
+  onStar?: (meta: Meta) => void;
+  /** Opens the share dialog; only for someone who may change the meta. */
+  onShare?: (meta: Meta) => void;
   onDelete: (meta: Meta) => void;
   onReplace: (meta: Meta) => void;
-  onExport: (meta: Meta) => void;
   /** After a copy, a new meta, or tags changed: the list is loaded again. */
   onChanged: (notice?: string) => void;
   onError: (message: string) => void;
@@ -43,7 +48,7 @@ type Sub = 'derive' | 'tags' | null;
  * edit its settings, copy it whole, replace it with another, make a meta of another type
  * from it, tag it, export it to a file, delete it. Arrow keys move, → opens a submenu, Esc closes.
  */
-export function MetaContextMenu({ meta, at, tags, onClose, onEdit, onDelete, onReplace, onExport, onChanged, onError }: Props) {
+export function MetaContextMenu({ meta, at, tags, onClose, full, starred = false, onStar, onShare, onDelete, onReplace, onChanged, onError }: Props) {
   const navigate = useNavigate();
   const menu = useRef<HTMLDivElement>(null);
   const [sub, setSub] = useState<Sub>(null);
@@ -80,7 +85,7 @@ export function MetaContextMenu({ meta, at, tags, onClose, onEdit, onDelete, onR
     try {
       await work();
     } catch (err) {
-      onError(message(err, t("That did not work.")));
+      onError(message(err, t('That did not work.')));
     } finally {
       setBusy(false);
       onClose();
@@ -91,7 +96,7 @@ export function MetaContextMenu({ meta, at, tags, onClose, onEdit, onDelete, onR
     run(async () => {
       const made = await metaApi.copy(meta.id);
       onChanged(`Copied as ${made.name} (${made.code}).`);
-      onEdit(made);
+      navigate(`/metas/${made.id}`);
     });
 
   const go = (to: string) => {
@@ -100,7 +105,14 @@ export function MetaContextMenu({ meta, at, tags, onClose, onEdit, onDelete, onR
   };
 
   return (
-    <div className="fixed inset-0 z-50" onContextMenu={(e) => { e.preventDefault(); onClose(); }} style={{ pointerEvents: 'none' }}>
+    <div
+      className="fixed inset-0 z-50"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      style={{ pointerEvents: 'none' }}
+    >
       <div
         ref={menu}
         role="menu"
@@ -109,24 +121,86 @@ export function MetaContextMenu({ meta, at, tags, onClose, onEdit, onDelete, onR
         className="pointer-events-auto absolute rounded-lg bg-primary py-1 shadow-lg ring-1 ring-secondary"
         style={{ left: pos.x, top: pos.y, width: MENU_W }}
       >
-        <p className="truncate px-3 pt-1 pb-1.5 text-xs font-semibold text-tertiary" title={`${meta.name} · ${meta.code}`}>{meta.name}</p>
-        <Item icon={LinkExternal01} label={t("Open")} hint="builder" onSelect={() => go(`/metas/${meta.id}`)} onHover={() => setSub(null)} />
-        <Item icon={Eye} label={t("View")} hint={t("as users see it")} onSelect={() => go(`/run/${meta.id}`)} onHover={() => setSub(null)} />
-        <Item icon={Edit01} label={t("Edit")} hint="settings" onSelect={() => { onClose(); onEdit(meta); }} onHover={() => setSub(null)} />
+        <p className="truncate px-3 pt-1 pb-1.5 text-xs font-semibold text-tertiary" title={`${meta.name} · ${meta.code}`}>
+          {meta.name}
+        </p>
+        <Item icon={LinkExternal01} label={t('Open')} hint="builder" onSelect={() => go(`/metas/${meta.id}`)} onHover={() => setSub(null)} />
+        <Item icon={Eye} label={t('View')} hint={t('as users see it')} onSelect={() => go(`/run/${meta.id}`)} onHover={() => setSub(null)} />
+        {full && (
+          <>
+            <Separator />
+            <Item icon={Copy01} label={t('Copy')} disabled={busy} onSelect={copy} onHover={() => setSub(null)} />
+            <Item
+              icon={SwitchHorizontal01}
+              label={t('Replace with…')}
+              onSelect={() => {
+                onClose();
+                onReplace(meta);
+              }}
+              onHover={() => setSub(null)}
+            />
+            <Item icon={LayersTwo01} label={t('Make based on')} submenu open={sub === 'derive'} onSelect={() => setSub('derive')} onHover={() => setSub('derive')} />
+            <Item icon={Tag01} label={t('Tags')} submenu open={sub === 'tags'} onSelect={() => setSub('tags')} onHover={() => setSub('tags')} />
+            <Item icon={Download01} label={t('Export…')} onSelect={() => go(`/metas/${meta.id}?section=export`)} onHover={() => setSub(null)} />
+            <Item icon={Link03} label={t('Where used')} onSelect={() => go(`/metas/${meta.id}?section=usage`)} onHover={() => setSub(null)} />
+          </>
+        )}
+        {(onStar || onShare) && <Separator />}
+        {onStar && (
+          <Item
+            icon={Star01}
+            label={starred ? t('Remove from starred') : t('Star')}
+            onSelect={() => {
+              onClose();
+              onStar(meta);
+            }}
+            onHover={() => setSub(null)}
+          />
+        )}
+        {onShare && (
+          <Item
+            icon={Share07}
+            label={t('Share…')}
+            onSelect={() => {
+              onClose();
+              onShare(meta);
+            }}
+            onHover={() => setSub(null)}
+          />
+        )}
         <Separator />
-        <Item icon={Copy01} label={t("Copy")} disabled={busy} onSelect={copy} onHover={() => setSub(null)} />
-        <Item icon={SwitchHorizontal01} label={t("Replace with…")} onSelect={() => { onClose(); onReplace(meta); }} onHover={() => setSub(null)} />
-        <Item icon={LayersTwo01} label={t("Make based on")} submenu open={sub === 'derive'} onSelect={() => setSub('derive')} onHover={() => setSub('derive')} />
-        <Item icon={Tag01} label={t("Tags")} submenu open={sub === 'tags'} onSelect={() => setSub('tags')} onHover={() => setSub('tags')} />
-        <Item icon={Download01} label={t("Export…")} hint={t("to a file")} onSelect={() => { onClose(); onExport(meta); }} onHover={() => setSub(null)} />
-        <Item icon={Link03} label={t("Where used")} onSelect={() => go(`/metas/usage?meta=${meta.id}`)} onHover={() => setSub(null)} />
-        <Separator />
-        <Item icon={Trash01} label={t("Delete")} danger onSelect={() => { onClose(); onDelete(meta); }} onHover={() => setSub(null)} />
+        <Item
+          icon={Trash01}
+          label={t('Delete')}
+          danger
+          onSelect={() => {
+            onClose();
+            onDelete(meta);
+          }}
+          onHover={() => setSub(null)}
+        />
       </div>
       {sub && (
-        <SubPanel anchor={menu} index={sub === 'derive' ? 6 : 7} onBack={() => { setSub(null); menu.current?.querySelectorAll<HTMLElement>('[role=menuitem]')[sub === 'derive' ? 5 : 6]?.focus(); }} onClose={onClose}>
+        <SubPanel
+          anchor={menu}
+          index={sub === 'derive' ? 6 : 7}
+          onBack={() => {
+            setSub(null);
+            menu.current?.querySelectorAll<HTMLElement>('[role=menuitem]')[sub === 'derive' ? 5 : 6]?.focus();
+          }}
+          onClose={onClose}
+        >
           {sub === 'derive' ? (
-            <DeriveItems meta={meta} onMade={(made) => run(async () => { onChanged(`Made ${made.type?.name ?? 'a meta'} ${made.name}.`); navigate(`/metas/${made.id}`); })} onError={onError} />
+            <DeriveItems
+              meta={meta}
+              onMade={(made) =>
+                run(async () => {
+                  onChanged(`Made ${made.type?.name ?? 'a meta'} ${made.name}.`);
+                  navigate(`/metas/${made.id}`);
+                })
+              }
+              onError={onError}
+            />
           ) : (
             <TagItems meta={meta} tags={tags} onChanged={onChanged} onError={onError} />
           )}
@@ -157,7 +231,17 @@ function keys(e: KeyboardEvent<HTMLDivElement>, { onClose, onOpenSub }: { onClos
   }
 }
 
-function Item({ icon: Icon, label, hint, danger, disabled, submenu, open, onSelect, onHover }: {
+function Item({
+  icon: Icon,
+  label,
+  hint,
+  danger,
+  disabled,
+  submenu,
+  open,
+  onSelect,
+  onHover,
+}: {
   icon: FC<{ className?: string }>;
   label: string;
   hint?: string;
@@ -239,15 +323,16 @@ function DeriveItems({ meta, onMade, onError }: { meta: Meta; onMade: (made: Met
   useEffect(() => {
     metaApi.deriveTargets(meta.id).then(setTargets, (err) => {
       setTargets([]);
-      onError(message(err, t("Could not tell what can be made from it.")));
+      onError(message(err, t('Could not tell what can be made from it.')));
     });
   }, [meta.id, onError]);
 
-  if (!targets) return <p className="px-3 py-2 text-sm text-tertiary">{t("Loading…")}</p>;
-  if (!targets.length) return <p className="px-3 py-2 text-sm text-tertiary">{t('Nothing can be made from a {type} like this: it reads no table or query.', { type: meta.type?.name?.toLowerCase() ?? 'meta' })}</p>;
+  if (!targets) return <p className="px-3 py-2 text-sm text-tertiary">{t('Loading…')}</p>;
+  if (!targets.length)
+    return <p className="px-3 py-2 text-sm text-tertiary">{t('Nothing can be made from a {type} like this: it reads no table or query.', { type: meta.type?.name?.toLowerCase() ?? 'meta' })}</p>;
   return (
     <>
-      <p className="px-3 pt-1 pb-1.5 text-xs text-tertiary">{t("A new meta on the same data, with its fields")}</p>
+      <p className="px-3 pt-1 pb-1.5 text-xs text-tertiary">{t('A new meta on the same data, with its fields')}</p>
       {targets.map((entry) => (
         <button
           key={entry.code}
@@ -267,7 +352,7 @@ function DeriveItems({ meta, onMade, onError }: { meta: Meta; onMade: (made: Met
         >
           <Plus className="size-4 shrink-0 text-fg-quaternary" />
           <span className="flex-1">{entry.name}</span>
-          {making === entry.code && <span className="text-xs text-quaternary">{t("making…")}</span>}
+          {making === entry.code && <span className="text-xs text-quaternary">{t('making…')}</span>}
         </button>
       ))}
     </>
@@ -292,7 +377,7 @@ function TagItems({ meta, tags, onChanged, onError }: { meta: Meta; tags: Tag[];
       onChanged();
     } catch (err) {
       setIds(before);
-      onError(message(err, t("The tags could not be saved.")));
+      onError(message(err, t('The tags could not be saved.')));
     } finally {
       setBusy(false);
     }
@@ -309,7 +394,7 @@ function TagItems({ meta, tags, onChanged, onError }: { meta: Meta; tags: Tag[];
       setBusy(false);
       if (!ids.includes(tag.id)) await save([...ids, tag.id]);
     } catch (err) {
-      onError(message(err, t("The tag could not be made.")));
+      onError(message(err, t('The tag could not be made.')));
       setBusy(false);
     }
   }
@@ -319,7 +404,7 @@ function TagItems({ meta, tags, onChanged, onError }: { meta: Meta; tags: Tag[];
       <label className="mx-2 mb-1 flex items-center gap-1.5 rounded-md px-2 py-1 ring-1 ring-secondary">
         <SearchLg className="size-3.5 text-fg-quaternary" aria-hidden="true" />
         <input
-          aria-label={t("Find or add a tag")}
+          aria-label={t('Find or add a tag')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
@@ -329,7 +414,7 @@ function TagItems({ meta, tags, onChanged, onError }: { meta: Meta; tags: Tag[];
               else void add();
             }
           }}
-          placeholder={t("Find or add a tag")}
+          placeholder={t('Find or add a tag')}
           className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder"
         />
       </label>
@@ -353,11 +438,17 @@ function TagItems({ meta, tags, onChanged, onError }: { meta: Meta; tags: Tag[];
         );
       })}
       {name.trim() && !exact && (
-        <button type="button" role="menuitem" disabled={busy} onClick={add} className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm font-medium text-brand-secondary outline-none hover:bg-primary_hover focus-visible:bg-primary_hover">
+        <button
+          type="button"
+          role="menuitem"
+          disabled={busy}
+          onClick={add}
+          className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm font-medium text-brand-secondary outline-none hover:bg-primary_hover focus-visible:bg-primary_hover"
+        >
           <Plus className="size-4" /> {t('Add tag “{name}”', { name: name.trim() })}
         </button>
       )}
-      {!shown.length && !name.trim() && <p className="px-3 py-2 text-sm text-tertiary">{t("No tags yet. Type a name to add one.")}</p>}
+      {!shown.length && !name.trim() && <p className="px-3 py-2 text-sm text-tertiary">{t('No tags yet. Type a name to add one.')}</p>}
     </>
   );
 }
@@ -384,33 +475,51 @@ export function ReplaceMetaModal({ target, metas, onClose, onDone }: { target: M
       if (result.warnings.length) setWarnings(result.warnings);
       else onDone(t('{target} is now the same as {source}. Its previous state is in its versions.', { target: target.name, source: source.name }));
     } catch (err) {
-      setError(message(err, t("It could not be replaced.")));
+      setError(message(err, t('It could not be replaced.')));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal title={t('Replace {name}', { name: target.name })} description={t("It becomes the same as the meta you pick: type, table, fields, buttons, workflow, permissions and tags. Its id, code and name stay, so menus and links to it keep working.")} onClose={onClose} size="lg">
+    <Modal
+      title={t('Replace {name}', { name: target.name })}
+      description={t('It becomes the same as the meta you pick: type, table, fields, buttons, workflow, permissions and tags. Its id, code and name stay, so menus and links to it keep working.')}
+      onClose={onClose}
+      size="lg"
+    >
       <div className="space-y-4">
         {error && <Alert>{error}</Alert>}
         {warnings ? (
           <>
             <Alert>{t('Replaced, with notes: {notes}', { notes: warnings.join(' ') })}</Alert>
             <div className="flex justify-end">
-              <Button size="sm" onPress={() => onDone(t('{target} is now the same as {source}.', { target: target.name, source: source?.name }))}>{t("Done")}</Button>
+              <Button size="sm" onPress={() => onDone(t('{target} is now the same as {source}.', { target: target.name, source: source?.name }))}>
+                {t('Done')}
+              </Button>
             </div>
           </>
         ) : (
           <>
             <label className="flex items-center gap-2 rounded-lg px-3 py-2 ring-1 ring-primary">
               <SearchLg className="size-4 text-fg-quaternary" aria-hidden="true" />
-              <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Find the meta to copy from")} aria-label={t("Find the meta to copy from")} className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('Find the meta to copy from')}
+                aria-label={t('Find the meta to copy from')}
+                className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder"
+              />
             </label>
-            <ul role="listbox" aria-label={t("Metas")} className="max-h-72 divide-y divide-secondary overflow-auto rounded-lg ring-1 ring-secondary">
+            <ul role="listbox" aria-label={t('Metas')} className="max-h-72 divide-y divide-secondary overflow-auto rounded-lg ring-1 ring-secondary">
               {shown.map((m) => (
                 <li key={m.id} role="option" aria-selected={source?.id === m.id}>
-                  <button type="button" onClick={() => setSource(m)} className={cx('flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-primary_hover', source?.id === m.id && 'bg-brand-primary_alt')}>
+                  <button
+                    type="button"
+                    onClick={() => setSource(m)}
+                    className={cx('flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-primary_hover', source?.id === m.id && 'bg-brand-primary_alt')}
+                  >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-primary">{m.name}</span>
                       <span className="block truncate text-xs text-tertiary">{m.code}</span>
@@ -420,17 +529,23 @@ export function ReplaceMetaModal({ target, metas, onClose, onDone }: { target: M
                   </button>
                 </li>
               ))}
-              {!shown.length && <li className="px-3 py-4 text-sm text-tertiary">{t("No meta matches.")}</li>}
+              {!shown.length && <li className="px-3 py-4 text-sm text-tertiary">{t('No meta matches.')}</li>}
             </ul>
             {source && (
               <p className="rounded-lg bg-warning-primary p-3 text-sm text-warning-primary">
-                {t('Everything {target} has now is replaced by a copy of {source}’s ({type}). Its current state is saved as a version first, so you can put it back from its Versions.', { target: target.name, source: source.name, type: source.type?.name })}
+                {t('Everything {target} has now is replaced by a copy of {source}’s ({type}). Its current state is saved as a version first, so you can put it back from its Versions.', {
+                  target: target.name,
+                  source: source.name,
+                  type: source.type?.name,
+                })}
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <Button size="sm" color="secondary" onPress={onClose}>{t("Cancel")}</Button>
+              <Button size="sm" color="secondary" onPress={onClose}>
+                {t('Cancel')}
+              </Button>
               <Button size="sm" color="primary-destructive" isDisabled={!source} isLoading={busy} showTextWhileLoading onPress={replace}>
-                {t("Replace")}
+                {t('Replace')}
               </Button>
             </div>
           </>

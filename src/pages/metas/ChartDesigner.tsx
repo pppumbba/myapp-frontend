@@ -1,25 +1,16 @@
 import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
-import {
-  AlignLeft,
-  BarChart01,
-  Hash01,
-  LineChartUp01,
-  PieChart01,
-  PieChart03,
-  Plus,
-  Table,
-  TrendUp01,
-  Trash01,
-} from '@untitledui/icons';
+import { AlignLeft, BarChart01, Hash01, HelpCircle, LineChartUp01, PieChart01, PieChart03, Plus, Table, TrendUp01, Trash01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
 import { chartApi, type Aggregate, type ChartColumn, type ChartConfig, type ChartType, type FilterOp } from '../../lib/chartApi';
 import { metaApi, type Meta, type MetaOption } from '../../lib/metaApi';
 import { ComboField } from '../../components/ComboField';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { Alert, IconAction } from '../../components/ui';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
 import { useDebounced } from '@/hooks/use-debounced';
+import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
 import { cx } from '@/utils/cx';
 import { ChartCard } from '../../render/DashboardView';
 import { DrilldownEditor, chartSources } from './DrilldownEditor';
@@ -89,8 +80,7 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
   const single = type === 'pie' || type === 'donut' || type === 'kpi';
   const measures = config.measures?.length ? config.measures : [{ agg: 'count' as Aggregate }];
   const kindOf = (name?: string | null) => columns?.find((c) => c.name === name)?.kind;
-  const choices = (kinds?: ChartColumn['kind'][]) =>
-    (columns ?? []).filter((c) => !kinds || kinds.includes(c.kind)).map((c) => ({ id: c.name, label: `${c.name} · ${kindLabel[c.kind]}` }));
+  const choices = (kinds?: ChartColumn['kind'][]) => (columns ?? []).filter((c) => !kinds || kinds.includes(c.kind)).map((c) => ({ id: c.name, label: `${c.name} · ${kindLabel[c.kind]}` }));
   const dirty = JSON.stringify(config) !== saved;
 
   async function save() {
@@ -128,147 +118,188 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium text-secondary">{t('Chart type')}</legend>
-            <div className="grid grid-cols-4 gap-2">
-              {types.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={type === item.id}
-                  onClick={() => set({ type: item.id, ...(item.id === 'kpi' ? { split: null } : {}) })}
-                  className={cx(
-                    'flex flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-xs font-medium outline-focus-ring transition duration-100 ease-linear focus-visible:outline-2',
-                    type === item.id ? 'bg-brand-primary_alt text-brand-secondary ring-2 ring-brand' : 'text-secondary ring-1 ring-secondary hover:bg-primary_hover',
-                  )}
-                >
-                  <item.icon className="size-5" aria-hidden="true" />
-                  {t(item.label)}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {!columns ? (
-            <div className="h-60 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
-          ) : (
-            <>
-              {type !== 'kpi' && (
-                <Group title={t('Group by')} hint={t('Each value of this column becomes a column, bar, point or slice.')}>
-                  <ComboField
-                    aria-label={t('Group by column')}
-                    items={choices()}
-                    value={config.x ?? ''}
-                    onChange={(x) => set({ x: x || null, bucket: kindOf(x) === 'date' ? (config.bucket ?? 'month') : null })}
-                  />
-                  {kindOf(config.x) === 'date' && (
-                    <NativeSelect
-                      label={t('Dates by')}
-                      size="sm"
-                      value={config.bucket ?? ''}
-                      onChange={(e) => set({ bucket: (e.target.value || null) as ChartConfig['bucket'] })}
-                      options={[
-                        { value: '', label: t('Each date as it is') },
-                        { value: 'day', label: t('Day') },
-                        { value: 'week', label: t('Week') },
-                        { value: 'month', label: t('Month') },
-                        { value: 'quarter', label: t('Quarter') },
-                        { value: 'year', label: t('Year') },
-                      ]}
-                    />
-                  )}
-                  {kindOf(config.x) === 'number' && <LookupPicker options={options} value={config.x_lookup ?? null} onChange={(x_lookup) => set({ x_lookup })} />}
-                </Group>
-              )}
-
-              <Group title={single ? t('Value') : t('Values')} hint={single ? undefined : t('Up to four, drawn as separate series.')}>
-                {(single ? measures.slice(0, 1) : measures).map((m, i) => (
-                  <div key={i} className="grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-2">
-                    <NativeSelect
-                      aria-label={t('Value {n}: how', { n: i + 1 })}
-                      size="sm"
-                      value={m.agg}
-                      onChange={(e) => set({ measures: measures.map((x, j) => (j === i ? { ...x, agg: e.target.value as Aggregate } : x)) })}
-                      options={tLabels(aggregates)}
-                    />
-                    <ComboField
-                      aria-label={t('Value {n}: column', { n: i + 1 })}
-                      size="sm"
-                      placeholder={m.agg === 'count' ? t('Rows') : t('Column…')}
-                      items={choices(m.agg === 'sum' || m.agg === 'avg' ? ['number'] : undefined)}
-                      value={m.column ?? ''}
-                      onChange={(column) => set({ measures: measures.map((x, j) => (j === i ? { ...x, column: column || null } : x)) })}
-                      isInvalid={m.agg !== 'count' && !m.column}
-                    />
-                    <IconAction
-                      icon={Trash01}
-                      danger
-                      label={t('Remove value {n}', { n: i + 1 })}
-                      onPress={() => set({ measures: measures.filter((_, j) => j !== i) })}
-                      className={cx('mt-1', measures.length < 2 && 'invisible')}
-                    />
-                    <div className="col-span-2">
-                      <Input
-                        aria-label={t('Value {n}: name', { n: i + 1 })}
-                        size="sm"
-                        placeholder={t('Name shown in the legend (optional)')}
-                        value={m.label ?? ''}
-                        onChange={(label) => set({ measures: measures.map((x, j) => (j === i ? { ...x, label: label || null } : x)) })}
-                      />
-                    </div>
-                  </div>
+        <div className="space-y-8">
+          <Block title={t('What it shows')}>
+            <Group title={t('Chart type')}>
+              <div className="grid grid-cols-4 gap-2">
+                {types.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={type === item.id}
+                    onClick={() => set({ type: item.id, ...(item.id === 'kpi' ? { split: null } : {}) })}
+                    className={cx(
+                      'flex flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-xs font-medium outline-focus-ring transition duration-100 ease-linear focus-visible:outline-2',
+                      type === item.id ? 'bg-brand-primary_alt text-brand-secondary ring-2 ring-brand' : 'text-secondary ring-1 ring-secondary hover:bg-primary_hover',
+                    )}
+                  >
+                    <item.icon className="size-5" aria-hidden="true" />
+                    {t(item.label)}
+                  </button>
                 ))}
-                {!single && measures.length < 4 && !config.split && (
-                  <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => set({ measures: [...measures, { agg: 'sum' }] })}>
-                    {t('Add value')}
-                  </Button>
+              </div>
+            </Group>
+
+            {!columns ? (
+              <div aria-busy="true" className="h-60 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />
+            ) : (
+              <>
+                {type !== 'kpi' && (
+                  <Group title={t('Group by')} hint={t('Each value of this column becomes a column, bar, point or slice.')}>
+                    <ComboField
+                      aria-label={t('Group by column')}
+                      items={choices()}
+                      value={config.x ?? ''}
+                      onChange={(x) => set({ x: x || null, bucket: kindOf(x) === 'date' ? (config.bucket ?? 'month') : null })}
+                    />
+                    {kindOf(config.x) === 'date' && (
+                      <NativeSelect
+                        label={t('Dates by')}
+                        size="sm"
+                        value={config.bucket ?? ''}
+                        onChange={(e) => set({ bucket: (e.target.value || null) as ChartConfig['bucket'] })}
+                        options={[
+                          { value: '', label: t('Each date as it is') },
+                          { value: 'day', label: t('Day') },
+                          { value: 'week', label: t('Week') },
+                          { value: 'month', label: t('Month') },
+                          { value: 'quarter', label: t('Quarter') },
+                          { value: 'year', label: t('Year') },
+                        ]}
+                      />
+                    )}
+                    {kindOf(config.x) === 'number' && <LookupPicker options={options} value={config.x_lookup ?? null} onChange={(x_lookup) => set({ x_lookup })} />}
+                  </Group>
                 )}
-              </Group>
 
-              {!single && (
-                <Group title={t('Split by')} hint={t('One series per value of this column (the first value only).')}>
-                  <ComboField aria-label={t('Split by column')} placeholder={t('No split')} items={choices(['text', 'boolean', 'number'])} value={config.split ?? ''} onChange={(split) => set({ split: split || null })} />
-                </Group>
-              )}
-
-              <Group title={t('Only rows where')} hint={t('All of these must hold.')}>
-                {(config.filters ?? []).map((f, i) => {
-                  const update = (patch: Partial<typeof f>) => set({ filters: config.filters!.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-                  const noValue = f.op === 'empty' || f.op === 'not_empty';
-                  return (
-                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] items-start gap-2">
-                      <ComboField aria-label={t('Filter {n}: column', { n: i + 1 })} size="sm" items={choices()} value={f.column} onChange={(column) => update({ column })} />
-                      <NativeSelect aria-label={t('Filter {n}: rule', { n: i + 1 })} size="sm" value={f.op} onChange={(e) => update({ op: e.target.value as FilterOp })} options={tLabels(operators)} />
-                      <IconAction icon={Trash01} danger label={t('Remove filter {n}', { n: i + 1 })} className="mt-1" onPress={() => set({ filters: config.filters!.filter((_, j) => j !== i) })} />
-                      {!noValue && (
+                <Group title={single ? t('Value') : t('Values')} hint={single ? undefined : t('Up to four, drawn as separate series.')}>
+                  {(single ? measures.slice(0, 1) : measures).map((m, i) => (
+                    <div key={i} className={cx('grid items-start gap-2', single ? 'grid-cols-[8rem_minmax(0,1fr)]' : 'grid-cols-[8rem_minmax(0,1fr)_auto]')}>
+                      <NativeSelect
+                        aria-label={t('Value {n}: how', { n: i + 1 })}
+                        size="sm"
+                        value={m.agg}
+                        onChange={(e) => set({ measures: measures.map((x, j) => (j === i ? { ...x, agg: e.target.value as Aggregate } : x)) })}
+                        options={tLabels(aggregates)}
+                      />
+                      <ComboField
+                        aria-label={t('Value {n}: column', { n: i + 1 })}
+                        size="sm"
+                        placeholder={m.agg === 'count' ? t('Rows') : t('Column…')}
+                        items={choices(m.agg === 'sum' || m.agg === 'avg' ? ['number'] : undefined)}
+                        value={m.column ?? ''}
+                        onChange={(column) => set({ measures: measures.map((x, j) => (j === i ? { ...x, column: column || null } : x)) })}
+                        isInvalid={m.agg !== 'count' && !m.column}
+                      />
+                      {!single && (
+                        <IconAction
+                          icon={Trash01}
+                          danger
+                          label={t('Remove value {n}', { n: i + 1 })}
+                          onPress={() => set({ measures: measures.filter((_, j) => j !== i) })}
+                          className={cx('mt-1', measures.length < 2 && 'invisible')}
+                        />
+                      )}
+                      {!single && (
                         <div className="col-span-2">
-                          <Input aria-label={t('Filter {n}: value', { n: i + 1 })} size="sm" placeholder={t('Value')} value={String(f.value ?? '')} onChange={(value) => update({ value })} />
+                          <Input
+                            aria-label={t('Value {n}: name', { n: i + 1 })}
+                            size="sm"
+                            placeholder={t('Name shown in the legend (optional)')}
+                            value={m.label ?? ''}
+                            onChange={(label) => set({ measures: measures.map((x, j) => (j === i ? { ...x, label: label || null } : x)) })}
+                          />
                         </div>
                       )}
                     </div>
-                  );
-                })}
-                <Button
-                  size="sm"
-                  color="link-color"
-                  iconLeading={Plus}
-                  onPress={() => set({ filters: [...(config.filters ?? []), { column: columns[0]?.name ?? '', op: '=', value: '' }] })}
+                  ))}
+                  {!single && measures.length < 4 && !config.split && (
+                    <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => set({ measures: [...measures, { agg: 'sum' }] })}>
+                      {t('Add value')}
+                    </Button>
+                  )}
+                </Group>
+
+                {single && (
+                  <Group title={t('Shown as')} hint={t('The value’s name. Empty: how it is worked out, e.g. Sum of total_amount.')}>
+                    <Input
+                      aria-label={t('Shown as')}
+                      size="sm"
+                      placeholder={t('e.g. Spend (optional)')}
+                      value={measures[0].label ?? ''}
+                      onChange={(label) => set({ measures: measures.map((x, j) => (j === 0 ? { ...x, label: label || null } : x)) })}
+                    />
+                  </Group>
+                )}
+
+                {!single && (
+                  <Group title={t('Split by')} hint={t('One series per value of this column (the first value only).')}>
+                    <ComboField
+                      aria-label={t('Split by column')}
+                      placeholder={t('No split')}
+                      items={choices(['text', 'boolean', 'number'])}
+                      value={config.split ?? ''}
+                      onChange={(split) => set({ split: split || null })}
+                    />
+                  </Group>
+                )}
+
+                <Group title={t('Only rows where')} hint={t('All of these must hold.')}>
+                  {(config.filters ?? []).map((f, i) => {
+                    const update = (patch: Partial<typeof f>) => set({ filters: config.filters!.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+                    const noValue = f.op === 'empty' || f.op === 'not_empty';
+                    return (
+                      <div key={i} className="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] items-start gap-2">
+                        <ComboField aria-label={t('Filter {n}: column', { n: i + 1 })} size="sm" items={choices()} value={f.column} onChange={(column) => update({ column })} />
+                        <NativeSelect
+                          aria-label={t('Filter {n}: rule', { n: i + 1 })}
+                          size="sm"
+                          value={f.op}
+                          onChange={(e) => update({ op: e.target.value as FilterOp })}
+                          options={tLabels(operators)}
+                        />
+                        <IconAction icon={Trash01} danger label={t('Remove filter {n}', { n: i + 1 })} className="mt-1" onPress={() => set({ filters: config.filters!.filter((_, j) => j !== i) })} />
+                        {!noValue && (
+                          <div className="col-span-2">
+                            <Input aria-label={t('Filter {n}: value', { n: i + 1 })} size="sm" placeholder={t('Value')} value={String(f.value ?? '')} onChange={(value) => update({ value })} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <Button size="sm" color="link-color" iconLeading={Plus} onPress={() => set({ filters: [...(config.filters ?? []), { column: columns[0]?.name ?? '', op: '=', value: '' }] })}>
+                    {t('Add filter')}
+                  </Button>
+                </Group>
+              </>
+            )}
+          </Block>
+
+          {columns && (
+            <>
+              <Block title={t('On dashboards')}>
+                <Group
+                  title={t('Date range')}
+                  hint={type === 'kpi' ? t('The range narrows this column; the figure also compares with the period before.') : t('The range picked on a dashboard narrows this column.')}
                 >
-                  {t('Add filter')}
-                </Button>
-              </Group>
+                  <ComboField
+                    aria-label={t('Date range column')}
+                    placeholder={t('Not affected by the range')}
+                    items={choices(['date'])}
+                    value={config.date_field ?? ''}
+                    onChange={(date_field) => set({ date_field: date_field || null })}
+                  />
+                </Group>
 
-              <Group title={t('Dashboard date range')} hint={type === 'kpi' ? t('The range narrows this column; the figure also compares with the period before.') : t('The range picked on a dashboard narrows this column.')}>
-                <ComboField aria-label={t('Date range column')} placeholder={t('Not affected by the range')} items={choices(['date'])} value={config.date_field ?? ''} onChange={(date_field) => set({ date_field: date_field || null })} />
-              </Group>
+                <Group title={t('When clicked')} hint={t('A column, slice, point or figure opens another meta with the clicked values. Works on running dashboards, not in this preview.')}>
+                  <div className="divide-y divide-secondary border-l-2 border-secondary pl-3">
+                    <DrilldownEditor value={config.drilldown ?? null} onChange={(drilldown) => set({ drilldown })} options={options} sources={tLabels(chartSources)} selfId={meta.id} rows="stacked" />
+                  </div>
+                </Group>
+              </Block>
 
-              <Group title={t('When clicked')} hint={t('A column, slice, point or figure opens another meta with the clicked values. Works on running dashboards, not in this preview.')}>
-                <DrilldownEditor value={config.drilldown ?? null} onChange={(drilldown) => set({ drilldown })} options={options} sources={tLabels(chartSources)} selfId={meta.id} />
-              </Group>
-
-              <Group title={t('Display')}>
-                <div className="grid grid-cols-2 gap-3">
+              <Block title={t('Display')}>
+                <div className={cx('grid gap-3', type !== 'kpi' && 'grid-cols-2')}>
                   <NativeSelect
                     label={t('Numbers as')}
                     size="sm"
@@ -301,11 +332,11 @@ export function ChartDesigner({ meta, options }: { meta: Meta; options: MetaOpti
                       placeholder={config.bucket ? t('Every period') : type === 'pie' || type === 'donut' ? '6' : '12'}
                       value={config.limit ? String(config.limit) : ''}
                       onChange={(v) => set({ limit: v ? Math.max(1, Math.min(500, Number(v))) : null })}
-                      hint={type === 'pie' || type === 'donut' ? t("The rest add up into \"Other\".") : undefined}
+                      hint={type === 'pie' || type === 'donut' ? t('The rest add up into "Other".') : undefined}
                     />
                   )}
                 </div>
-              </Group>
+              </Block>
             </>
           )}
         </div>
@@ -339,31 +370,47 @@ function Panel({ children, actions }: { children: ReactNode; actions?: ReactNode
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <fieldset className="space-y-2.5">
-      <legend className="text-sm font-medium text-secondary">{title}</legend>
-      {hint && <p className="-mt-1 text-xs text-tertiary">{hint}</p>}
+    <fieldset className="space-y-2">
+      <legend className="flex items-center gap-1 text-sm font-medium text-secondary">
+        {title}
+        {hint && (
+          <Tooltip title={hint} placement="top">
+            <TooltipTrigger
+              aria-label={t('About {name}', { name: title })}
+              className="cursor-pointer text-fg-quaternary transition duration-200 hover:text-fg-quaternary_hover focus:text-fg-quaternary_hover"
+            >
+              <HelpCircle className="size-4" />
+            </TooltipTrigger>
+          </Tooltip>
+        )}
+      </legend>
       {children}
     </fieldset>
   );
 }
 
+/** A block of the settings: its name, then a line (like the groups of a meta's side list). */
+function Block({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="space-y-5">
+      <p aria-hidden="true" className="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-quaternary uppercase">
+        {title}
+        <span className="h-px flex-1 bg-border-secondary" />
+      </p>
+      {children}
+    </section>
+  );
+}
+
 /** When the group column holds ids, which meta's records name them, and by which field. */
-function LookupPicker({
-  options,
-  value,
-  onChange,
-}: {
-  options: MetaOption[];
-  value: ChartConfig['x_lookup'];
-  onChange: (value: ChartConfig['x_lookup']) => void;
-}) {
+function LookupPicker({ options, value, onChange }: { options: MetaOption[]; value: ChartConfig['x_lookup']; onChange: (value: ChartConfig['x_lookup']) => void }) {
   const { def } = useMetaDef(value?.meta_id);
-  const metas = useMemo(() => options.filter((o) => o.type === 'datagrid' || o.type === 'form').map((o) => ({ id: String(o.id), label: o.name })), [options]);
+  const metas = useMemo(() => metaChoices(options.filter((o) => o.type === 'datagrid' || o.type === 'form')), [options]);
   const fields = def ? visibleParams(def.params).map((p) => ({ id: p.field_path, label: p.label_name || p.field_path })) : [];
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      <ComboField
+      <MetaLookupField
         label={t('Names from')}
         size="sm"
         placeholder={t('Show the ids')}

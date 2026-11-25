@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download01, SearchLg, Upload01 } from '@untitledui/icons';
+import { SearchLg, Upload01 } from '@untitledui/icons';
 import { ApiError } from '../../lib/api';
 import { metaApi, type ImportExisting, type ImportResult, type Meta, type SchemaChanges } from '../../lib/metaApi';
 import { Modal } from '../../components/Modal';
@@ -10,51 +10,6 @@ import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
-
-/**
- * Downloads metas as a file to import in another installation: each with its fields, buttons,
- * workflow, permissions, links, tags and translations, and a page with its own widgets.
- */
-export function ExportMetasModal({ metas, initial, onClose }: { metas: Meta[]; initial: number[]; onClose: () => void }) {
-  const [picked, setPicked] = useState<number[]>(initial);
-  const [withUsed, setWithUsed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function download() {
-    setBusy(true);
-    setError(null);
-    try {
-      await metaApi.exportFile(picked, withUsed);
-      onClose();
-    } catch (err) {
-      setError(message(err, t("The metas could not be exported.")));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal title={t("Export metas")} description={t("A file with the metas and everything defined with them, to import in another installation of the app. Their records are not included.")} onClose={onClose} size="lg">
-      <div className="space-y-4">
-        {error && <Alert>{error}</Alert>}
-        <MetaPicker metas={metas} picked={picked} onChange={setPicked} />
-        <Checkbox
-          isSelected={withUsed}
-          onChange={setWithUsed}
-          label={t("Also the metas they use")}
-          hint={t("Lookups, the forms their buttons open, process steps, linked metas… and the ones those use. Leave it off when the other app already has them: they are found there by code.")}
-        />
-        <div className="flex items-center justify-end gap-2">
-          <span className="mr-auto text-sm text-tertiary">{t('{n} picked', { n: picked.length })}</span>
-          <Button size="sm" color="secondary" onPress={onClose}>{t("Cancel")}</Button>
-          <Button size="sm" iconLeading={Download01} isDisabled={!picked.length} isLoading={busy} showTextWhileLoading onPress={download}>
-            {t("Export")}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 /** Metas to tick, with a search; ticked ones are highlighted. */
 export function MetaPicker({
@@ -76,9 +31,16 @@ export function MetaPicker({
     <div className="space-y-2">
       <label className="flex items-center gap-2 rounded-lg px-3 py-2 ring-1 ring-primary">
         <SearchLg className="size-4 text-fg-quaternary" aria-hidden="true" />
-        <input autoFocus={autoFocus} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Find metas")} aria-label={t("Find metas")} className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder" />
+        <input
+          autoFocus={autoFocus}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('Find metas')}
+          aria-label={t('Find metas')}
+          className="w-full bg-transparent text-sm text-primary outline-none placeholder:text-placeholder"
+        />
       </label>
-      <ul aria-label={t("Metas")} className="max-h-72 divide-y divide-secondary overflow-auto rounded-lg ring-1 ring-secondary">
+      <ul aria-label={t('Metas')} className="max-h-72 divide-y divide-secondary overflow-auto rounded-lg ring-1 ring-secondary">
         {shown.map((m) => (
           <li key={m.id} className={cx('flex items-center gap-3 px-3 py-2', picked.includes(m.id) && 'bg-brand-primary_alt')}>
             <Checkbox aria-label={m.name} isSelected={picked.includes(m.id)} onChange={() => toggle(m.id)} />
@@ -89,7 +51,7 @@ export function MetaPicker({
             <span className="text-xs text-tertiary">{m.type?.name}</span>
           </li>
         ))}
-        {!shown.length && <li className="px-3 py-4 text-sm text-tertiary">{t("No meta matches.")}</li>}
+        {!shown.length && <li className="px-3 py-4 text-sm text-tertiary">{t('No meta matches.')}</li>}
       </ul>
     </div>
   );
@@ -111,24 +73,26 @@ const ACTIONS: Record<ImportResult['metas'][number]['action'], { label: string; 
 export function SchemaSummary({ schema }: { schema: SchemaChanges }) {
   const rows = Object.entries(schema.rows);
   const lines = [
-    [t("New tables"), schema.tables],
-    [t("New columns"), schema.columns],
-    [t("New indexes and links"), schema.keys],
-    [t("New triggers"), schema.triggers],
-    [t("Replaced triggers"), schema.replaced_triggers],
-    [t("New roles"), schema.roles],
-    [t("Rows added"), rows.map(([table, n]) => `${table} (${n})`)],
-    [t("Rows left out, the table already has records"), schema.rows_kept],
+    [t('New tables'), schema.tables],
+    [t('New columns'), schema.columns],
+    [t('New indexes and links'), schema.keys],
+    [t('New triggers'), schema.triggers],
+    [t('Replaced triggers'), schema.replaced_triggers],
+    [t('New roles'), schema.roles],
+    [t('Rows added'), rows.map(([table, n]) => `${table} (${n})`)],
+    [t('Rows left out, the table already has records'), schema.rows_kept],
   ] as const;
   const shown = lines.filter(([, items]) => items.length > 0);
   if (!shown.length) return null;
   return (
     <div className="rounded-lg p-3 text-sm ring-1 ring-secondary">
-      <p className="font-medium text-secondary">{t("Database")}</p>
+      <p className="font-medium text-secondary">{t('Database')}</p>
       <dl className="mt-1 space-y-1">
         {shown.map(([label, items]) => (
           <div key={label}>
-            <dt className="text-tertiary">{label}: {items.length}</dt>
+            <dt className="text-tertiary">
+              {label}: {items.length}
+            </dt>
             <dd className="break-words text-xs text-secondary">{items.join(', ')}</dd>
           </div>
         ))}
@@ -140,11 +104,11 @@ export function SchemaSummary({ schema }: { schema: SchemaChanges }) {
 export function ImportMetasModal({
   onClose,
   onDone,
-  title = t("Import metas"),
+  title = t('Import metas'),
   description = t("Metas from a file exported in this or another installation. What they point at is found here by code; what isn't here is reported."),
   run: send = (pkg, existing, dryRun) => metaApi.importFile(pkg, existing, dryRun),
-  filePrompt = t("Pick a .metas.json file"),
-  actionLabel = t("Import"),
+  filePrompt = t('Pick a .metas.json file'),
+  actionLabel = t('Import'),
 }: {
   onClose: () => void;
   onDone: (notice: string) => void;
@@ -169,7 +133,7 @@ export function ImportMetasModal({
     setError(null);
     send(file.pkg, existing, true, file.name).then(
       (result) => live && setPreview(result),
-      (err) => live && setError(message(err, t("The file could not be read."))),
+      (err) => live && setError(message(err, t('The file could not be read.'))),
     );
     return () => {
       live = false;
@@ -182,7 +146,7 @@ export function ImportMetasModal({
     try {
       setFile({ name: picked.name, pkg: JSON.parse(await picked.text()) });
     } catch {
-      setError(t("This is not a metas file."));
+      setError(t('This is not a metas file.'));
     }
   }
 
@@ -195,7 +159,7 @@ export function ImportMetasModal({
       if (result.warnings.length) setDone(result);
       else finish(result);
     } catch (err) {
-      setError(message(err, t("The metas could not be imported.")));
+      setError(message(err, t('The metas could not be imported.')));
     } finally {
       setBusy(false);
     }
@@ -213,15 +177,15 @@ export function ImportMetasModal({
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-primary px-4 py-3 hover:bg-primary_hover">
               <Upload01 className="size-5 text-fg-quaternary" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate text-sm text-secondary">{file ? file.name : filePrompt}</span>
-              <input type="file" accept=".json,application/json" className="sr-only" aria-label={t("Metas file")} onChange={(e) => void read(e.target.files?.[0])} />
+              <input type="file" accept=".json,application/json" className="sr-only" aria-label={t('Metas file')} onChange={(e) => void read(e.target.files?.[0])} />
             </label>
             <fieldset className="space-y-2">
-              <legend className="mb-1 text-sm font-medium text-secondary">{t("When a meta with the same code is already here")}</legend>
+              <legend className="mb-1 text-sm font-medium text-secondary">{t('When a meta with the same code is already here')}</legend>
               {(
                 [
-                  ['replace', t("Replace it"), t("It keeps its id, so menus and links to it still work. Its current state is saved as a version first.")],
-                  ['skip', t("Keep it, skip the file’s")],
-                  ['copy', t("Add the file’s as a copy"), t("Under a new code ending in _copy.")],
+                  ['replace', t('Replace it'), t('It keeps its id, so menus and links to it still work. Its current state is saved as a version first.')],
+                  ['skip', t('Keep it, skip the file’s')],
+                  ['copy', t('Add the file’s as a copy'), t('Under a new code ending in _copy.')],
                 ] as const
               ).map(([value, label, hint]) => (
                 <label key={value} className="flex items-start gap-2 text-sm text-secondary">
@@ -239,7 +203,7 @@ export function ImportMetasModal({
         {file && !shown && !error && <div className="h-24 animate-pulse rounded-lg bg-secondary motion-reduce:animate-none" />}
         {shown && (
           <>
-            <p className="text-sm font-medium text-secondary">{done ? t("Imported") : t("What will happen")}</p>
+            <p className="text-sm font-medium text-secondary">{done ? t('Imported') : t('What will happen')}</p>
             {!done && !!preview?.installed_before?.length && (
               <Alert>{t('This file was already installed here on {when}. Installing it again is allowed.', { when: new Date(preview.installed_before[0].installed_at ?? '').toLocaleString() })}</Alert>
             )}
@@ -260,7 +224,7 @@ export function ImportMetasModal({
             {shown.schema && <SchemaSummary schema={shown.schema} />}
             {shown.warnings.length > 0 && (
               <div className="rounded-lg bg-warning-primary p-3 text-sm text-warning-primary">
-                <p className="font-medium">{t("Notes")}</p>
+                <p className="font-medium">{t('Notes')}</p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-5">
                   {shown.warnings.map((w) => (
                     <li key={w}>{w}</li>
@@ -273,10 +237,14 @@ export function ImportMetasModal({
 
         <div className="flex justify-end gap-2">
           {done ? (
-            <Button size="sm" onPress={() => finish(done)}>{t("Done")}</Button>
+            <Button size="sm" onPress={() => finish(done)}>
+              {t('Done')}
+            </Button>
           ) : (
             <>
-              <Button size="sm" color="secondary" onPress={onClose}>{t("Cancel")}</Button>
+              <Button size="sm" color="secondary" onPress={onClose}>
+                {t('Cancel')}
+              </Button>
               <Button size="sm" iconLeading={Upload01} isDisabled={!preview} isLoading={busy} showTextWhileLoading onPress={run}>
                 {actionLabel}
               </Button>

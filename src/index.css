@@ -192,46 +192,66 @@ html {
 .page-enter > * {
   animation: blur-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
-/* A grid's rows cascade in: the first dozen one after another, the rest with the last. */
-.rows-in > tr {
-  animation: blur-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-  animation-delay: 300ms;
+/*
+ * A grid's record rows (.grid-row) fade and rise a little as they arrive: no blur, which is too
+ * heavy to paint on many rows at once. The first records cascade in (.rows-in on the body,
+ * render/GridView): --rows-from waits for the card's own blur-in, then the first dozen follow one
+ * another, the rest with the last. Later pages just fade in. Both use the one animation and only
+ * its timing changes, so taking .rows-in off afterwards doesn't play it again (a blink).
+ */
+@keyframes rows-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.grid-row {
+  animation: rows-in 200ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+/* Parts of a panel that is itself blurring in (render/GridSidebar's sections) rise in, one after another. */
+.rise-in {
+  animation: rows-in 250ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.rows-in > .grid-row {
+  animation-duration: 250ms;
+  animation-delay: calc(var(--rows-from, 0ms) + min(var(--row, 12), 12) * 15ms);
 }
 .rows-in > tr:nth-child(1) {
-  animation-delay: 0ms;
+  --row: 0;
 }
 .rows-in > tr:nth-child(2) {
-  animation-delay: 25ms;
+  --row: 1;
 }
 .rows-in > tr:nth-child(3) {
-  animation-delay: 50ms;
+  --row: 2;
 }
 .rows-in > tr:nth-child(4) {
-  animation-delay: 75ms;
+  --row: 3;
 }
 .rows-in > tr:nth-child(5) {
-  animation-delay: 100ms;
+  --row: 4;
 }
 .rows-in > tr:nth-child(6) {
-  animation-delay: 125ms;
+  --row: 5;
 }
 .rows-in > tr:nth-child(7) {
-  animation-delay: 150ms;
+  --row: 6;
 }
 .rows-in > tr:nth-child(8) {
-  animation-delay: 175ms;
+  --row: 7;
 }
 .rows-in > tr:nth-child(9) {
-  animation-delay: 200ms;
+  --row: 8;
 }
 .rows-in > tr:nth-child(10) {
-  animation-delay: 225ms;
+  --row: 9;
 }
 .rows-in > tr:nth-child(11) {
-  animation-delay: 250ms;
+  --row: 10;
 }
 .rows-in > tr:nth-child(12) {
-  animation-delay: 275ms;
+  --row: 11;
 }
 
 /* A toast (components/Notices) rises in at the corner. */
@@ -296,12 +316,51 @@ html {
 .modal-grow[data-entering] {
   animation: modal-grow 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/*
+ * A modal whose content is still loading (components/Modal) waits unseen, then fades and grows
+ * in with that content drawn, instead of opening empty and filling in.
+ */
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+.modal-waiting {
+  opacity: 0;
+}
+.modal-waiting,
+.modal-waiting .modal-grow {
+  animation: none;
+}
+/* Not while closing, so it still fades out as usual. */
+.modal-reveal:not([data-exiting]) {
+  animation: modal-fade 300ms ease-out;
+}
+.modal-reveal .modal-grow:not([data-exiting]) {
+  animation: modal-grow 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* The drilldown side panel (render/DrilldownHost) slides in from the right instead. */
+@keyframes drawer-in {
+  from {
+    translate: 100% 0;
+  }
+}
+.modal-waiting .drawer-in {
+  animation: none;
+}
+.modal-reveal .drawer-in:not([data-exiting]) {
+  animation: drawer-in 300ms ease-out;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .page-enter > *,
   .blur-in,
   .cards-in > *,
-  .rows-in > tr {
+  .grid-row,
+  .rise-in,
+  .modal-reveal:not([data-exiting]),
+  .modal-reveal .modal-grow:not([data-exiting]),
+  .modal-reveal .drawer-in:not([data-exiting]) {
     animation: none;
   }
   .blur-word {

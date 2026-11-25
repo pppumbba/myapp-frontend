@@ -242,7 +242,7 @@ export function LookupDialog({
           {defError || error ? (
             <Alert>{defError ?? error}</Alert>
           ) : !def || !result ? (
-            <div className="h-60 shrink-0 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
+            <div aria-busy="true" className="h-60 shrink-0 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
           ) : (
             <div className="flex min-h-0 flex-col overflow-hidden rounded-xl ring-1 ring-secondary">
               <div className="min-h-0 overflow-auto">

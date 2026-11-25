@@ -325,7 +325,7 @@ export function GridCards({
       {loading ? (
         <div aria-hidden="true" className={LAYOUTS[look]}>
           {Array.from({ length: SKELETON_CARDS }, (_, i) => (
-            <div key={i} className={cx(SKELETONS[look], "animate-pulse rounded-xl bg-secondary motion-reduce:animate-none")} />
+            <div key={i} aria-busy="true" className={cx(SKELETONS[look], "animate-pulse rounded-xl bg-secondary motion-reduce:animate-none")} />
           ))}
         </div>
       ) : (

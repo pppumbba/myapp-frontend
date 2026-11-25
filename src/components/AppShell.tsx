@@ -46,13 +46,15 @@ export function Logo() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
   const navigationType = useNavigationType();
   const { isAdmin, isBuilder, hasFeature } = useAuth();
-  // A new screen starts at the top; Back and Forward leave the scroll where the browser puts it.
+  // A new screen starts at the top; Back and Forward leave the scroll where the browser puts it,
+  // and a link with state.keepScroll leaves it to the page (Metas puts back where you were).
+  const keepScroll = !!(state as { keepScroll?: boolean } | null)?.keepScroll;
   useEffect(() => {
-    if (navigationType !== 'POP') window.scrollTo(0, 0);
-  }, [pathname, navigationType]);
+    if (navigationType !== 'POP' && !keepScroll) window.scrollTo(0, 0);
+  }, [pathname, navigationType, keepScroll]);
   const builders = [...(isBuilder ? [metas] : []), ...(hasFeature('studio') ? [studio] : [])];
   const nav = (isAdmin ? [...everyone, ...admins] : [...everyone, ...builders]).map((item) => ({ ...item, label: t(item.label) }));
   // /metas/12 still highlights Metas; the longest match wins, so /admin/roles/3 is Users & roles, not Home.

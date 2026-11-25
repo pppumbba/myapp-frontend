@@ -30,10 +30,13 @@ function Panel({ title, description, actions, footer, children }: { title: strin
           <h2 className="text-md font-semibold text-primary">{title}</h2>
           <p className="max-w-prose text-sm text-tertiary">{description}</p>
         </div>
-        {actions}
+        {/* Save sits on top with the other buttons, like every section of the meta page. */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+          {actions}
+          {footer}
+        </div>
       </div>
       <div className="overflow-x-auto">{children}</div>
-      <div className="flex items-center justify-end gap-3 border-t border-secondary px-4 py-3 sm:px-5">{footer}</div>
     </section>
   );
 }
@@ -52,7 +55,7 @@ function useRoles() {
 function SaveRow({ busy, done, dirty, error, onSave }: { busy: boolean; done: boolean; dirty: boolean; error: string | null; onSave: () => void }) {
   return (
     <>
-      {error && <p className="mr-auto text-sm font-medium text-error-primary">{error}</p>}
+      {error && <p className="text-sm font-medium text-error-primary">{error}</p>}
       {done && !dirty && (
         <p role="status" className="flex items-center gap-1.5 text-sm font-medium text-success-primary">
           <CheckCircle className="size-4" aria-hidden="true" />
@@ -111,7 +114,7 @@ function AddRolesDialog({ roles, onAdd, onClose }: { roles: Role[]; onAdd: (ids:
     });
 
   return (
-    <Modal title={t('Add roles')} description={t('Tick the roles to give access to. They start with Open; tick what else each may do after.')} onClose={onClose} size="lg">
+    <Modal title={t('Add roles')} description={t('Tick roles to give them Open, then what else they may do.')} onClose={onClose} size="lg">
       <div className="space-y-4">
         <Input
           aria-label={t('Search roles')}
@@ -270,8 +273,8 @@ export function MetaPermissionsPanel({ meta }: { meta: Meta }) {
       title={t("Who can use it")}
       description={
         restricted
-          ? t("Only the ticked roles (and administrators) can use this meta.")
-          : t("No role is given access, so only administrators can open this meta.")
+          ? t("Only ticked roles and admins can use it.")
+          : t("No role given: only admins can open it.")
       }
       actions={
         roles && roles.length > 0 ? (
@@ -393,7 +396,7 @@ export function StatusPermissionsPanel({ meta }: { meta: Meta }) {
   return (
     <Panel
       title={t("Who can move and see records")}
-      description={t("Move in: who may move a record into the status. See: who may see records while they're in it. A status with nothing ticked is open to everyone. People who can take the next step get a notification when a record arrives.")}
+      description={t("Who may move records into each status, and see them there. None ticked: open to all.")}
       footer={<SaveRow busy={busy} done={done} dirty={dirty} error={error} onSave={save} />}
     >
       {loadError && (

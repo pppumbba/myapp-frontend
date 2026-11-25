@@ -81,7 +81,7 @@ export function MatrixView({ def, scope }: { def: MetaDef; scope?: Record<string
   }, [totals, matrix]);
 
   if (error && !matrix) return <Alert>{error}</Alert>;
-  if (!matrix) return <div className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
+  if (!matrix) return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />;
   if (!matrix.rows.length || !matrix.columns.length) {
     return (
       <div className="rounded-xl border border-dashed border-primary px-5 py-8 text-center text-sm text-tertiary">

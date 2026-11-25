@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/api';
 import { metaApi, type Meta, type MetaOption } from '../../lib/metaApi';
 import { pageApi, propValues, type PageItem, type PageItemInput, type Widget, type WidgetProp } from '../../lib/pageApi';
 import { ComboField } from '../../components/ComboField';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { Alert, IconAction } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
@@ -158,7 +159,7 @@ function duplicate(d: PageDraft): PageDraft {
  * their settings takes the composite's setting with that key. The preview fills them with
  * the composite's defaults.
  */
-export function PageDesigner({ meta, options }: { meta: Meta; options: MetaOption[] }) {
+export function PageDesigner({ meta, options, full = false }: { meta: Meta; options: MetaOption[]; full?: boolean }) {
   const [library, setLibrary] = useState<Widget[] | null>(null);
   const [drafts, setDrafts] = useState<PageDraft[] | null>(null);
   const [saved, setSaved] = useState('');
@@ -207,13 +208,17 @@ export function PageDesigner({ meta, options }: { meta: Meta; options: MetaOptio
   }
 
   return (
-    <section className="rounded-xl bg-primary shadow-xs ring-1 ring-secondary" aria-labelledby="page-designer-title">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-secondary px-4 py-4 sm:px-5">
+    // Full: full screen under the page builder's title bar, its buttons a toolbar as in the studio.
+    <section className={full ? 'bg-primary' : 'rounded-xl bg-primary shadow-xs ring-1 ring-secondary'} aria-label={t('Page builder')}>
+      <div
+        className={cx(
+          'flex flex-wrap items-center justify-between gap-3 border-b border-secondary',
+          full ? 'sticky top-0 z-10 min-h-11 bg-secondary_alt px-3 py-1.5' : 'px-4 py-4 sm:px-5',
+        )}
+      >
         <div className="min-w-0">
-          <h2 id="page-designer-title" className="text-lg font-semibold text-primary">
-            {t('Page builder')}
-          </h2>
-          <p className="mt-0.5 text-sm text-tertiary">{t('Add widgets from the library, pick one to change its settings, drag to reorder. Sections hold other widgets.')}</p>
+          {!full && <h2 className="text-lg font-semibold text-primary">{t('Page builder')}</h2>}
+          <p className={full ? 'truncate text-sm text-tertiary' : 'mt-0.5 text-sm text-tertiary'}>{t('Add widgets from the library, pick one to change its settings, drag to reorder. Sections hold other widgets.')}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" color="secondary" iconLeading={Eye} onPress={() => setPreview((p) => !p)} aria-pressed={preview}>
@@ -276,7 +281,7 @@ export function PageCanvas({
     for (const w of library) groups.set(w.category, [...(groups.get(w.category) ?? []), w]);
     return [...groups.entries()];
   }, [library]);
-  const widgetMetas = options.filter((o) => o.type === 'widget').map((o) => ({ id: String(o.id), label: o.name }));
+  const widgetMetas = metaChoices(options.filter((o) => o.type === 'widget'));
   // When this is a composite's template: that composite, whose settings the parts may use.
   const composite = (pageId && library.find((w) => w.template_meta_id === pageId)) || null;
   const bindings: Binding[] = (composite?.props ?? []).map((p) => ({
@@ -497,7 +502,7 @@ export function PageCanvas({
         {widgetMetas.length > 0 && (
           <div>
             <p className="mb-2 text-xs font-semibold text-quaternary">{t('Saved widgets')}</p>
-            <ComboField aria-label={t('Place a saved widget')} size="sm" placeholder={t('Place an existing one…')} items={widgetMetas} value={existing} onChange={addExisting} />
+            <MetaLookupField aria-label={t('Place a saved widget')} size="sm" placeholder={t('Place an existing one…')} items={widgetMetas} value={existing} onChange={addExisting} />
           </div>
         )}
       </aside>

@@ -5,19 +5,26 @@ import {
   BarChart01,
   Calendar,
   Circle,
+  ClockRewind,
   Database01,
   File06,
   Folder,
+  Globe01,
   Grid01,
   HomeLine,
+  Link01,
   LogIn01,
+  Mail01,
   Package,
   Plus,
   Receipt,
   SearchLg,
   Settings01,
+  Share07,
   ShoppingCart01,
+  Star01,
   Tool01,
+  Trash01,
   Truck01,
   Users01,
   Zap,
@@ -26,6 +33,7 @@ import type { MetaParam } from '../lib/metaApi';
 import { AppSidebar, menuSideOf, menuStyleOf } from '../components/AppSidebar';
 import { useMenuStyles } from '../lib/menuStyle';
 import { LogoMark } from '../components/AppShell';
+import { AppImage } from '../components/AppArt';
 import type { NavItemType } from '@/components/application/app-navigation/config';
 import { DrilldownHost } from './DrilldownHost';
 import { MetaView } from './MetaView';
@@ -55,7 +63,14 @@ export const MENU_ICONS: Record<string, FC<{ className?: string }>> = {
   search: SearchLg,
   settings: Settings01,
   tool: Tool01,
+  trash: Trash01,
   zap: Zap,
+  star: Star01,
+  clock: ClockRewind,
+  share: Share07,
+  globe: Globe01,
+  link: Link01,
+  mail: Mail01,
 };
 
 export const menuLabel = (p: MetaParam) => p.label_name || p.param_name;
@@ -119,9 +134,13 @@ export function AppView({ def, home = '/', children, activePath }: { def: MetaDe
   const { def: screenDef } = useMetaDef(menuStyle === 'header' && !children ? current?.ref_meta_id : null);
   const selfTitled = ['dashboard', 'form'].includes(screenDef?.meta.type?.code ?? '');
   const heading = menuStyle === 'header' && current && (!current.ref_meta_id || screenDef) && !selfTitled ? { title: menuLabel(current), description: screenDef?.meta.description } : undefined;
-  // The Wand mark, in its own indigo whatever the app's theme; the header's pill holds it small, white in a brand circle.
+  // The app's brand: its uploaded picture, round in the header's pill. With none (or its icon
+  // switched off), the Wand mark, in its own indigo whatever the app's theme; the header's pill
+  // holds it small, white in a brand circle.
   const mark =
-    menuStyle === 'header' ? (
+    def.meta.image_path && def.meta.json_config?.show_icon !== false ? (
+      <AppImage app={def.meta} variant="icon" className={menuStyle === 'header' ? 'size-9 shrink-0 rounded-full' : 'size-8 shrink-0 rounded-lg ring-1 ring-black/5'} />
+    ) : menuStyle === 'header' ? (
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-solid">
         <LogoMark size={16} className="translate-x-px translate-y-px text-white" />
       </span>

@@ -2,9 +2,7 @@ import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { cx } from '@/utils/cx';
 
 const KEYWORDS = new Set(
-  'async await break case catch const continue default delete do else false for function if in instanceof let new null of return switch this throw true try typeof undefined var void while'.split(
-    ' ',
-  ),
+  'async await break case catch const continue default delete do else false for function if in instanceof let new null of return switch this throw true try typeof undefined var void while'.split(' '),
 );
 
 type Token = { text: string; cls?: string };
@@ -57,8 +55,11 @@ export function CodeEditor({
   placeholder,
   hint,
   isInvalid,
+  hideLabel = false,
 }: {
   label: string;
+  /** Keeps the label for screen readers only, when what is around it already names it. */
+  hideLabel?: boolean;
   value: string;
   onChange: (value: string) => void;
   /** Words to colour as known names, e.g. the helpers a script can call. */
@@ -105,7 +106,7 @@ export function CodeEditor({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-secondary">
+      <label htmlFor={id} className={cx('text-sm font-medium text-secondary', hideLabel && 'sr-only')}>
         {label}
       </label>
       <div
@@ -121,7 +122,19 @@ export function CodeEditor({
         </div>
         <div className="relative grid min-w-0 flex-1">
           <pre aria-hidden="true" className="col-start-1 row-start-1 m-0 min-h-full px-3 py-2.5 whitespace-pre text-primary">
-            {value ? tokenize(value, known).map((t, i) => (t.cls ? <span key={i} className={t.cls}>{t.text}</span> : t.text)) : <span className="text-placeholder">{placeholder}</span>}
+            {value ? (
+              tokenize(value, known).map((t, i) =>
+                t.cls ? (
+                  <span key={i} className={t.cls}>
+                    {t.text}
+                  </span>
+                ) : (
+                  t.text
+                ),
+              )
+            ) : (
+              <span className="text-placeholder">{placeholder}</span>
+            )}
             {'\n '}
           </pre>
           <textarea

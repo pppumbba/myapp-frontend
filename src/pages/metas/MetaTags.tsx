@@ -18,6 +18,15 @@ export function tagColor(tag: Pick<Tag, 'name' | 'color'>): TagColor {
   return TAG_COLORS[h % TAG_COLORS.length];
 }
 
+/** Badge colours named for what they mean, and the utility palette each is drawn from. */
+const DOT_PALETTE: Partial<Record<TagColor, string>> = { gray: 'neutral', warning: 'amber', success: 'green', error: 'red' };
+
+/** A tag's colour as a dot (the badge colours have no utility token of their own for some). */
+export const tagDot = (tag: Pick<Tag, 'name' | 'color'>) => {
+  const color = tagColor(tag);
+  return `var(--color-utility-${DOT_PALETTE[color] ?? color}-500)`;
+};
+
 export function TagBadge({ tag }: { tag: Tag }) {
   return (
     <Badge type="pill-color" size="sm" color={tagColor(tag)}>
@@ -33,6 +42,7 @@ export function TagPicker({
   onChange,
   onCreated,
   hint,
+  hideLabel = false,
 }: {
   /** Every tag there is. */
   tags: Tag[];
@@ -42,16 +52,15 @@ export function TagPicker({
   /** A tag was just added, so the list of all tags can include it. */
   onCreated: (tag: Tag) => void;
   hint?: string;
+  /** On a settings row, which names it already. */
+  hideLabel?: boolean;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const picked = value.map((id) => tags.find((item) => item.id === id)).filter((item): item is Tag => !!item);
   const q = text.trim().toLowerCase();
-  const matches = useMemo(
-    () => (q ? tags.filter((item) => !value.includes(item.id) && item.name.toLowerCase().includes(q)).slice(0, 8) : []),
-    [tags, value, q],
-  );
+  const matches = useMemo(() => (q ? tags.filter((item) => !value.includes(item.id) && item.name.toLowerCase().includes(q)).slice(0, 8) : []), [tags, value, q]);
   const exact = tags.find((item) => item.name.toLowerCase() === q);
 
   function pick(tag: Tag) {
@@ -70,7 +79,7 @@ export function TagPicker({
       onCreated(tag);
       pick(tag);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("The tag could not be added."));
+      setError(err instanceof ApiError ? err.message : t('The tag could not be added.'));
     } finally {
       setBusy(false);
     }
@@ -90,7 +99,7 @@ export function TagPicker({
   return (
     <div className="space-y-2">
       {picked.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label={t("Tags")}>
+        <div className="flex flex-wrap gap-1.5" aria-label={t('Tags')}>
           {picked.map((item) => (
             <BadgeWithButton
               key={item.id}
@@ -107,12 +116,14 @@ export function TagPicker({
       )}
       <div onKeyDown={onKeyDown}>
         <Input
-          label={t("Tags")}
+          label={hideLabel ? undefined : t('Tags')}
+          aria-label={hideLabel ? t('Tags') : undefined}
+          isOptional={!hideLabel}
           value={text}
           onChange={setText}
-          placeholder={t("Type to find a tag or add a new one")}
+          placeholder={t('Type to find a tag or add a new one')}
           isInvalid={!!error}
-          hint={error ?? hint ?? t("What this meta is for. Enter adds the tag; a new name makes a new tag.")}
+          hint={error ?? hint ?? (hideLabel ? undefined : t('What this meta is for. Enter adds the tag; a new name makes a new tag.'))}
           isDisabled={busy}
         />
       </div>
@@ -145,7 +156,7 @@ export function TagsModal({ tags, onClose, onChanged }: { tags: Tag[]; onClose: 
       await job();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("The tag could not be changed."));
+      setError(err instanceof ApiError ? err.message : t('The tag could not be changed.'));
     }
   }
 
@@ -155,7 +166,7 @@ export function TagsModal({ tags, onClose, onChanged }: { tags: Tag[]; onClose: 
   }
 
   return (
-    <Modal title={t("Tags")} description={t("Rename, recolor or remove the tags metas carry. Removing a tag only takes it off its metas.")} onClose={onClose}>
+    <Modal title={t('Tags')} description={t('Rename, recolor or remove the tags metas carry. Removing a tag only takes it off its metas.')} onClose={onClose}>
       <div className="space-y-4">
         {error && <Alert>{error}</Alert>}
         {tags.length === 0 && <p className="text-sm text-tertiary">{t("No tags yet. Add them on a meta's form.")}</p>}
@@ -176,12 +187,12 @@ export function TagsModal({ tags, onClose, onChanged }: { tags: Tag[]; onClose: 
                   aria-label={t('Color of {name}', { name: item.name })}
                   value={item.color ?? ''}
                   onChange={(e) => run(() => metaApi.updateTag(item.id, { color: (e.target.value || null) as TagColor | null }))}
-                  options={[{ label: t("Automatic"), value: '' }, ...TAG_COLORS.map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))]}
+                  options={[{ label: t('Automatic'), value: '' }, ...TAG_COLORS.map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))]}
                 />
               </div>
               <div className="flex w-28 items-center justify-end gap-2 pb-1">
                 <TagBadge tag={item} />
-                <span className="text-xs text-tertiary tabular-nums" title={t("Metas with this tag")}>
+                <span className="text-xs text-tertiary tabular-nums" title={t('Metas with this tag')}>
                   {item.metas_count ?? 0}
                 </span>
                 <IconAction icon={Trash01} danger label={t('Remove {name}', { name: item.name })} onPress={() => run(() => metaApi.removeTag(item.id))} />

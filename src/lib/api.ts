@@ -43,7 +43,7 @@ const SETUP = [
   /^\/metas\/\d+\/(params|actions)(\?[^/]*)?$/,
   /^\/metas\/\d+\/page$/,
   /^\/workflows\/\d+(\?translated=1)?$/,
-  /^\/(themes|menu-styles|meta-tree|user|user\/access|user\/session)$/,
+  /^\/(themes|menu-styles|meta-tree|meta-types|metas\/options|user|user\/access|user\/session)$/,
 ];
 const kept = new Map<string, Promise<unknown>>();
 // Reads on their way: the same one asked for again meanwhile (e.g. by two widgets) waits for it.
@@ -73,8 +73,11 @@ const QUIET = [
   /^\/metas\/\d+\/consolidate\//,
 ];
 
-/** Writes that change nothing a screen is built from, so the kept setup reads stay (the messenger writes every few seconds). */
-const KEEPS_SETUP = /^\/chats(\/|\?|$)/;
+/**
+ * Writes that change nothing a screen is built from, so the kept setup reads stay (the messenger
+ * writes every few seconds; opening or starring a meta notes it for the Meta studio lists).
+ */
+const KEEPS_SETUP = /^\/(chats(\/|\?|$)|metas\/\d+\/(viewed|star)$)/;
 
 /** What the toast says for a write that worked. */
 const DONE: [RegExp, string][] = [

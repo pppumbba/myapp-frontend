@@ -58,7 +58,8 @@ export function GridSidebar({
   const statusesOf = (p: MetaParam) => (p.field_path === 'status_id' ? statuses : undefined);
   const lists = shown.filter((p) => kindOf(p, statusesOf(p)) === 'list');
   const labels = useLookupLabels(lists);
-  const [facets, setFacets] = useState<Record<string, Facet[]>>({});
+  // null until the first counts arrive, so a lookup's list waits instead of saying there is nothing.
+  const [facets, setFacets] = useState<Record<string, Facet[]> | null>(null);
   const listKey = lists.map((p) => p.field_path).join(',');
   const queryKey = JSON.stringify([filters, search, scope, fixed]);
 
@@ -83,7 +84,8 @@ export function GridSidebar({
   const active = Object.keys(filters).length;
 
   return (
-    // It blurs in, then its sections and their values one after another (.blur-in, --i).
+    // It blurs in, then its sections rise in one after another (.rise-in, --i): no blur inside a
+    // blurring panel, which is too heavy to paint.
     <aside aria-label={t('Filters')} className="blur-in rounded-xl bg-primary p-4 shadow-xs ring-1 ring-secondary lg:absolute lg:inset-0 lg:flex lg:flex-col">
       {/* The title stays put; only the list scrolls, inside the card's padding so the scrollbar is shorter. */}
       <div className="mb-4 flex shrink-0 items-center justify-between gap-2">
@@ -115,11 +117,12 @@ export function GridSidebar({
           const label = `${p.label_name || p.param_name}${p.is_mandatory_criteria ? ' *' : ''}`;
           const value = filters[p.field_path] ?? '';
           return (
-            <section key={p.field_path} aria-label={label} className="blur-in" style={{ '--i': n + 1 } as React.CSSProperties}>
+            <section key={p.field_path} aria-label={label} className="rise-in" style={{ '--i': n + 1 } as React.CSSProperties}>
               {kind === 'list' ? (
                 <FacetList
                   label={label}
-                  choices={choicesOf(p, statusesOf(p), facets[p.field_path], labels.get(p.field_path))}
+                  choices={choicesOf(p, statusesOf(p), facets?.[p.field_path], labels.get(p.field_path))}
+                  loading={!facets && !optionsOf(p) && p.data_type !== 'boolean'}
                   value={value}
                   onPick={(v) => set(p.field_path, v === value ? '' : v)}
                 />
@@ -169,7 +172,7 @@ function choicesOf(p: MetaParam, statuses: WfmStatus[] | undefined, facets: Face
     });
 }
 
-function FacetList({ label, choices, value, onPick }: { label: string; choices: Choice[]; value: string; onPick: (value: string) => void }) {
+function FacetList({ label, choices, value, loading, onPick }: { label: string; choices: Choice[]; value: string; loading: boolean; onPick: (value: string) => void }) {
   const [all, setAll] = useState(false);
   // The picked value stays in view even when it is past the short list.
   const visible = all ? choices : choices.filter((c, i) => i < SHORT_LIST || c.value === value);
@@ -177,14 +180,21 @@ function FacetList({ label, choices, value, onPick }: { label: string; choices: 
   return (
     <div>
       <p className="mb-1.5 text-xs font-semibold text-tertiary">{label}</p>
-      {choices.length === 0 ? (
+      {loading ? (
+        <div aria-busy="true" className="space-y-2.5 py-1">
+          {[70, 50, 60].map((w) => (
+            <div key={w} className="h-3 animate-pulse rounded bg-tertiary motion-reduce:animate-none" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+      ) : choices.length === 0 ? (
         <p className="text-sm text-quaternary">{t('Nothing to pick.')}</p>
       ) : (
-        <ul className="-mx-2 space-y-0.5">
-          {visible.map((c, i) => {
+        // Fades in once, when its values first come; new counts after a pick update them in place.
+        <ul className="-mx-2 space-y-0.5 animate-in fade-in duration-200 motion-reduce:animate-none">
+          {visible.map((c) => {
             const picked = c.value === value;
             return (
-              <li key={c.value} className="blur-in" style={{ '--i': i + 2 } as React.CSSProperties}>
+              <li key={c.value}>
                 <button
                   type="button"
                   aria-pressed={picked}

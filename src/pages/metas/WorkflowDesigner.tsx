@@ -9,6 +9,7 @@ import { Section } from '../../components/form';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { palette } from '../../render/palette';
@@ -486,12 +487,13 @@ function StatusEditor({
               </div>
             </div>
           </div>
-          <NativeSelect
+          <MetaLookupField
             label={t("Form on entering")}
+            placeholder={t("None: move straight away")}
             value={formId}
-            onChange={(e) => setFormId(e.target.value)}
+            onChange={setFormId}
             hint={save.fe('meta_id') ?? t("Opened for the record when it moves into this status, e.g. to ask why it was rejected. Saving it completes the move.")}
-            options={[{ label: t("None: move straight away"), value: '' }, ...forms.map((f) => ({ label: f.name, value: String(f.id) }))]}
+            items={metaChoices(forms)}
           />
           <div className="flex items-center justify-between gap-3 border-t border-secondary pt-4">
             {status ? (
@@ -601,12 +603,13 @@ function TransitionEditor({
           <Toggle label={t("People can use it")} hint={t("Off: only drawn in the diagram, as a dashed line.")} isSelected={usable} onChange={setUsable} />
         </Section>
         <Section title={t("Where and how it's drawn")}>
-          <NativeSelect
+          <MetaLookupField
             label={t("Offered in")}
+            placeholder={t("Everywhere")}
             value={source}
-            onChange={(e) => setSource(e.target.value)}
+            onChange={setSource}
             hint={t("The grid this move shows in. Everywhere: every grid run by this workflow.")}
-            options={[{ label: t("Everywhere"), value: '' }, ...grids.map((g) => ({ label: g.name, value: String(g.id) }))]}
+            items={metaChoices(grids)}
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <NativeSelect label={t("Previous in the diagram")} value={prevId} onChange={(e) => setPrevId(e.target.value)} options={[{ label: t("None"), value: '' }, ...others]} />

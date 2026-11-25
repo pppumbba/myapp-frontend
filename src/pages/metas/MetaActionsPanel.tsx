@@ -9,6 +9,7 @@ import { Badge } from '@/components/base/badges/badges';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { NativeSelect } from '@/components/base/select/select-native';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { TextArea } from '@/components/base/textarea/textarea';
 import { Toggle } from '@/components/base/toggle/toggle';
 import { t } from '@/i18n';
@@ -266,38 +267,41 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
             <Section title={t('Connected to')}>
               <div className="grid gap-4 sm:grid-cols-2">
                 {form.action === 'import' ? (
-                  <NativeSelect
+                  <MetaLookupField
                     label={t('Excel import')}
-                    required
+                    isRequired
+                    placeholder={t('Choose an import…')}
                     value={form.form_meta_id}
-                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    onChange={(v) => set('form_meta_id', v)}
                     hint={fe('form_meta_id') ?? (imports.length ? t('Says which columns the file has and where they go.') : t('No Excel import metas yet. Create one on the Metas page.'))}
-                    options={[{ label: t('Choose an import…'), value: '' }, ...imports.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    items={metaChoices(imports)}
                   />
                 ) : form.action === 'stage_query' ? (
-                  <NativeSelect
+                  <MetaLookupField
                     label={t('Stage query')}
-                    required
+                    isRequired
+                    placeholder={t('Choose a stage query…')}
                     value={form.form_meta_id}
-                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    onChange={(v) => set('form_meta_id', v)}
                     hint={fe('form_meta_id') ?? (stageQueries.length ? t('The query this button runs, after a dry-run check.') : t('No stage queries yet. Create one on the Metas page.'))}
-                    options={[{ label: t('Choose a stage query…'), value: '' }, ...stageQueries.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    items={metaChoices(stageQueries)}
                   />
                 ) : (
-                  <NativeSelect
+                  <MetaLookupField
                     label={t('Form')}
-                    required
+                    isRequired
+                    placeholder={t('Choose a form…')}
                     value={form.form_meta_id}
-                    onChange={(e) => set('form_meta_id', e.target.value)}
+                    onChange={(v) => set('form_meta_id', v)}
                     hint={fe('form_meta_id') ?? (form.action === 'delete' ? t('The row is removed from this form’s table.') : t('The form this button opens.'))}
-                    options={[{ label: t('Choose a form…'), value: '' }, ...forms.map((o) => ({ label: o.name, value: String(o.id) }))]}
+                    items={metaChoices(forms)}
                   />
                 )}
                 {form.action !== 'delete' && form.action !== 'import' && (
-                  <NativeSelect
+                  <MetaLookupField
                     label={t('Get (opens with)')}
                     value={form.get_meta_id}
-                    onChange={(e) => set('get_meta_id', e.target.value)}
+                    onChange={(v) => set('get_meta_id', v)}
                     hint={
                       fe('get_meta_id') ??
                       (!gets.length
@@ -308,13 +312,8 @@ export function MetaActionsPanel({ meta, options }: { meta: Meta; options: MetaO
                             ? t('Run once for each picked record; all its rows are merged (a get joining the lines gives a row per line).')
                             : t('Decides the values the form opens with.'))
                     }
-                    options={[
-                      {
-                        label: form.action === 'edit' ? t('The row from the form’s table') : form.action === 'stage_query' ? t('The picked row (by Parameters)') : form.action === 'consolidate' ? t('The picked rows themselves') : t('Nothing (empty form)'),
-                        value: '',
-                      },
-                      ...gets.map((o) => ({ label: o.name, value: String(o.id) })),
-                    ]}
+                    placeholder={form.action === 'edit' ? t('The row from the form’s table') : form.action === 'stage_query' ? t('The picked row (by Parameters)') : form.action === 'consolidate' ? t('The picked rows themselves') : t('Nothing (empty form)')}
+                    items={metaChoices(gets)}
                   />
                 )}
               </div>

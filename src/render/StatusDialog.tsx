@@ -112,7 +112,7 @@ export function StatusDialog({
         </div>
       )}
       {!state ? (
-        !error && <div className="h-40 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
+        !error && <div aria-busy="true" className="h-40 animate-pulse rounded-xl bg-secondary motion-reduce:animate-none" />
       ) : (
         <div className="space-y-5">
           <div className="flex items-center gap-2 text-sm text-tertiary">

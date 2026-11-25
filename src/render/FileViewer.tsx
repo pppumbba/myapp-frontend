@@ -1,9 +1,10 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { memo, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Download01, File06, LinkExternal01, XClose } from '@untitledui/icons';
 import { Dialog, Heading, Modal as AriaModal, ModalOverlay } from 'react-aria-components';
 import { contentApi, fileSize, type FileInfo } from '../lib/contentApi';
 import { readDelimited, readDocx, readPptx, readXlsx, type Block, type Sheet } from '../lib/officePreview';
 import { IconAction } from '../components/ui';
+import { useModalLoaded } from '../components/Modal';
 import { Button } from '@/components/base/buttons/button';
 import { cx } from '@/utils/cx';
 import { t } from '@/i18n';
@@ -59,6 +60,9 @@ function FileViewer({ files, index, onIndex, onClose }: { files: FileInfo[]; ind
   const file = files[index];
   const many = files.length > 1;
   const step = (by: number) => onIndex((index + by + files.length) % files.length);
+  // Hidden until the first file's preview is read, then it grows in with it.
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  const { loaded, waited } = useModalLoaded(body);
 
   // Left and right step through the files, unless typing somewhere.
   useEffect(() => {
@@ -82,6 +86,7 @@ function FileViewer({ files, index, onIndex, onClose }: { files: FileInfo[]; ind
           'fixed inset-0 z-[70] flex items-center justify-center bg-overlay/70 p-2 outline-hidden backdrop-blur-[6px] sm:p-6',
           isEntering && 'duration-200 ease-out animate-in fade-in',
           isExiting && 'duration-150 ease-in animate-out fade-out',
+          !loaded ? 'modal-waiting' : waited && 'modal-reveal',
         )
       }
     >
@@ -106,7 +111,7 @@ function FileViewer({ files, index, onIndex, onClose }: { files: FileInfo[]; ind
             <IconAction icon={Download01} label={t('Download')} onPress={() => void contentApi.download(file)} />
             <IconAction icon={XClose} label={t('Close')} onPress={onClose} />
           </header>
-          <div className="min-h-0 flex-1 overflow-auto bg-secondary">
+          <div ref={setBody} className="min-h-0 flex-1 overflow-auto bg-secondary">
             {/* Keyed on the file, so stepping starts each one fresh. */}
             <Preview key={file.id} file={file} />
           </div>
@@ -173,13 +178,14 @@ const guessSeparator = (text: string) => {
   return (line.match(/;/g)?.length ?? 0) > (line.match(/,/g)?.length ?? 0) ? ';' : ',';
 };
 
-function Preview({ file }: { file: FileInfo }) {
+// Memoized: a big sheet is slow to draw, and the viewer appearing (useModalLoaded) shouldn't draw it again.
+const Preview = memo(function Preview({ file }: { file: FileInfo }) {
   const kind = kindOf(file);
   const { loaded, error } = useLoaded(file, kind);
 
   if (!kind) return <NoPreview file={file} text={t('There is no preview for this kind of file.')} />;
   if (error) return <NoPreview file={file} text={error} />;
-  if (!loaded) return <div className="m-6 h-64 animate-pulse rounded-xl bg-tertiary motion-reduce:animate-none" />;
+  if (!loaded) return <div aria-busy="true" className="m-6 h-64 animate-pulse rounded-xl bg-tertiary motion-reduce:animate-none" />;
 
   switch (loaded.kind) {
     case 'url':
@@ -233,7 +239,7 @@ function Preview({ file }: { file: FileInfo }) {
         </div>
       );
   }
-}
+});
 
 /** A sheet of paper for text and Word files. */
 function Page({ children }: { children: ReactNode }) {

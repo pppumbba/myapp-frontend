@@ -15,6 +15,7 @@ import { Tooltip } from '@/components/base/tooltip/tooltip';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { typeLook } from '../../components/TypePreview';
 import { AutonumberEditor } from './AutonumberEditor';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { parse as parseFormula } from '../../render/formula';
 import { t } from '@/i18n';
 
@@ -568,17 +569,12 @@ export function MetaParamsPanel({ meta, options }: { meta: Meta; options: MetaOp
 
             <Section title={t("Link and display")}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <NativeSelect
+                <MetaLookupField
                   label={t("Refers to")}
                   value={form.ref_meta_id}
-                  onChange={(e) => set('ref_meta_id', e.target.value)}
+                  onChange={(v) => set('ref_meta_id', v)}
                   hint={fe('ref_meta_id') ?? refHint(meta.type?.code)}
-                  options={[
-                    { label: t("Nothing"), value: '' },
-                    ...options
-                      .filter((o) => o.id !== meta.id)
-                      .map((o) => ({ label: `${o.name} (${o.type ?? 'no type'})`, value: String(o.id) })),
-                  ]}
+                  items={metaChoices(options.filter((o) => o.id !== meta.id))}
                 />
                 <Input
                   label={t("Render as")}

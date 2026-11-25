@@ -165,13 +165,86 @@ export interface PublicSite {
   } | null;
 }
 
+/** A release on the Website management pages, with its site (SiteDeskController). */
+export interface DeskRelease {
+  id: number;
+  site: { id: number; name: string };
+  param_id: number | null;
+  path: string | null;
+  note: string | null;
+  publish_at: string;
+  created_at: string | null;
+  publisher: string | null;
+  scheduled: boolean;
+  /** A take-down: the page went off the site. */
+  taken_down: boolean;
+  restored: boolean;
+  /** What the page shows now. */
+  current: boolean;
+}
+
+export interface DeskOverview {
+  sites: number;
+  active: number;
+  pages: number;
+  live_pages: number;
+  domains: number;
+  scheduled: number;
+  views: { days: number; total: number; previous: number };
+  messages_30_days: number;
+  upcoming: DeskRelease[];
+  recent: DeskRelease[];
+  top_sites: { id: number; name: string; views: number }[];
+}
+
+export interface DeskSite {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface DeskMessage {
+  form: { id: number; name: string };
+  sites: string[];
+  record_id: number | null;
+  created_at: string;
+  fields: { label: string; value: string }[];
+}
+
+export interface DeskVisits extends SiteStats {
+  sites: { id: number; name: string; views: number; previous: number }[];
+  pages: { site_id: number; site: string; path: string; views: number }[];
+}
+
+/** Paged lists on the Website management pages. */
+export interface DeskPage<T> {
+  data: T[];
+  total: number;
+  has_more: boolean;
+}
+
+/** Website management: every site at once (backend: SiteDeskController). */
+export const siteDeskApi = {
+  overview: () => api<DeskOverview>('/sites/overview'),
+  releases: (f: { status: 'all' | 'scheduled' | 'history'; site_id?: number; q?: string; page: number }) =>
+    api<DeskPage<DeskRelease> & { counts: { scheduled: number; history: number } }>(
+      `/site-releases?${new URLSearchParams({ status: f.status, page: String(f.page), ...(f.site_id ? { site_id: String(f.site_id) } : {}), ...(f.q ? { q: f.q } : {}) })}`,
+    ),
+  domains: () => api<{ domains: { id: number; host: string; is_primary: boolean; created_at: string | null; site: DeskSite }[]; without: DeskSite[] }>('/site-domains'),
+  messages: (f: { site_id?: number; form_id?: number; page: number }) =>
+    api<DeskPage<DeskMessage> & { forms: { id: number; name: string; sites: string[]; is_public: boolean; dated: boolean }[] }>(
+      `/site-messages?${new URLSearchParams({ page: String(f.page), ...(f.site_id ? { site_id: String(f.site_id) } : {}), ...(f.form_id ? { form_id: String(f.form_id) } : {}) })}`,
+    ),
+  visits: (days: number) => api<DeskVisits>(`/site-visits?days=${days}`),
+};
+
 /** Websites (backend: SiteController, PublicSiteController). */
 export const siteApi = {
   list: () => api<SiteSummary[]>('/sites'),
   create: (name: string) => api<Site>('/sites', { method: 'POST', body: JSON.stringify({ name }) }),
   get: (id: number) => api<Site>(`/sites/${id}`),
-  save: (id: number, input: { name?: string; site?: SiteSettings; domains?: SiteDomain[]; pages?: SitePageInput[] }) =>
-    api<Site>(`/sites/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  save: (id: number, input: { name?: string; site?: SiteSettings; domains?: SiteDomain[]; pages?: SitePageInput[] }) => api<Site>(`/sites/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   check: (id: number, paramId: number) => api<{ issues: SiteIssue[] }>(`/sites/${id}/pages/${paramId}/check`),
   publish: (id: number, paramId: number, input: { publish_at?: string | null; note?: string | null }) =>
     api<SiteRelease>(`/sites/${id}/pages/${paramId}/publish`, { method: 'POST', body: JSON.stringify(input) }),
@@ -194,7 +267,10 @@ export const siteApi = {
  * every host is the app and sites open at /site/{code}.
  */
 export function siteHost(hostname = window.location.hostname): string | null {
-  const configured = (import.meta.env.VITE_APP_HOSTS as string | undefined)?.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const configured = (import.meta.env.VITE_APP_HOSTS as string | undefined)
+    ?.split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
   if (!configured?.length) return null;
   const host = hostname.toLowerCase();
   return configured.includes(host) ? null : host;

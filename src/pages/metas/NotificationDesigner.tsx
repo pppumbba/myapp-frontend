@@ -5,6 +5,7 @@ import { accessApi, type Role, type UserWithRoles } from '../../lib/accessApi';
 import { metaApi, type Meta, type MetaOption, type MetaParam } from '../../lib/metaApi';
 import { workflowApi, type WfmStatus } from '../../lib/workflowApi';
 import { ComboField } from '../../components/ComboField';
+import { MetaLookupField, metaChoices } from './MetaLookupField';
 import { ConfirmDialog } from '../../components/Modal';
 import { Alert, IconAction } from '../../components/ui';
 import { Badge } from '@/components/base/badges/badges';
@@ -181,7 +182,7 @@ export function NotificationDesigner({ meta, options }: { meta: Meta; options: M
     [source],
   );
   const dirty = recipients !== null && JSON.stringify([config, recipients]) !== saved;
-  const metaItems = (types?: string[]) => options.filter((o) => o.id !== meta.id && (!types || types.includes(o.type ?? ''))).map((o) => ({ id: String(o.id), label: types?.length === 1 ? o.name : `${o.name} (${o.type ?? 'no type'})` }));
+  const metaItems = (types?: string[]) => metaChoices(options.filter((o) => o.id !== meta.id && (!types || types.includes(o.type ?? ''))));
 
   const tokens = [
     ...fields.map((f) => ({ token: `{${f.id}}`, label: f.label })),
@@ -251,7 +252,7 @@ export function NotificationDesigner({ meta, options }: { meta: Meta; options: M
           <Panel title={t('When it is sent')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <NativeSelect label={t('Send when')} value={config.event} onChange={(e) => set('event', e.target.value as Event)} options={tLabels(EVENTS)} />
-              <ComboField
+              <MetaLookupField
                 label={config.event === 'status_changed' ? t('Its fields come from') : t('Records of')}
                 placeholder={t('Choose a form or grid…')}
                 items={metaItems(DATA_TYPES)}
@@ -265,7 +266,7 @@ export function NotificationDesigner({ meta, options }: { meta: Meta; options: M
               />
               {config.event === 'status_changed' && (
                 <>
-                  <ComboField label={t('Workflow')} placeholder={t('Choose a workflow…')} items={metaItems(['workflow'])} value={config.workflow_meta_id ? String(config.workflow_meta_id) : ''} onChange={(v) => set('workflow_meta_id', num(v))} />
+                  <MetaLookupField label={t('Workflow')} placeholder={t('Choose a workflow…')} items={metaItems(['workflow'])} value={config.workflow_meta_id ? String(config.workflow_meta_id) : ''} onChange={(v) => set('workflow_meta_id', num(v))} />
                   <NativeSelect
                     label={t('Into status')}
                     value={config.status_id ? String(config.status_id) : ''}
@@ -332,7 +333,7 @@ export function NotificationDesigner({ meta, options }: { meta: Meta; options: M
 
           <Panel title={t('Where it leads')} description={t('Clicking the notification opens this.')}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <ComboField label={t('Opens screen')} placeholder={t('Nothing')} items={metaItems()} value={config.link_meta_id ? String(config.link_meta_id) : ''} onChange={(v) => set('link_meta_id', num(v))} />
+              <MetaLookupField label={t('Opens screen')} placeholder={t('Nothing')} items={metaItems()} value={config.link_meta_id ? String(config.link_meta_id) : ''} onChange={(v) => set('link_meta_id', num(v))} />
               <div className="self-end pb-1.5">
                 <Toggle label={t('On the record')} hint={t('A form or report opens that record; a workflow grid, its status.')} isSelected={config.link_record} isDisabled={!config.link_meta_id} onChange={(v) => set('link_record', v)} />
               </div>

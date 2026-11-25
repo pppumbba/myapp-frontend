@@ -27,6 +27,73 @@
   font-weight: 600;
 }
 
+/*
+ * The inset style: the menu sits on the grey frame, so its items let the frame show, and the
+ * current one is a white raised pill like the screen panel beside it (large screens; the phone
+ * drawer is a white panel and keeps the usual items).
+ */
+@media (min-width: 1024px) {
+  .menu-inset aside nav a,
+  .menu-inset aside nav summary {
+    background-color: transparent;
+  }
+
+  .menu-inset aside nav a:hover,
+  .menu-inset aside nav summary:hover {
+    background-color: color-mix(in srgb, var(--color-bg-primary) 55%, transparent);
+  }
+
+  .menu-inset aside nav a[aria-current="page"] {
+    background-color: var(--color-bg-primary);
+    box-shadow:
+      0 1px 2px rgb(16 24 40 / 0.06),
+      0 0 0 1px var(--color-border-secondary);
+  }
+}
+
+/*
+ * App menus draw the current item as one highlight that springs between items (AppSidebar
+ * SpringList). The items stay see-through, so it shows as it passes behind them and the item it
+ * lands on doesn't mark itself again. The doubled class wins over the item marks above.
+ */
+.spring-marked.spring-marked a:not(:hover),
+.spring-marked.spring-marked summary:not(:hover),
+.spring-marked.spring-marked button:not(:hover) {
+  background-color: transparent;
+}
+
+.spring-marked.spring-marked a[aria-current="page"] {
+  box-shadow: none;
+}
+
+/* The highlight takes the current look of the menu it is in. */
+.spring-mark {
+  background-color: var(--color-bg-secondary);
+}
+
+[data-menu-item] .spring-mark {
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+[data-menu-item="bar"] .spring-mark {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  box-shadow: inset 3px 0 0 var(--color-fg-brand-primary);
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+[data-menu-item="plain"] .spring-mark {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .menu-inset aside .spring-mark {
+    background-color: var(--color-bg-primary);
+    box-shadow:
+      0 1px 2px rgb(16 24 40 / 0.06),
+      0 0 0 1px var(--color-border-secondary);
+  }
+}
+
 /* Glass: the see-through fill comes from --menu-fill; this blurs what is behind it and edges it in light. */
 .menu-glass {
   backdrop-filter: blur(16px) saturate(140%);
